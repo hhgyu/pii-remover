@@ -73,21 +73,18 @@ jobs:
             suffix: ""
             platforms: linux/amd64,linux/arm64
             use-qemu: true
-            cache-hf-weights: true
             require-main-or-tag: false
           - variant: slim
             dockerfile: Dockerfile.slim
             suffix: "-slim"
             platforms: linux/amd64,linux/arm64
             use-qemu: true
-            cache-hf-weights: true
             require-main-or-tag: false
           - variant: gpu
             dockerfile: Dockerfile.gpu
             suffix: "-gpu"
             platforms: linux/amd64
             use-qemu: false
-            cache-hf-weights: false
             require-main-or-tag: true
     uses: ./.github/workflows/reusable-docker-image-build.yml
     with:
@@ -96,6 +93,5 @@ jobs:
       suffix: ${{ matrix.suffix }}
       platforms: ${{ matrix.platforms }}
       use-qemu: ${{ matrix.use-qemu }}
-      cache-hf-weights: ${{ matrix.cache-hf-weights }}
       require-main-or-tag: ${{ matrix.require-main-or-tag }}
       image-name: ${{ github.repository_owner }}/pii-remover-backend

@@ -8,6 +8,12 @@
 #
 # See ADR-0008 for the self-built rationale; ADR-0009 for the tesseract
 # install (Phase 6 image redaction).
+#
+# BuildKit cache mounts (--mount=type=cache) keep pip downloads and the
+# HuggingFace model cache off the final image while letting subsequent
+# builds reuse them — much more effective than the previous host-level
+# actions/cache, which mounted /tmp/hf-cache on the runner but never
+# inside the container.
 
 ARG PYTHON_VERSION=3.11
 ARG OPF_MODEL_ID=openai/privacy-filter
@@ -19,8 +25,7 @@ ARG KNER_MODEL_ID=soddokayo/koelectra-base-klue-ner
 FROM python:${PYTHON_VERSION}-slim AS opf-weights
 
 ARG OPF_MODEL_ID
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HF_HOME=/root/.cache/huggingface \
     TRANSFORMERS_NO_ADVISORY_WARNINGS=1
 
@@ -33,10 +38,12 @@ RUN apt-get update \
 WORKDIR /build
 
 COPY scripts/requirements-opf-builder.txt .
-RUN pip install --upgrade pip \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --upgrade pip \
     && pip install -r requirements-opf-builder.txt
 
-RUN OPF_MODEL_ID="${OPF_MODEL_ID}" python - <<'PY'
+RUN --mount=type=cache,target=/root/.cache/huggingface,sharing=locked \
+    OPF_MODEL_ID="${OPF_MODEL_ID}" python - <<'PY'
 from huggingface_hub import hf_hub_download
 import os
 import shutil
@@ -62,8 +69,7 @@ PY
 FROM python:${PYTHON_VERSION}-slim AS kner-export
 
 ARG KNER_MODEL_ID
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HF_HOME=/root/.cache/huggingface \
     TRANSFORMERS_NO_ADVISORY_WARNINGS=1
 
@@ -76,7 +82,8 @@ RUN apt-get update \
 WORKDIR /build
 
 COPY scripts/requirements-kner-builder.txt .
-RUN pip install --upgrade pip \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --upgrade pip \
     && pip install --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements-kner-builder.txt
 
@@ -85,7 +92,9 @@ RUN pip install --upgrade pip \
 # smaller on disk (109 MB vs 430 MB), 2x faster on CPU, 37% lower process
 # RSS, and accuracy went UP (PS F1 0.818 vs 0.750). Builder discards
 # the FP32 staging dir; runtime only carries /models/klue-ner-int8.
-RUN python -c "\
+RUN --mount=type=cache,target=/root/.cache/huggingface,sharing=locked \
+    --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python -c "\
 from optimum.onnxruntime import ORTModelForTokenClassification, ORTQuantizer; \
 from optimum.onnxruntime.configuration import AutoQuantizationConfig; \
 from transformers import AutoTokenizer; \
@@ -112,7 +121,6 @@ ARG OPF_MODEL_ID
 ARG KNER_MODEL_ID
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HF_HOME=/home/app/.cache/huggingface \
     OPF_DEVICE=cpu \
@@ -136,7 +144,8 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --upgrade pip \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --upgrade pip \
     && pip install -r requirements.txt
 
 COPY --from=opf-weights --chown=app:app /models/opf-int8 /models/opf-int8

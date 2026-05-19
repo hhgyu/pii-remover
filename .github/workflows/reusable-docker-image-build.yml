@@ -25,11 +25,6 @@ on:
         required: false
         default: false
         description: "Set up QEMU for cross-platform builds (needed for arm64 on amd64 runners)."
-      cache-hf-weights:
-        type: boolean
-        required: false
-        default: false
-        description: "Cache the HuggingFace model weights directory across runs."
       require-main-or-tag:
         type: boolean
         required: false
@@ -78,15 +73,6 @@ jobs:
           registry: ${{ inputs.registry }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache HuggingFace model weights
-        if: inputs.cache-hf-weights
-        uses: actions/cache@v5
-        with:
-          path: /tmp/hf-cache
-          key: hf-cache-${{ inputs.variant }}-openai-privacy-filter-v1
-          restore-keys: |
-            hf-cache-${{ inputs.variant }}-
 
       - name: Compute image metadata
         id: meta
