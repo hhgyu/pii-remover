@@ -11,8 +11,8 @@ doesn't pay the model-load cost.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI
 
@@ -52,14 +52,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     try:
         runner.load()
-    except Exception:  # noqa: BLE001 - intentional broad catch
+    except Exception:
         # Surface as model_loaded=false in /health rather than crashing the
         # process so docker healthcheck/restart policy can react.
         log.exception("OPF model load failed; /health will report not-loaded")
     if kner_settings.preload:
         try:
             kner_runner.load()
-        except Exception:  # noqa: BLE001 - same fail-soft policy as OPF
+        except Exception:
             log.exception(
                 "Korean NER preload failed; /redact will lazy-load Korean NER"
             )

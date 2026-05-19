@@ -6,7 +6,7 @@ without hitting the network or loading real model weights.
 
 from __future__ import annotations
 
-from server.korean_ner_runner import KoreanNerRunner, KoreanNerSpan
+from server.korean_ner_runner import KoreanNerSpan
 
 
 def test_runner_normalises_bio_prefix() -> None:

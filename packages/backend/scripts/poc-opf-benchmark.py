@@ -296,7 +296,7 @@ def _decode_bioes(
         span["text"] = text[start:end]
         spans.append(span)
 
-    for token_index, (pred_id, (start_raw, end_raw)) in enumerate(zip(pred_ids, offsets)):
+    for token_index, (pred_id, (start_raw, end_raw)) in enumerate(zip(pred_ids, offsets, strict=True)):
         start = int(start_raw)
         end = int(end_raw)
         label = id2label.get(int(pred_id), "O")
@@ -328,10 +328,9 @@ def _decode_bioes(
             cur["text"] = text[int(cur["start"]):end]
             append_span(cur)
             cur = None
-        else:
-            if cur is not None:
-                append_span(cur)
-                cur = None
+        elif cur is not None:
+            append_span(cur)
+            cur = None
 
     if cur is not None:
         append_span(cur)

@@ -21,10 +21,11 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -118,7 +119,9 @@ def _decode_bio(
     cur: dict[str, Any] | None = None
     token_scores = pred_scores.max(axis=-1)
 
-    for token_index, (pred_id, (start_raw, end_raw)) in enumerate(zip(pred_ids, offsets)):
+    for token_index, (pred_id, (start_raw, end_raw)) in enumerate(
+        zip(pred_ids, offsets, strict=True)
+    ):
         start = int(start_raw)
         end = int(end_raw)
         label = id2label.get(int(pred_id), "O")
@@ -141,10 +144,9 @@ def _decode_bio(
             cur["end"] = end
             cur["n"] += 1
             cur["score"] = float(cur["score"]) + float(token_scores[token_index])
-        else:
-            if cur is not None:
-                spans.append(_finalize_span(cur, text))
-                cur = None
+        elif cur is not None:
+            spans.append(_finalize_span(cur, text))
+            cur = None
 
     if cur is not None:
         spans.append(_finalize_span(cur, text))
@@ -358,7 +360,10 @@ class KoreanNerRunner:
             raise FileNotFoundError(config_path)
 
         providers = ["CPUExecutionProvider"]
-        if self._settings.device == "cuda" and "CUDAExecutionProvider" in ort.get_available_providers():
+        if (
+            self._settings.device == "cuda"
+            and "CUDAExecutionProvider" in ort.get_available_providers()
+        ):
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
         self._session = ort.InferenceSession(str(model_path), providers=providers)

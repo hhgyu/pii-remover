@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import pytest
 from fastapi import FastAPI
@@ -39,7 +39,7 @@ _PATTERNS: dict[str, re.Pattern[str]] = {
 class FakeOpfRunner(OpfRunner):
     """A regex-driven OPF stand-in that never touches torch/transformers."""
 
-    def __init__(self) -> None:  # noqa: D401 - simple init
+    def __init__(self) -> None:
         self._loaded = True
 
     @property
@@ -205,7 +205,7 @@ def test_redact_batch_returns_per_input_results(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert len(body["results"]) == len(texts)
-    for result, sample in zip(body["results"], _load_fixtures()):
+    for result, sample in zip(body["results"], _load_fixtures(), strict=True):
         labels_found = {d["label"] for d in result["detections"]}
         if "private_email" in sample["expected_labels"]:
             assert "private_email" in labels_found

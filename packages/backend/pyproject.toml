@@ -68,6 +68,29 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP", "SIM", "PL", "RUF"]
 ignore = ["PLR0913"]
 
+[tool.ruff.lint.per-file-ignores]
+"scripts/**/*.py" = [
+    "PLC0415",
+    "PLR2004",
+    "E501",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+    "F821",
+]
+"tests/**/*.py" = [
+    "PLC0415",
+    "PLR2004",
+    "E501",
+]
+"server/**/*.py" = [
+    "PLC0415",
+    "PLR2004",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

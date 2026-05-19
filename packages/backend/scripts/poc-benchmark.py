@@ -28,6 +28,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from optimum.onnxruntime import ORTModelForTokenClassification
+from transformers import AutoTokenizer, pipeline
+
+try:
+    import psutil
+except ImportError:
+    psutil = None  # type: ignore[assignment]
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
 )
@@ -81,12 +89,9 @@ def _dir_size_mb(p: Path) -> float:
 
 
 def _peak_memory_mb() -> float:
-    try:
-        import psutil
-
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
-    except ImportError:
+    if psutil is None:
         return 0.0
+    return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
 
 
 def _normalise_tag(raw: str) -> str:
@@ -128,9 +133,6 @@ def _run_inference(pipeline: Any, text: str) -> list[dict[str, Any]]:
 
 
 def _build_pipeline(model_dir: Path) -> Any:
-    from optimum.onnxruntime import ORTModelForTokenClassification
-    from transformers import AutoTokenizer, pipeline
-
     tok = AutoTokenizer.from_pretrained(str(model_dir))
     model = ORTModelForTokenClassification.from_pretrained(str(model_dir))
     return pipeline(
