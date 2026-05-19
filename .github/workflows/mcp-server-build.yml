@@ -62,7 +62,7 @@ jobs:
             runner: macos-latest
             artifact: pii-remover-mcp-darwin-arm64
           - target: darwin-x64
-            runner: macos-13
+            runner: macos-15-intel
             artifact: pii-remover-mcp-darwin-x64
           - target: windows-x64
             runner: windows-latest
