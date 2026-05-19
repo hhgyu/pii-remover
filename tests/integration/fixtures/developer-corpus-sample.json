@@ -1,0 +1,315 @@
+{
+  "$comment": "Developer-flavoured English + Korean PII corpus for Phase 1/2 e2e tests. Each `pii` entry MUST be detected as the listed `category`; each `non_pii` entry MUST NOT be flagged (false positive). Mix of code snippets, git output, file paths, free-form text, and Korean PII (RRN/BIZNUM/Phone/Person). Categories follow ADR-0010 (private_email, private_url, card, private_phone, rrn, biz_num, private_person). All Korean RRN / BIZNUM values below are algorithm-generated valid-checksum dummies — NOT real personal data.",
+  "pii": [
+    {
+      "text": "Please email alice.smith@example.com about the meeting tomorrow.",
+      "category": "private_email",
+      "needle": "alice.smith@example.com"
+    },
+    {
+      "text": "Reply to bob+work@corp.io with the report.",
+      "category": "private_email",
+      "needle": "bob+work@corp.io"
+    },
+    {
+      "text": "Test failures reported by qa-team@example.com after the deploy.",
+      "category": "private_email",
+      "needle": "qa-team@example.com"
+    },
+    {
+      "text": "Contact dev.ops@startup.co for the kubeconfig.",
+      "category": "private_email",
+      "needle": "dev.ops@startup.co"
+    },
+    {
+      "text": "Issue assigned to maintainer.foo@github-corp.dev directly.",
+      "category": "private_email",
+      "needle": "maintainer.foo@github-corp.dev"
+    },
+    {
+      "text": "On-call rotation: pager@example.org handles weekends.",
+      "category": "private_email",
+      "needle": "pager@example.org"
+    },
+    {
+      "text": "Open PR review at https://github.com/example/repo/pull/123 please.",
+      "category": "private_url",
+      "needle": "https://github.com/example/repo/pull/123"
+    },
+    {
+      "text": "Docs live at https://api.example.com/v2/docs/index.html now.",
+      "category": "private_url",
+      "needle": "https://api.example.com/v2/docs/index.html"
+    },
+    {
+      "text": "CI link: http://ci.internal.example.org:8080/job/build/42.",
+      "category": "private_url",
+      "needle": "http://ci.internal.example.org:8080/job/build/42"
+    },
+    {
+      "text": "Reference https://stackoverflow.com/questions/12345/how-to-x for context.",
+      "category": "private_url",
+      "needle": "https://stackoverflow.com/questions/12345/how-to-x"
+    },
+    {
+      "text": "Webhook URL https://hooks.slack.com/services/T000/B000/abcdef secret.",
+      "category": "private_url",
+      "needle": "https://hooks.slack.com/services/T000/B000/abcdef"
+    },
+    {
+      "text": "Tracked at https://jira.corp.example.net/browse/PROJ-9001 for now.",
+      "category": "private_url",
+      "needle": "https://jira.corp.example.net/browse/PROJ-9001"
+    },
+    {
+      "text": "Card paid with 4242 4242 4242 4242 in the regression fixture.",
+      "category": "card",
+      "needle": "4242 4242 4242 4242"
+    },
+    {
+      "text": "Sample card 5555-5555-5555-4444 (luhn-valid Mastercard test).",
+      "category": "card",
+      "needle": "5555-5555-5555-4444"
+    },
+    {
+      "text": "Test transaction billed to 4111 1111 1111 1111 last cycle.",
+      "category": "card",
+      "needle": "4111 1111 1111 1111"
+    },
+    {
+      "text": "Call support at (415) 555-0142 for billing escalations.",
+      "category": "private_phone",
+      "needle": "(415) 555-0142"
+    },
+    {
+      "text": "On-call number 555-867-5309 routes to the SRE pager rota.",
+      "category": "private_phone",
+      "needle": "555-867-5309"
+    },
+    {
+      "text": "Customer support hotline: 800-555-0199 for tier-1 tickets.",
+      "category": "private_phone",
+      "needle": "800-555-0199"
+    },
+    {
+      "text": "테스트 케이스: 주민번호 850315-1123457 을 마스킹해야 함.",
+      "category": "rrn",
+      "needle": "850315-1123457"
+    },
+    {
+      "text": "유저 RRN 920401-1234569 가 로그에 새고 있음.",
+      "category": "rrn",
+      "needle": "920401-1234569"
+    },
+    {
+      "text": "DB 더미 데이터: 780622-3123456 (1900년대 남성 가상).",
+      "category": "rrn",
+      "needle": "780622-3123456"
+    },
+    {
+      "text": "QA 시드: 991231-1123450 으로 회원가입 플로우 검증.",
+      "category": "rrn",
+      "needle": "991231-1123450"
+    },
+    {
+      "text": "테스트 fixture rrn 880815-1123456 — 알고리즘 valid.",
+      "category": "rrn",
+      "needle": "880815-1123456"
+    },
+    {
+      "text": "여성 가상 케이스 RRN 850315-2123450 회원 등록.",
+      "category": "rrn",
+      "needle": "850315-2123450"
+    },
+    {
+      "text": "결제 흐름 더미 주민번호 950101-2123458 사용.",
+      "category": "rrn",
+      "needle": "950101-2123458"
+    },
+    {
+      "text": "구 RRN (1900년대 여성) 751120-2876540 처리 검증.",
+      "category": "rrn",
+      "needle": "751120-2876540"
+    },
+    {
+      "text": "2000년대 가상 남성 050301-3111114 등록 시 마스킹.",
+      "category": "rrn",
+      "needle": "050301-3111114"
+    },
+    {
+      "text": "2000년대 가상 여성 100612-4123457 회원 데이터 시드.",
+      "category": "rrn",
+      "needle": "100612-4123457"
+    },
+    {
+      "text": "사업자등록번호 104-81-52702 입금 확인 부탁드립니다.",
+      "category": "biz_num",
+      "needle": "104-81-52702"
+    },
+    {
+      "text": "Vendor 123-45-67891 계산서 발행 요청.",
+      "category": "biz_num",
+      "needle": "123-45-67891"
+    },
+    {
+      "text": "발주처 사업자 220-85-12349 매입 명세서 첨부.",
+      "category": "biz_num",
+      "needle": "220-85-12349"
+    },
+    {
+      "text": "테스트 시드 biz 111-11-11119 — 가상 valid.",
+      "category": "biz_num",
+      "needle": "111-11-11119"
+    },
+    {
+      "text": "QA fixture 사업자 987-65-43215 매출 데이터 시뮬.",
+      "category": "biz_num",
+      "needle": "987-65-43215"
+    },
+    {
+      "text": "연락처 010-1234-5678 로 알림 보내주세요.",
+      "category": "private_phone",
+      "needle": "010-1234-5678"
+    },
+    {
+      "text": "구 SKT 번호 011-9876-5432 도 마스킹 대상.",
+      "category": "private_phone",
+      "needle": "011-9876-5432"
+    },
+    {
+      "text": "구 KT 번호 016-555-1234 (10자리 변형).",
+      "category": "private_phone",
+      "needle": "016-555-1234"
+    },
+    {
+      "text": "구 한솔 번호 018-111-2222 legacy 회원 정보.",
+      "category": "private_phone",
+      "needle": "018-111-2222"
+    },
+    {
+      "text": "구 LGT 번호 019-333-4444 마이그레이션 큐에 있음.",
+      "category": "private_phone",
+      "needle": "019-333-4444"
+    },
+    {
+      "text": "회원 김철수 님께서 결제하셨습니다.",
+      "category": "private_person",
+      "needle": "김철수"
+    },
+    {
+      "text": "관리자 박영희 가 시스템 권한을 요청했습니다.",
+      "category": "private_person",
+      "needle": "박영희"
+    },
+    {
+      "text": "엔지니어 이순신 이 PR을 머지했습니다.",
+      "category": "private_person",
+      "needle": "이순신"
+    },
+    {
+      "text": "장영실 님께 회의록 공유 부탁드립니다.",
+      "category": "private_person",
+      "needle": "장영실"
+    },
+    {
+      "text": "신청자 정약용 의 서류 접수 완료.",
+      "category": "private_person",
+      "needle": "정약용"
+    },
+    {
+      "text": "PM 최민수 가 일정 조율 중입니다.",
+      "category": "private_person",
+      "needle": "최민수"
+    },
+    {
+      "text": "디자이너 윤동주 시안 검토 요청 드립니다.",
+      "category": "private_person",
+      "needle": "윤동주"
+    },
+    {
+      "text": "Reviewer 강감찬 의견을 반영했습니다.",
+      "category": "private_person",
+      "needle": "강감찬"
+    },
+    {
+      "text": "복성 이름 황보영 님 자료 첨부합니다.",
+      "category": "private_person",
+      "needle": "황보영"
+    },
+    {
+      "text": "엔지니어 남궁민수 가 onboarding 완료.",
+      "category": "private_person",
+      "needle": "남궁민수"
+    }
+  ],
+  "non_pii": [
+    {
+      "text": "let user_id = request.user_id; return user_id * 2;",
+      "reason": "code snippet — `user_id` is an identifier, not PII"
+    },
+    {
+      "text": "function getUserById(userId: string) { return repo.find(userId); }",
+      "reason": "TypeScript function with identifier-style names"
+    },
+    {
+      "text": "git diff --stat /home/john/projects/main/src/index.ts",
+      "reason": "file path inside a CLI invocation — system paths"
+    },
+    {
+      "text": "cat /etc/hosts && echo /var/log/syslog already merged here",
+      "reason": "Unix-style paths, no real PII"
+    },
+    {
+      "text": "Run npm install in /Users/jane/work/project/packages/core directory.",
+      "reason": "filesystem path, identifier-shaped substrings"
+    },
+    {
+      "text": "import { getUserProfile } from './services/user-service';",
+      "reason": "import statement with identifier paths"
+    },
+    {
+      "text": "const FOO_BAR_BAZ = process.env.FOO_BAR_BAZ || 'default';",
+      "reason": "constant declaration; no PII"
+    },
+    {
+      "text": "describe('UserController', () => { it('handles 200 responses', () => {}) })",
+      "reason": "test snippet — names like UserController are identifiers"
+    },
+    {
+      "text": "TODO: refactor getUserById and getProfileByUserId into one method",
+      "reason": "todo comment with identifier-shaped names"
+    },
+    {
+      "text": "Build passed in 12.34s on linux-amd64 runner: artifacts uploaded.",
+      "reason": "CI status line with version-shaped numbers"
+    },
+    {
+      "text": "Use ISBN 978-3-16-148410-0 in the test fixture for catalog parsing.",
+      "reason": "ISBN — not a credit-card LUHN match"
+    },
+    {
+      "text": "Tracking number 1Z999AA10123456784 for the package was delivered.",
+      "reason": "UPS tracking — not a phone or card"
+    },
+    {
+      "text": "박물관에 가서 김치 먹고 정말 좋았다.",
+      "reason": "Korean stopwords — 박물관/김치/정말 all share surname-shaped prefix but are common nouns"
+    },
+    {
+      "text": "한국 강남 일대에서 안녕 인사를 했다.",
+      "reason": "Korean stopwords — 한국/강남/안녕 share surname prefixes but are non-PII"
+    },
+    {
+      "text": "회사 이름과 정보를 정리했다.",
+      "reason": "Korean stopwords — 이름/정보/정리 all in stopword list"
+    },
+    {
+      "text": "주민 번호 같은 문자열은 9999-9999999 처럼 임의 패턴은 통과해야 한다.",
+      "reason": "Random 4-7 digit pair — neither valid RRN checksum nor BIZNUM shape"
+    },
+    {
+      "text": "임의 사업자 형태 12-34-56789 (잘못된 자릿수, 3자리로 시작 안 함).",
+      "reason": "BIZNUM regex requires 3-2-5 — 2-2-5 not matched"
+    }
+  ]
+}

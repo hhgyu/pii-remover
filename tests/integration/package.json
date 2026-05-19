@@ -1,0 +1,24 @@
+{
+  "name": "@pii-remover/integration-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Workspace-root integration tests (run with bun test)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@pii-remover/core": "workspace:*",
+    "@pii-remover/opencode-plugin": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "$schema": "Cross-language regex detector parity fixture.",
+  "$invariant": "Python server.regex_pipeline.find_pii_spans and TS LocalRegexBackend MUST produce identical spans for these inputs.",
+  "$offset_units": "Codepoint offsets. All inputs are BMP-only so Python str indices and JS UTF-16 code units coincide.",
+  "samples": [
+    {
+      "name": "plain email",
+      "text": "contact alice@example.com today",
+      "expected": [
+        { "category": "private_email", "text": "alice@example.com", "start": 8, "end": 25 }
+      ]
+    },
+    {
+      "name": "korean mobile phone with dashes",
+      "text": "call me at 010-1234-5678 today",
+      "expected": [
+        { "category": "private_phone", "text": "010-1234-5678", "start": 11, "end": 24 }
+      ]
+    },
+    {
+      "name": "korean phone no dashes",
+      "text": "phone 01012345678 end",
+      "expected": [
+        { "category": "private_phone", "text": "01012345678", "start": 6, "end": 17 }
+      ]
+    },
+    {
+      "name": "valid korean RRN with dash",
+      "text": "id 900101-1023483 next",
+      "expected": [
+        { "category": "rrn", "text": "900101-1023483", "start": 3, "end": 17 }
+      ]
+    },
+    {
+      "name": "valid biz_num with dashes",
+      "text": "biz 124-81-00998 ok",
+      "expected": [
+        { "category": "biz_num", "text": "124-81-00998", "start": 4, "end": 16 }
+      ]
+    },
+    {
+      "name": "valid credit card LUHN 4-group",
+      "text": "card 4111-1111-1111-1111 done",
+      "expected": [
+        { "category": "card", "text": "4111-1111-1111-1111", "start": 5, "end": 24 }
+      ]
+    },
+    {
+      "name": "mixed korean name context with phone and email",
+      "text": "홍길동 010-1234-5678 alice@example.com",
+      "expected": [
+        { "category": "private_phone", "text": "010-1234-5678", "start": 4, "end": 17 },
+        { "category": "private_email", "text": "alice@example.com", "start": 18, "end": 35 }
+      ]
+    },
+    {
+      "name": "two emails in one line",
+      "text": "emails: a@b.com, c@d.io",
+      "expected": [
+        { "category": "private_email", "text": "a@b.com", "start": 8, "end": 15 },
+        { "category": "private_email", "text": "c@d.io", "start": 17, "end": 23 }
+      ]
+    },
+    {
+      "name": "clean text — no detections",
+      "text": "the quick brown fox jumps over the lazy dog",
+      "expected": []
+    },
+    {
+      "name": "invalid RRN checksum — rejected",
+      "text": "fake rrn 900101-1234567 here",
+      "expected": []
+    },
+    {
+      "name": "invalid biz_num checksum — rejected",
+      "text": "fake biz 124-81-00999 here",
+      "expected": []
+    },
+    {
+      "name": "invalid LUHN card — rejected",
+      "text": "fake card 4111-1111-1111-1112 nope",
+      "expected": []
+    },
+    {
+      "name": "non-mobile prefix phone — rejected",
+      "text": "office 02-1234-5678 line",
+      "expected": []
+    },
+    {
+      "name": "wrong-length phone — rejected",
+      "text": "short 010-12-3456 long",
+      "expected": []
+    },
+    {
+      "name": "amex 15-digit LUHN-valid — rejected (strict 16-only)",
+      "text": "amex 378282246310005 here",
+      "expected": []
+    },
+    {
+      "name": "diners 14-digit LUHN-valid — rejected (strict 16-only)",
+      "text": "diners 30569309025904 here",
+      "expected": []
+    },
+    {
+      "name": "16-digit non-4-group layout — rejected (strict 4-4-4-4)",
+      "text": "weird 1234-56-7890-1234-5678 layout",
+      "expected": []
+    },
+    {
+      "name": "card with space separators — accepted",
+      "text": "card 4111 1111 1111 1111 ok",
+      "expected": [
+        { "category": "card", "text": "4111 1111 1111 1111", "start": 5, "end": 24 }
+      ]
+    },
+    {
+      "name": "card no separators 16 digits — accepted",
+      "text": "card 4111111111111111 ok",
+      "expected": [
+        { "category": "card", "text": "4111111111111111", "start": 5, "end": 21 }
+      ]
+    },
+    {
+      "name": "email TLD followed by word char — rejected by \\b",
+      "text": "fail abc@def.co1more end",
+      "expected": []
+    }
+  ]
+}

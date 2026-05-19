@@ -1,0 +1,79 @@
+PII Remover
+Copyright 2026 Hong HakGyu
+
+This product includes software developed at PII Remover
+(https://github.com/hhgyu15/pii-remover).
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+Third-party components
+================================================================================
+
+This product incorporates or interoperates with the following third-party
+components. Each component remains under its own license; the notices below
+are provided for attribution purposes only.
+
+--------------------------------------------------------------------------------
+OpenAI Privacy Filter (English NER model)
+--------------------------------------------------------------------------------
+Used by the detection backend (packages/backend) for English PII NER.
+Source: https://huggingface.co/openai/openai-privacy-filter
+License: Apache-2.0
+Copyright (c) OpenAI
+
+--------------------------------------------------------------------------------
+KLUE NER (Korean NER model)
+--------------------------------------------------------------------------------
+Optionally used by the detection backend (packages/backend) for Korean name
+detection.
+Source: https://github.com/KLUE-benchmark/KLUE
+License: CC-BY-SA-4.0
+Copyright (c) KLUE Benchmark Authors
+
+--------------------------------------------------------------------------------
+Tesseract OCR
+--------------------------------------------------------------------------------
+Used by the vision package (packages/vision) and the detection backend
+(packages/backend) for OCR text extraction.
+Source: https://github.com/tesseract-ocr/tesseract
+License: Apache-2.0
+Copyright (c) Google Inc., HP Inc., and contributors
+
+--------------------------------------------------------------------------------
+Model Context Protocol (MCP) SDK
+--------------------------------------------------------------------------------
+Used by the MCP server package (packages/mcp-server).
+Source: https://github.com/modelcontextprotocol/typescript-sdk
+License: MIT
+Copyright (c) Anthropic, PBC
+
+--------------------------------------------------------------------------------
+Hugging Face Transformers
+--------------------------------------------------------------------------------
+Used by the detection backend (packages/backend) to load and run NER models.
+Source: https://github.com/huggingface/transformers
+License: Apache-2.0
+Copyright (c) The HuggingFace Team
+
+--------------------------------------------------------------------------------
+FastAPI
+--------------------------------------------------------------------------------
+Used by the detection backend (packages/backend) as the HTTP framework.
+Source: https://github.com/tiangolo/fastapi
+License: MIT
+Copyright (c) Sebastián Ramírez
+
+================================================================================
+Korean PII detection algorithms
+================================================================================
+
+The Korean Resident Registration Number (RRN), Business Number, and Credit
+Card (LUHN) checksum algorithms implemented in @pii-remover/core are based on
+publicly documented Korean government / international standards. The
+implementations themselves are part of this project and are licensed under
+Apache-2.0 (see LICENSE).

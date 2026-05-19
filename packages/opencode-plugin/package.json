@@ -1,0 +1,72 @@
+{
+  "name": "@pii-remover/opencode-plugin",
+  "version": "0.0.1",
+  "description": "OpenCode plugin: routes tool input through @pii-remover/core for PII masking (Phase 1: masking only)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./mask": {
+      "bun": "./src/mask.ts",
+      "types": "./dist/mask.d.ts",
+      "default": "./dist/mask.js"
+    },
+    "./restore": {
+      "bun": "./src/restore.ts",
+      "types": "./dist/restore.d.ts",
+      "default": "./dist/restore.js"
+    },
+    "./server": {
+      "bun": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "default": "./dist/server.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/write-dist-package.cjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@pii-remover/core": "workspace:*"
+  },
+  "oc-plugin": [
+    "server"
+  ],
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.14.0"
+  },
+  "peerDependenciesMeta": {
+    "@opencode-ai/plugin": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.14.48",
+    "@types/bun": "^1.1.14",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}

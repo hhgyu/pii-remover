@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pii-remover-backend"
+version = "0.0.1"
+description = "FastAPI HTTP backend wrapping openai/privacy-filter for the pii-remover project (gh0stkey OPF API compatible)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "pii-remover contributors" }]
+keywords = ["pii", "privacy", "redaction", "opf", "fastapi", "huggingface"]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Framework :: FastAPI",
+    "Topic :: Security",
+]
+dependencies = [
+    "fastapi>=0.115,<0.117",
+    "uvicorn[standard]>=0.30,<0.33",
+    "pydantic>=2.7,<3",
+    "transformers>=4.55",
+    "huggingface_hub>=0.24",
+    "onnxruntime>=1.18,<2",
+    "onnx>=1.16,<2",
+    "pytesseract>=0.3.10,<1",
+    "Pillow>=10.0,<12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9",
+    "pytest-asyncio>=0.23,<1",
+    "httpx>=0.27,<1",
+    "ruff>=0.5,<1",
+    "mypy>=1.10,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/pii-remover"
+Documentation = "https://github.com/your-org/pii-remover/blob/main/packages/backend/README.md"
+Source = "https://github.com/your-org/pii-remover"
+Issues = "https://github.com/your-org/pii-remover/issues"
+
+[tool.setuptools]
+packages = ["server", "server.api"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires external binaries (e.g. tesseract). Skipped when missing.",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "PL", "RUF"]
+ignore = ["PLR0913"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true

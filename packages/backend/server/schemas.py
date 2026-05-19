@@ -1,0 +1,230 @@
+"""Pydantic v2 request/response schemas for the OPF HTTP API.
+
+Schema shapes intentionally mirror the gh0stkey OPF HTTP API surface so that
+clients can swap between backends (see ADR-0008). Labels follow the OPF
+8-category taxonomy (see ADR-0010), extended with Korean-specific
+categories (``rrn``, ``biz_num``, ``card``) for the Phase 6 image
+redaction endpoint (ADR-0009).
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+#: PII taxonomy returned by ``/redact``: OPF 8 categories (ADR-0010) plus
+#: the Korean regex categories (``rrn``, ``biz_num``, ``card``) supplied by
+#: :mod:`server.regex_pipeline`. ``OpfLabel`` is preserved as a backward-
+#: compat alias; ``PiiLabel`` is the preferred name for new code.
+PiiLabel = Literal[
+    "account_number",
+    "private_address",
+    "private_email",
+    "private_person",
+    "private_phone",
+    "private_url",
+    "private_date",
+    "secret",
+    "rrn",
+    "biz_num",
+    "card",
+]
+
+OpfLabel = PiiLabel
+
+
+class Detection(BaseModel):
+    """A single PII span detected in an input text."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    start: int = Field(..., ge=0, description="Inclusive UTF-16 code unit offset")
+    end: int = Field(..., ge=0, description="Exclusive UTF-16 code unit offset")
+    label: PiiLabel = Field(
+        ...,
+        description=(
+            "PII category. OPF 8 categories (ADR-0010) plus Korean regex "
+            "extensions: rrn, biz_num, card."
+        ),
+    )
+    score: float = Field(..., ge=0.0, le=1.0, description="Aggregate confidence")
+    text: str = Field(..., description="Original PII surface form")
+
+
+class RedactRequest(BaseModel):
+    """Single-text redaction request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(..., description="Free-form text to redact")
+    korean_ner_min_confidence: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Override the server-side Korean NER min_confidence for this "
+            "request. When omitted the server default (KNER_MIN_CONFIDENCE) "
+            "is used."
+        ),
+    )
+
+
+class RedactResponse(BaseModel):
+    """Single-text redaction response body.
+
+    ``redacted_text`` substitutes each detected span with a placeholder of the
+    form ``[OPF:<LABEL>]``. The TypeScript core re-tokenises into the
+    ``__OPF_<CATEGORY>_<INDEX>__`` form (ADR-0002) with a vault index — this
+    server is intentionally stateless and does not track indices.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    detections: list[Detection] = Field(default_factory=list)
+    redacted_text: str = Field(..., description="Text with PII spans masked")
+
+
+class RedactBatchRequest(BaseModel):
+    """Batched redaction request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    texts: list[str] = Field(..., min_length=1)
+    korean_ner_min_confidence: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Override the server-side Korean NER min_confidence for this "
+            "request. When omitted the server default (KNER_MIN_CONFIDENCE) "
+            "is used."
+        ),
+    )
+
+
+class RedactBatchResponse(BaseModel):
+    """Batched redaction response body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    results: list[RedactResponse]
+
+
+class HealthResponse(BaseModel):
+    """Health probe response body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    version: str
+    model: str
+    device: Literal["cpu", "cuda", "mps"]
+    model_loaded: bool = Field(
+        ...,
+        description=(
+            "True once the OPF model weights and tokenizer are loaded in memory."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 / ADR-0009: image redaction schemas
+# ---------------------------------------------------------------------------
+
+#: ``PiiCategory`` is retained as a public alias for the image endpoint; it
+#: shares the 11-category taxonomy with :data:`PiiLabel`.
+PiiCategory = PiiLabel
+
+
+MaskMethod = Literal["fill", "blur", "pixelate"]
+LowConfidencePolicy = Literal["mask", "warn", "block"]
+
+
+class Region(BaseModel):
+    """Pixel-space rectangle."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    left: int = Field(..., ge=0)
+    top: int = Field(..., ge=0)
+    width: int = Field(..., gt=0)
+    height: int = Field(..., gt=0)
+
+
+class ImageDimensions(BaseModel):
+    """Width/height of the input (and redacted output) image, in pixels."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    width: int = Field(..., gt=0)
+    height: int = Field(..., gt=0)
+
+
+class ImageDetection(BaseModel):
+    """A PII span detected in OCR text, with pixel regions for masking.
+
+    A span may cover multiple OCR words on different lines; in that case
+    ``regions`` contains one entry per visual line (bbox union of the
+    line's covered words) so the renderer can draw separate rectangles
+    rather than a single oversized one.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: PiiCategory
+    score: float = Field(..., ge=0.0, le=1.0)
+    text: str
+    regions: list[Region] = Field(..., min_length=1)
+    text_start: int = Field(
+        ..., ge=0, description="Char offset of the span in the joined OCR text."
+    )
+    text_end: int = Field(
+        ..., ge=0, description="Char-exclusive end offset in the joined OCR text."
+    )
+
+
+class ImageRedactRequest(BaseModel):
+    """Request body for ``POST /redact/image``.
+
+    All fields except ``image_b64`` are optional with conservative
+    defaults. The payload is the base64-encoded image bytes (a
+    ``data:image/...;base64,`` URI prefix is also accepted).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    image_b64: str = Field(..., min_length=1)
+    languages: list[str] | None = Field(
+        default=None,
+        description=(
+            "Tesseract language codes (e.g. ['kor','eng']). When None, "
+            "falls back to the server default 'kor+eng'."
+        ),
+    )
+    mask_method: MaskMethod = Field(default="fill")
+    confidence_threshold: float = Field(
+        default=60.0,
+        ge=0.0,
+        le=100.0,
+        description="OCR confidence below which a word is 'low confidence'.",
+    )
+    policy_on_low_confidence: LowConfidencePolicy = Field(default="mask")
+    categories: list[PiiCategory] | None = Field(
+        default=None,
+        description="Restrict detection to these PII categories.",
+    )
+
+
+class ImageRedactResponse(BaseModel):
+    """Response body for ``POST /redact/image``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    redacted_image_b64: str
+    detections: list[ImageDetection] = Field(default_factory=list)
+    low_confidence_regions: list[Region] = Field(default_factory=list)
+    ocr_text: str | None = None
+    image_dimensions: ImageDimensions
+    processing_time_ms: float = Field(..., ge=0.0)
+    warnings: list[str] = Field(default_factory=list)

@@ -1,0 +1,33 @@
+services:
+  opf:
+    image: ghcr.io/your-org/pii-remover-backend:latest-gpu
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    container_name: pii-remover-backend-gpu
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      OPF_DEVICE: cuda
+      OPF_HOST: 0.0.0.0
+      OPF_PORT: "8000"
+      OPF_LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    volumes:
+      - opf_hf_cache_gpu:/home/app/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  opf_hf_cache_gpu:

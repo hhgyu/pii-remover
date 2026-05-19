@@ -1,0 +1,64 @@
+{
+  "name": "@pii-remover/mcp-server",
+  "version": "0.0.1",
+  "description": "MCP (Model Context Protocol) server exposing @pii-remover/core sanitize/desanitize/analyze tools",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "pii-remover-mcp": "./bin/pii-remover-mcp.js"
+  },
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "bun": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./vault-pool": {
+      "bun": "./src/vault-pool.ts",
+      "types": "./dist/vault-pool.d.ts",
+      "default": "./dist/vault-pool.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "bin",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "compile:linux-x64": "bun build --compile --target=bun-linux-x64 --outfile=compiled/pii-remover-mcp-linux-x64 bin/pii-remover-mcp.ts",
+    "compile:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 --outfile=compiled/pii-remover-mcp-darwin-arm64 bin/pii-remover-mcp.ts",
+    "compile:darwin-x64": "bun build --compile --target=bun-darwin-x64 --outfile=compiled/pii-remover-mcp-darwin-x64 bin/pii-remover-mcp.ts",
+    "compile:windows-x64": "bun build --compile --target=bun-windows-x64 --outfile=compiled/pii-remover-mcp-windows-x64.exe bin/pii-remover-mcp.ts"
+  },
+  "dependencies": {
+    "@pii-remover/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}

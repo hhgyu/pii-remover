@@ -1,0 +1,134 @@
+name: npm-publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "If true, run npm publish --dry-run instead of publishing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: typecheck & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify version sync
+        run: |
+          node scripts/sync-versions.mjs
+          if ! git diff --quiet; then
+            echo "::error::Versions are out of sync. Run 'bun run sync-versions' locally and commit."
+            git diff
+            exit 1
+          fi
+
+      - name: Verify tag matches root version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match package.json version '$PKG_VERSION'"
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test
+
+  publish:
+    name: publish to npm
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Node (for npm CLI + provenance)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build (core + plugins)
+        run: bun run build
+
+      - name: Publish in dependency order
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          # NPM_TOKEN is intentionally unset. npm CLI v11.5+ uses GitHub
+          # Actions OIDC (id-token: write) to exchange a token with npm
+          # when a Trusted Publisher is configured for the package.
+          # See: https://docs.npmjs.com/cli/v11/commands/npm-publish
+        run: |
+          set -e
+          # Dependency order:
+          #   1) core (base, no internal deps)
+          #   2) cli / proxy / opencode-plugin / vision / mcp-server (all depend on core only)
+          packages=(
+            "packages/core"
+            "packages/cli"
+            "packages/proxy"
+            "packages/opencode-plugin"
+            "packages/vision"
+            "packages/mcp-server"
+          )
+
+          flag=""
+          if [ "$DRY_RUN" = "true" ]; then
+            flag="--dry-run"
+          fi
+
+          for pkg in "${packages[@]}"; do
+            name="$(node -p "require('./$pkg/package.json').name")"
+            version="$(node -p "require('./$pkg/package.json').version")"
+            echo "::group::Publishing $name@$version"
+            # Skip if this exact version already exists on the registry.
+            if npm view "$name@$version" version > /dev/null 2>&1; then
+              echo "Skipping $name@$version (already published)"
+              echo "::endgroup::"
+              continue
+            fi
+            # NOTE: bun publish does NOT support npm OIDC Trusted Publisher
+            # as of Bun 1.3.x (oven-sh/bun#22423, PR #29374 / #30522 open).
+            # We use npm publish here, which natively supports OIDC token
+            # exchange via id-token: write permission above. --provenance
+            # is implicit from publishConfig.provenance:true in package.json,
+            # but we pass it explicitly for clarity.
+            (cd "$pkg" && npm publish --provenance --access public $flag)
+            echo "::endgroup::"
+          done

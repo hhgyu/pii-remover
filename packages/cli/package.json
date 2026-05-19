@@ -1,0 +1,56 @@
+{
+  "name": "@pii-remover/cli",
+  "version": "0.0.1",
+  "description": "PII Remover CLI — UserPromptSubmit hook installer + detect/health utilities for Claude Code, OpenCode, and OpenAI Codex CLI. Detection + fail-closed gate; actual masking is delegated to @pii-remover/proxy.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "bin",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "bin": {
+    "pii-remover": "./bin/pii-remover.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "compile:linux-x64": "bun build --compile --target=bun-linux-x64 ./bin/pii-remover.ts --outfile=compiled/pii-remover-linux-x64",
+    "compile:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 ./bin/pii-remover.ts --outfile=compiled/pii-remover-darwin-arm64",
+    "compile:darwin-x64": "bun build --compile --target=bun-darwin-x64 ./bin/pii-remover.ts --outfile=compiled/pii-remover-darwin-x64",
+    "compile:windows-x64": "bun build --compile --target=bun-windows-x64 ./bin/pii-remover.ts --outfile=compiled/pii-remover-windows-x64.exe"
+  },
+  "dependencies": {
+    "@inquirer/checkbox": "^5.1.5",
+    "@pii-remover/core": "workspace:*"
+  },
+  "optionalDependencies": {
+    "@pii-remover/opencode-plugin": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}

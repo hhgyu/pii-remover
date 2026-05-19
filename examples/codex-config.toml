@@ -1,0 +1,26 @@
+# Example ~/.codex/config.toml for use with @pii-remover/cli.
+#
+# Generated style (closely matches what `pii-remover install --target codex
+# --proxy-url http://localhost:8765/codex/v1` would produce). Adapt to your
+# environment before use.
+#
+# See:
+#   - docs/ADR/0013-codex-hook-protocol.md
+#   - docs/ADR/0014-codex-proxy-routing.md
+
+# Route Codex Responses API calls through the local PII Remover proxy.
+# Codex has no env-var override for the base URL, so this MUST be set in
+# config.toml (not as an environment variable).
+openai_base_url = "http://localhost:8765/codex/v1"
+
+# Optional: pick a model.
+# model = "o1"
+
+# UserPromptSubmit hook — detects PII before Codex contacts the upstream
+# API and (depending on proxy availability) either blocks or warns. Actual
+# masking happens at the proxy. See ADR-0013.
+[[hooks.UserPromptSubmit]]
+  [[hooks.UserPromptSubmit.hooks]]
+  type = "command"
+  command = "node \"/abs/path/to/packages/cli/bin/pii-remover.js\" hook"
+  timeout = 30

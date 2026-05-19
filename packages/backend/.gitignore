@@ -1,0 +1,5 @@
+
+# Phase 7 INT8 PoC artifacts (developer-local only)
+.poc/
+.poc-venv/
+

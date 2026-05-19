@@ -1,0 +1,17 @@
+{
+  "name": "@pii-remover/shared-types",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Reserved placeholder for cross-package shared types (currently empty; see @pii-remover/core for canonical types)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}

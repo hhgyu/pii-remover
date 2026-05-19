@@ -1,0 +1,12 @@
+# PoC-only deps. Pinned for Python 3.11~3.14 compatibility (verified 2026-05-12).
+# Production Docker (Python 3.11) uses ../requirements.txt — these versions
+# do not affect production OPF runner.
+git+https://github.com/huggingface/transformers.git
+huggingface_hub>=0.24
+optimum[onnxruntime]>=1.27
+onnxruntime>=1.18,<2
+onnx>=1.16,<2
+psutil>=5.9
+sentencepiece>=0.2,<1
+protobuf>=4,<6
+# torch is auto-resolved by transformers (Python 3.14 needs torch>=2.9)
