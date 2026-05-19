@@ -13,7 +13,7 @@
     "build:core": "bun run --filter '@pii-remover/core' build",
     "build:plugins": "bun run --filter '@pii-remover/opencode-plugin' build && bun run --filter '@pii-remover/proxy' build && bun run --filter '@pii-remover/cli' build && bun run --filter '@pii-remover/vision' build && bun run --filter '@pii-remover/mcp-server' build",
     "build": "bun run build:core && bun run build:plugins",
-    "typecheck": "bun run --filter '@pii-remover/core' typecheck && bun run --filter '@pii-remover/opencode-plugin' typecheck && bun run --filter '@pii-remover/proxy' typecheck && bun run --filter '@pii-remover/cli' typecheck && bun run --filter '@pii-remover/vision' typecheck && bun run --filter '@pii-remover/mcp-server' typecheck",
+    "typecheck": "bun run build:core && bun run --filter '@pii-remover/core' typecheck && bun run --filter '@pii-remover/opencode-plugin' typecheck && bun run --filter '@pii-remover/proxy' typecheck && bun run --filter '@pii-remover/cli' typecheck && bun run --filter '@pii-remover/vision' typecheck && bun run --filter '@pii-remover/mcp-server' typecheck",
     "test": "bun test",
     "sync-versions": "node scripts/sync-versions.mjs",
     "version": "node scripts/sync-versions.mjs && git add -A"
