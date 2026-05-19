@@ -1,0 +1,62 @@
+name: _bun-checks (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      test-paths:
+        type: string
+        required: false
+        default: ""
+        description: 'Space-separated test paths passed to `bun test`. Empty string means run the full workspace.'
+      verify-versions:
+        type: boolean
+        required: false
+        default: false
+        description: "Run scripts/sync-versions.mjs and fail if it produces changes."
+      verify-tag-version:
+        type: boolean
+        required: false
+        default: false
+        description: "When the ref is a v* tag, fail if the tag does not match root package.json version."
+
+jobs:
+  checks:
+    name: typecheck & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify version sync
+        if: inputs.verify-versions
+        run: |
+          node scripts/sync-versions.mjs
+          if ! git diff --quiet; then
+            echo "::error::Versions are out of sync. Run 'bun run sync-versions' locally and commit."
+            git diff
+            exit 1
+          fi
+
+      - name: Verify tag matches root version
+        if: inputs.verify-tag-version && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match package.json version '$PKG_VERSION'"
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test ${{ inputs.test-paths }}
