@@ -97,6 +97,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=backend-${{ inputs.variant }}
+          cache-from: |
+            type=gha,scope=backend-${{ inputs.variant }}
+            type=gha,scope=backend-cpu
+            type=gha,scope=backend-slim
+            type=gha,scope=backend-gpu
           cache-to: type=gha,scope=backend-${{ inputs.variant }},mode=max
           provenance: false

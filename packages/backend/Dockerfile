@@ -9,11 +9,13 @@
 # See ADR-0008 for the self-built rationale; ADR-0009 for the tesseract
 # install (Phase 6 image redaction).
 #
-# BuildKit cache mounts (--mount=type=cache) keep pip downloads and the
-# HuggingFace model cache off the final image while letting subsequent
-# builds reuse them — much more effective than the previous host-level
-# actions/cache, which mounted /tmp/hf-cache on the runner but never
-# inside the container.
+# uv replaces pip across every stage. uv is 10-100x faster than pip for
+# dependency resolution + download (parallel) and ships as a single static
+# binary, mounted in build-time only via --mount=from so it never ends up
+# in the published image. BuildKit cache mounts on /root/.cache/uv and
+# /root/.cache/huggingface keep pip/HF downloads in build-time cache only
+# (not committed to the image), so re-builds reuse them when source layers
+# are unchanged.
 
 ARG PYTHON_VERSION=3.11
 ARG OPF_MODEL_ID=openai/privacy-filter
@@ -25,7 +27,8 @@ ARG KNER_MODEL_ID=soddokayo/koelectra-base-klue-ner
 FROM python:${PYTHON_VERSION}-slim AS opf-weights
 
 ARG OPF_MODEL_ID
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+ENV UV_SYSTEM_PYTHON=1 \
+    UV_LINK_MODE=copy \
     HF_HOME=/root/.cache/huggingface \
     TRANSFORMERS_NO_ADVISORY_WARNINGS=1
 
@@ -38,9 +41,9 @@ RUN apt-get update \
 WORKDIR /build
 
 COPY scripts/requirements-opf-builder.txt .
-RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
-    pip install --upgrade pip \
-    && pip install -r requirements-opf-builder.txt
+RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv pip install -r requirements-opf-builder.txt
 
 RUN --mount=type=cache,target=/root/.cache/huggingface,sharing=locked \
     OPF_MODEL_ID="${OPF_MODEL_ID}" python - <<'PY'
@@ -69,7 +72,8 @@ PY
 FROM python:${PYTHON_VERSION}-slim AS kner-export
 
 ARG KNER_MODEL_ID
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+ENV UV_SYSTEM_PYTHON=1 \
+    UV_LINK_MODE=copy \
     HF_HOME=/root/.cache/huggingface \
     TRANSFORMERS_NO_ADVISORY_WARNINGS=1
 
@@ -82,9 +86,9 @@ RUN apt-get update \
 WORKDIR /build
 
 COPY scripts/requirements-kner-builder.txt .
-RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
-    pip install --upgrade pip \
-    && pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv pip install --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements-kner-builder.txt
 
 # Pre-bake Korean NER as INT8 ONNX (Phase 7 PoC verdict C — see
@@ -93,7 +97,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
 # RSS, and accuracy went UP (PS F1 0.818 vs 0.750). Builder discards
 # the FP32 staging dir; runtime only carries /models/klue-ner-int8.
 RUN --mount=type=cache,target=/root/.cache/huggingface,sharing=locked \
-    --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     python -c "\
 from optimum.onnxruntime import ORTModelForTokenClassification, ORTQuantizer; \
 from optimum.onnxruntime.configuration import AutoQuantizationConfig; \
@@ -121,7 +125,8 @@ ARG OPF_MODEL_ID
 ARG KNER_MODEL_ID
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_SYSTEM_PYTHON=1 \
+    UV_LINK_MODE=copy \
     HF_HOME=/home/app/.cache/huggingface \
     OPF_DEVICE=cpu \
     OPF_HOST=0.0.0.0 \
@@ -144,9 +149,9 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
-    pip install --upgrade pip \
-    && pip install -r requirements.txt
+RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv pip install -r requirements.txt
 
 COPY --from=opf-weights --chown=app:app /models/opf-int8 /models/opf-int8
 
