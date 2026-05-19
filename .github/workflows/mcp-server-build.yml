@@ -92,7 +92,7 @@ jobs:
           name: ${{ matrix.artifact }}
           path: packages/mcp-server/compiled/${{ matrix.artifact }}
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   release:
     name: attach to release
