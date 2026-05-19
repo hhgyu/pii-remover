@@ -172,7 +172,7 @@ def _is_allowed_transition(prev_label: str, next_label: str) -> bool:
 def _softmax(logits: np.ndarray) -> np.ndarray:
     shifted = logits - logits.max(axis=-1, keepdims=True)
     exp = np.exp(shifted)
-    return exp / exp.sum(axis=-1, keepdims=True)
+    return exp / exp.sum(axis=-1, keepdims=True)  # type: ignore[no-any-return]
 
 
 def _build_transition_matrix(
@@ -215,7 +215,7 @@ def _viterbi_decode(
     final_scores = dp[-1].copy()
     final_scores[~valid_end] = _NEG_INF
     if np.all(final_scores <= _NEG_INF / 2):
-        return logits.argmax(axis=-1).astype(np.int64)
+        return logits.argmax(axis=-1).astype(np.int64)  # type: ignore[no-any-return]
 
     path = np.zeros(scores.shape[0], dtype=np.int64)
     path[-1] = int(final_scores.argmax())
@@ -421,7 +421,7 @@ class OpfRunner:
         return self._download_onnx_variant(variant)
 
     def _download_onnx_variant(self, variant: str) -> Path:
-        from huggingface_hub import hf_hub_download  # type: ignore[import-not-found]
+        from huggingface_hub import hf_hub_download
 
         cache_root = Path(
             self._settings.hf_cache_dir
@@ -444,8 +444,8 @@ class OpfRunner:
         return target
 
     def _load_onnx_variant(self, model_dir: Path, variant: str) -> None:
-        import onnxruntime as ort  # type: ignore[import-not-found]
-        from transformers import PreTrainedTokenizerFast  # type: ignore[import-not-found]
+        import onnxruntime as ort
+        from transformers import PreTrainedTokenizerFast
 
         model_path = model_dir / _MODEL_FILENAME_BY_VARIANT[variant]
         tokenizer_path = model_dir / "tokenizer.json"
@@ -465,7 +465,9 @@ class OpfRunner:
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
         self._session = ort.InferenceSession(str(model_path), providers=providers)
-        self._tokenizer = PreTrainedTokenizerFast(tokenizer_file=str(tokenizer_path))
+        self._tokenizer = PreTrainedTokenizerFast(  # type: ignore[unused-ignore, no-untyped-call]
+            tokenizer_file=str(tokenizer_path)
+        )
         self._id2label = self._load_id2label(config_path)
         self._viterbi_biases = self._load_viterbi_biases(model_dir / "viterbi_calibration.json")
         self._loaded_variant = variant

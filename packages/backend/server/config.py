@@ -46,12 +46,14 @@ OpfVariant = Literal["int8", "fp32"]
 
 def _env_str(name: str, default: str) -> str:
     value = os.environ.get(name)
-    return value if value not in (None, "") else default
+    if value is None or value == "":
+        return default
+    return value
 
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
-    if raw in (None, ""):
+    if raw is None or raw == "":
         return default
     try:
         return int(raw)
@@ -119,7 +121,7 @@ def get_settings() -> Settings:
 
 def _env_float(name: str, default: float) -> float:
     raw = os.environ.get(name)
-    if raw in (None, ""):
+    if raw is None or raw == "":
         return default
     try:
         return float(raw)
@@ -131,7 +133,7 @@ def _env_float(name: str, default: float) -> float:
 
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.environ.get(name)
-    if raw in (None, ""):
+    if raw is None or raw == "":
         return default
     return raw.strip().lower() in ("1", "true", "yes", "on")
 

@@ -87,7 +87,7 @@ def _normalise_tag(raw: str) -> str:
 def _softmax(logits: np.ndarray) -> np.ndarray:
     shifted = logits - logits.max(axis=-1, keepdims=True)
     exp = np.exp(shifted)
-    return exp / exp.sum(axis=-1, keepdims=True)
+    return exp / exp.sum(axis=-1, keepdims=True)  # type: ignore[no-any-return]
 
 
 def _label_parts(label: str) -> tuple[str, str | None]:
@@ -315,7 +315,7 @@ class KoreanNerRunner:
         return self._download_model()
 
     def _download_model(self) -> Path:
-        from huggingface_hub import hf_hub_download  # type: ignore[import-not-found]
+        from huggingface_hub import hf_hub_download
 
         cache_root = Path(
             self._settings.hf_cache_dir
@@ -343,8 +343,8 @@ class KoreanNerRunner:
         return target
 
     def _load_onnx(self, model_dir: Path) -> None:
-        import onnxruntime as ort  # type: ignore[import-not-found]
-        from transformers import PreTrainedTokenizerFast  # type: ignore[import-not-found]
+        import onnxruntime as ort
+        from transformers import PreTrainedTokenizerFast
 
         model_path = model_dir / _KLUE_ONNX_FILENAME
         if not model_path.is_file():
@@ -367,7 +367,9 @@ class KoreanNerRunner:
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
         self._session = ort.InferenceSession(str(model_path), providers=providers)
-        self._tokenizer = PreTrainedTokenizerFast(tokenizer_file=str(tokenizer_path))
+        self._tokenizer = PreTrainedTokenizerFast(  # type: ignore[unused-ignore, no-untyped-call]
+            tokenizer_file=str(tokenizer_path)
+        )
         self._id2label = self._load_id2label(config_path)
 
     @staticmethod
