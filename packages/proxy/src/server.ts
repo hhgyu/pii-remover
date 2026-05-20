@@ -3,7 +3,7 @@ import type {
   PIIRemoverInitOptions,
   PiiRemoverConfig,
 } from "@pii-remover/core";
-import { AuditEmitter } from "@pii-remover/core";
+import { AuditEmitter, maybeAutoStartBackend } from "@pii-remover/core";
 
 import {
   DEFAULT_PROXY_BIND_HOST,
@@ -81,6 +81,17 @@ export async function startProxy(
     upstream: opts.upstream ?? {},
   });
   const fetchImpl: FetchLike = opts.fetch_impl ?? fetch;
+
+  if (opts.config?.backend.auto_start === true) {
+    await maybeAutoStartBackend({
+      enabled: true,
+      endpoint: opts.config.backend.endpoint,
+      composeFile: opts.config.backend.compose_file ?? "cpu",
+      startTimeoutMs: opts.config.backend.start_timeout_ms ?? 60000,
+      bypassEnv: opts.config.bypass_env,
+      warn,
+    });
+  }
 
   const sessionPoolOpts: Parameters<typeof buildSessionPool>[0] = { warn };
   if (opts.config) sessionPoolOpts.config = opts.config;

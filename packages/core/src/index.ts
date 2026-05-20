@@ -62,6 +62,12 @@ export type {
   OnLocalFailure,
 } from "./backend/tiered-strategy.js";
 export {
+  maybeAutoStartBackend,
+  deriveHealthUrl,
+  defaultComposePathResolver,
+} from "./backend/auto-start.js";
+export type { AutoStartOptions } from "./backend/auto-start.js";
+export {
   buildFetchTlsExtension,
   buildPinningCheckServerIdentity,
   fingerprintMatches,

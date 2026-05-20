@@ -31,6 +31,7 @@
 | 0016 | [MCP Server 노출 — `@pii-remover/mcp-server`](./0016-mcp-server-package.md) | Accepted | 2026-05-19 |
 | 0017 | [Personal Data Library — 사용자 정의 PII 사전 등록](./0017-personal-data-library.md) | Accepted | 2026-05-19 |
 | 0018 | [Synthetic Substitution 모드 — 토큰 대신 그럴듯한 가짜 값](./0018-synthetic-substitution.md) | Accepted | 2026-05-19 |
+| 0019 | [Backend auto-start (opt-in) + idle model unload (default-on)](./0019-backend-auto-start-and-idle-unload.md) | Accepted | 2026-05-20 |
 
 ## ADR 카테고리별 그룹
 

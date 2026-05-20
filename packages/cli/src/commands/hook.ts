@@ -1,4 +1,10 @@
-import { PIIRemover, type PIIRemoverInitOptions } from "@pii-remover/core";
+import {
+  loadConfig,
+  maybeAutoStartBackend,
+  PIIRemover,
+  type PiiRemoverConfig,
+  type PIIRemoverInitOptions,
+} from "@pii-remover/core";
 
 import {
   HookProtocolError,
@@ -15,6 +21,8 @@ export interface HookCommandIo {
   stderr: (s: string) => void;
   env?: NodeJS.ProcessEnv;
   initPiiRemover?: (opts: PIIRemoverInitOptions) => Promise<PIIRemover>;
+  loadConfigFn?: (opts: { env: NodeJS.ProcessEnv }) => Promise<PiiRemoverConfig>;
+  autoStartFn?: typeof maybeAutoStartBackend;
 }
 
 export interface HookCommandResult {
@@ -56,9 +64,39 @@ export async function runHookCommand(
 
   const proxy = detectProxy(env as ProxyDetectionEnv);
 
+  let config: PiiRemoverConfig;
+  try {
+    const loadCfg = io.loadConfigFn ?? ((opts) => loadConfig(opts));
+    config = await loadCfg({ env });
+  } catch (err) {
+    return emitBlockError(
+      io,
+      `PII Remover config load failed (fail-closed): ${(err as Error).message}`
+    );
+  }
+
+  if (config.backend.auto_start === true) {
+    try {
+      const autoStart = io.autoStartFn ?? maybeAutoStartBackend;
+      await autoStart({
+        enabled: true,
+        endpoint: config.backend.endpoint,
+        composeFile: config.backend.compose_file ?? "cpu",
+        startTimeoutMs: config.backend.start_timeout_ms ?? 60000,
+        bypassEnv: config.bypass_env,
+        warn: (m) => io.stderr(`${m}\n`),
+      });
+    } catch (err) {
+      return emitBlockError(
+        io,
+        `PII Remover backend auto-start failed (fail-closed): ${(err as Error).message}`
+      );
+    }
+  }
+
   let remover: PIIRemover;
   try {
-    remover = await initFn({ env, warn: (m) => io.stderr(`${m}\n`) });
+    remover = await initFn({ env, config, warn: (m) => io.stderr(`${m}\n`) });
   } catch (err) {
     return emitBlockError(
       io,

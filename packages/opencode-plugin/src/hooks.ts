@@ -2,6 +2,7 @@ import {
   AuditEmitter,
   FailClosedError,
   PIIRemover,
+  maybeAutoStartBackend,
   type BackendClient,
   type MaskResult,
   type PiiRemoverConfig,
@@ -575,6 +576,17 @@ async function buildPluginFromCtx(
 
   const mode = pluginOptions.mode ?? "full";
   trackMode(mode, warn);
+
+  if (config.backend.auto_start === true) {
+    await maybeAutoStartBackend({
+      enabled: true,
+      endpoint: config.backend.endpoint,
+      composeFile: config.backend.compose_file ?? "cpu",
+      startTimeoutMs: config.backend.start_timeout_ms ?? 60000,
+      bypassEnv: config.bypass_env,
+      warn,
+    });
+  }
 
   const remover =
     pluginOptions.remover ??

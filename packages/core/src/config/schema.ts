@@ -33,6 +33,9 @@ export interface BackendConfig {
   tls: BackendTlsConfig;
   timeout_ms: number;
   retries: number;
+  auto_start?: boolean;
+  compose_file?: "cpu" | "gpu" | string;
+  start_timeout_ms?: number;
 }
 
 export interface KoreanHeuristicsConfig {
@@ -126,6 +129,9 @@ export const DEFAULT_CONFIG: PiiRemoverConfig = {
     },
     timeout_ms: 2000,
     retries: 1,
+    auto_start: false,
+    compose_file: "cpu",
+    start_timeout_ms: 60000,
   },
   detection: {
     enabled_categories: [

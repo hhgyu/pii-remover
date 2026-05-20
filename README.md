@@ -124,6 +124,52 @@ Bun + TypeScript workspace monorepo:
 
 Full design in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
+## Backend lifecycle (auto-start + idle unload) — ADR-0019
+
+The detection backend (Docker) can be auto-started by the plugin/proxy/CLI and automatically releases model weights when idle.
+
+### Auto-start (opt-in, fail-closed)
+
+Set in `pii-remover.json` (same shape as the default config — see [`packages/core/src/config/schema.ts`](./packages/core/src/config/schema.ts)):
+```jsonc
+{
+  "backend": {
+    "endpoint": "<your backend /redact URL>",
+    "auto_start": true,            // default: false (opt-in)
+    "compose_file": "cpu",          // "cpu" | "gpu" | "<absolute path>"
+    "start_timeout_ms": 60000       // health-poll deadline after `docker compose up -d`
+  }
+}
+```
+
+When `auto_start: true`, the plugin / `pii-remover-proxy start` / `pii-remover hook`:
+1. Probes `<endpoint>/health` (1.5s timeout) — if already healthy, skips spawn.
+2. Otherwise runs `docker compose -f <resolved-path> up -d`.
+3. Polls `/health` until `model_loaded: true` (or `start_timeout_ms` elapses).
+4. Any failure (Docker missing / daemon down / compose missing / timeout) raises **`FailClosedError`** — consistent with `failure_policy: "closed"`.
+
+### Idle model unload (default-on, 30 min)
+
+Backend-side; `OpfRunner.unload()` + `KoreanNerRunner.unload()` release ONNX session references when `/redact*` has been idle longer than `OPF_IDLE_TIMEOUT_SECONDS`. The container stays up; the next `/redact` request lazy-reloads (~1-3 s cold start).
+
+| Env var | Default | Effect |
+| --- | --- | --- |
+| `OPF_IDLE_TIMEOUT_SECONDS` | `1800` (30 min) | Idle-unload threshold. `0` disables (model permanently resident). |
+| `OPF_IDLE_CHECK_INTERVAL_SECONDS` | `60` | Background monitor polling interval. |
+
+`/health` reports the live state:
+```json
+{
+  "ok": true,
+  "model_loaded": false,
+  "idle_unloaded": true,
+  "idle_timeout_seconds": 1800,
+  "seconds_since_last_request": 1842.7
+}
+```
+
+> **Note**: `/health` requests do NOT count as activity — Docker `HEALTHCHECK` polls don't keep the model loaded. Only `/redact*` requests bump the idle timer.
+
 ## Security Model
 
 - **The hook cannot replace the prompt** (both Claude Code and Codex are source-verified). Masking always happens at the proxy. The hook is detection + fail-closed gate only.
