@@ -346,6 +346,26 @@ class OpfRunner:
                     log.warning("failed to load OPF ONNX variant=%s: %s", variant, exc)
             raise RuntimeError("failed to load OPF ONNX model; " + "; ".join(errors))
 
+    def unload(self) -> None:
+        """Release ONNX session + tokenizer references so the GC can reclaim memory.
+
+        Used by the idle-timeout monitor to free OPF weights when the
+        backend has been inactive. ``detect()`` will lazy-reload on the
+        next request via ``load()``. Idempotent and thread-safe.
+        """
+
+        if self._session is None:
+            return
+        with self._load_lock:
+            if self._session is None:
+                return
+            self._session = None
+            self._tokenizer = None
+            self._id2label = None
+            self._viterbi_biases = None
+            self._loaded_variant = None
+            log.info("OPF ONNX model unloaded (idle)")
+
     def detect(self, text: str) -> list[Detection]:
         """Run OPF on a single text and return Pydantic detections."""
 

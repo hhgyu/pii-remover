@@ -262,6 +262,23 @@ class KoreanNerRunner:
             self._load_onnx(model_dir)
             log.info("Korean NER ONNX model loaded from %s", model_dir)
 
+    def unload(self) -> None:
+        """Release ONNX session + tokenizer references (idle-timeout hook).
+
+        ``detect()`` lazy-reloads on the next request via ``load()``.
+        Idempotent and thread-safe.
+        """
+
+        if self._session is None:
+            return
+        with self._load_lock:
+            if self._session is None:
+                return
+            self._session = None
+            self._tokenizer = None
+            self._id2label = None
+            log.info("Korean NER ONNX model unloaded (idle)")
+
     def detect(
         self, text: str, min_confidence: float | None = None
     ) -> list[KoreanNerSpan]:

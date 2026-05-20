@@ -13,6 +13,8 @@ services:
       OPF_HOST: 0.0.0.0
       OPF_PORT: "8000"
       OPF_LOG_LEVEL: info
+      OPF_IDLE_TIMEOUT_SECONDS: "${OPF_IDLE_TIMEOUT_SECONDS:-1800}"
+      OPF_IDLE_CHECK_INTERVAL_SECONDS: "${OPF_IDLE_CHECK_INTERVAL_SECONDS:-60}"
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
       interval: 30s

@@ -95,6 +95,8 @@ class Settings:
     opf_variant: OpfVariant
     batch_max: int
     log_level: str
+    idle_timeout_seconds: int
+    idle_check_interval_seconds: int
 
 
 @lru_cache(maxsize=1)
@@ -116,6 +118,8 @@ def get_settings() -> Settings:
         opf_variant=_normalise_opf_variant(_env_str("OPF_VARIANT", "int8")),
         batch_max=_env_int("OPF_BATCH_MAX", 32),
         log_level=_env_str("OPF_LOG_LEVEL", "info"),
+        idle_timeout_seconds=_env_int("OPF_IDLE_TIMEOUT_SECONDS", 1800),
+        idle_check_interval_seconds=_env_int("OPF_IDLE_CHECK_INTERVAL_SECONDS", 60),
     )
 
 

@@ -126,6 +126,27 @@ class HealthResponse(BaseModel):
             "True once the OPF model weights and tokenizer are loaded in memory."
         ),
     )
+    idle_unloaded: bool = Field(
+        default=False,
+        description=(
+            "True when the model has been released from memory due to "
+            "inactivity. The next request lazy-reloads the model."
+        ),
+    )
+    idle_timeout_seconds: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Configured idle-unload timeout in seconds. 0 means disabled."
+        ),
+    )
+    seconds_since_last_request: float | None = Field(
+        default=None,
+        description=(
+            "Wall-clock seconds since the last successful /redact request, "
+            "or null if no request has been served yet."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

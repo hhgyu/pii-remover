@@ -9,8 +9,10 @@ and HTTP plumbing.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -21,6 +23,7 @@ from fastapi.testclient import TestClient
 from server import __version__
 from server.api import health as health_api
 from server.api import redact as redact_api
+from server.main import _idle_unload_monitor, _track_redact_activity
 from server.opf_runner import OpfRunner, _mask_text
 from server.schemas import Detection, RedactResponse
 
@@ -256,3 +259,184 @@ def test_detection_schema_round_trip() -> None:
     dumped = response.model_dump()
     assert dumped["detections"][0]["label"] == "private_person"
     assert dumped["redacted_text"] == "[OPF:PRIVATE_PERSON]"
+
+
+# --- Idle-unload monitor + activity tracking ----------------------------------
+
+
+class UnloadableFakeOpfRunner(FakeOpfRunner):
+    """Fake runner that supports unload/load lifecycle for idle tests."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._fake_loaded = True
+        self.unload_calls = 0
+        self.load_calls = 0
+
+    @property
+    def is_loaded(self) -> bool:  # type: ignore[override]
+        return self._fake_loaded
+
+    def load(self) -> None:  # type: ignore[override]
+        self.load_calls += 1
+        self._fake_loaded = True
+
+    def unload(self) -> None:  # type: ignore[override]
+        self.unload_calls += 1
+        self._fake_loaded = False
+
+
+def test_unloadable_runner_unload_is_idempotent() -> None:
+    r = UnloadableFakeOpfRunner()
+    assert r.is_loaded is True
+    r.unload()
+    assert r.is_loaded is False
+    assert r.unload_calls == 1
+    r.unload()
+    assert r.unload_calls == 2
+    assert r.is_loaded is False
+
+
+def test_unloadable_runner_lazy_reload_after_unload() -> None:
+    r = UnloadableFakeOpfRunner()
+    r.unload()
+    assert r.is_loaded is False
+    r.load()
+    assert r.is_loaded is True
+    assert r.load_calls == 1
+
+
+def test_health_reports_idle_unloaded_flag() -> None:
+    app = FastAPI()
+    app.include_router(health_api.router)
+    runner = UnloadableFakeOpfRunner()
+    app.state.opf_runner = runner
+    app.state.last_request_at = time.monotonic() - 600
+    app.state.idle_unloaded = True
+    runner.unload()
+    with TestClient(app) as c:
+        body = c.get("/health").json()
+        assert body["model_loaded"] is False
+        assert body["idle_unloaded"] is True
+        assert body["seconds_since_last_request"] is not None
+        assert body["seconds_since_last_request"] >= 0
+
+
+def test_health_does_NOT_report_idle_when_model_loaded() -> None:
+    app = FastAPI()
+    app.include_router(health_api.router)
+    runner = UnloadableFakeOpfRunner()
+    app.state.opf_runner = runner
+    app.state.last_request_at = time.monotonic()
+    app.state.idle_unloaded = True
+    with TestClient(app) as c:
+        body = c.get("/health").json()
+        assert body["model_loaded"] is True
+        assert body["idle_unloaded"] is False
+
+
+def test_redact_activity_middleware_stamps_last_request_at() -> None:
+    app = FastAPI()
+    app.middleware("http")(_track_redact_activity)
+    app.include_router(redact_api.router)
+    app.state.opf_runner = FakeOpfRunner()
+    app.state.last_request_at = None
+    app.state.idle_unloaded = True
+
+    with TestClient(app) as c:
+        before = time.monotonic()
+        c.post("/redact", json={"text": "user@example.com"})
+        assert app.state.last_request_at is not None
+        assert app.state.last_request_at >= before
+        assert app.state.idle_unloaded is False
+
+
+def test_health_probe_does_NOT_count_as_activity() -> None:
+    app = FastAPI()
+    app.middleware("http")(_track_redact_activity)
+    app.include_router(health_api.router)
+    app.state.opf_runner = FakeOpfRunner()
+    app.state.last_request_at = None
+    app.state.idle_unloaded = False
+
+    with TestClient(app) as c:
+        c.get("/health")
+        assert app.state.last_request_at is None
+
+
+def test_idle_monitor_disabled_when_timeout_zero(monkeypatch) -> None:
+    from server import config
+
+    monkeypatch.setenv("OPF_IDLE_TIMEOUT_SECONDS", "0")
+    config.get_settings.cache_clear()
+    try:
+        app = FastAPI()
+        app.state.opf_runner = UnloadableFakeOpfRunner()
+        app.state.korean_ner_runner = None
+        app.state.last_request_at = time.monotonic() - 9999
+        asyncio.run(_idle_unload_monitor(app))
+        assert app.state.opf_runner.is_loaded is True
+        assert app.state.opf_runner.unload_calls == 0
+    finally:
+        config.get_settings.cache_clear()
+
+
+def test_idle_monitor_unloads_after_timeout(monkeypatch) -> None:
+    from server import config
+
+    monkeypatch.setenv("OPF_IDLE_TIMEOUT_SECONDS", "1")
+    monkeypatch.setenv("OPF_IDLE_CHECK_INTERVAL_SECONDS", "1")
+    config.get_settings.cache_clear()
+
+    async def runner() -> None:
+        app = FastAPI()
+        opf = UnloadableFakeOpfRunner()
+        app.state.opf_runner = opf
+        app.state.korean_ner_runner = None
+        app.state.last_request_at = time.monotonic() - 10
+        app.state.idle_unloaded = False
+        task = asyncio.create_task(_idle_unload_monitor(app))
+        await asyncio.sleep(1.8)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        assert opf.unload_calls >= 1
+        assert opf.is_loaded is False
+        assert app.state.idle_unloaded is True
+
+    try:
+        asyncio.run(runner())
+    finally:
+        config.get_settings.cache_clear()
+
+
+def test_idle_monitor_does_NOT_unload_when_recently_active(monkeypatch) -> None:
+    from server import config
+
+    monkeypatch.setenv("OPF_IDLE_TIMEOUT_SECONDS", "5")
+    monkeypatch.setenv("OPF_IDLE_CHECK_INTERVAL_SECONDS", "1")
+    config.get_settings.cache_clear()
+
+    async def runner() -> None:
+        app = FastAPI()
+        opf = UnloadableFakeOpfRunner()
+        app.state.opf_runner = opf
+        app.state.korean_ner_runner = None
+        app.state.last_request_at = time.monotonic()
+        app.state.idle_unloaded = False
+        task = asyncio.create_task(_idle_unload_monitor(app))
+        await asyncio.sleep(1.5)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        assert opf.unload_calls == 0
+        assert opf.is_loaded is True
+
+    try:
+        asyncio.run(runner())
+    finally:
+        config.get_settings.cache_clear()

@@ -5,16 +5,20 @@ Run via uvicorn:
     uvicorn server.main:app --host 0.0.0.0 --port 8000
 
 The lifespan loads the OPF model once at startup so the first request
-doesn't pay the model-load cost.
+doesn't pay the model-load cost. A background idle-timeout monitor
+unloads model weights after ``OPF_IDLE_TIMEOUT_SECONDS`` of inactivity
+on ``/redact*`` endpoints; the next request lazy-reloads.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import AsyncIterator
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 
 from . import __version__
 from .api import health as health_api
@@ -25,6 +29,58 @@ from .korean_ner_runner import KoreanNerRunner
 from .opf_runner import OpfRunner
 
 log = logging.getLogger(__name__)
+
+
+async def _idle_unload_monitor(app: FastAPI) -> None:
+    """Background task: unload models when idle > ``idle_timeout_seconds``.
+
+    Polls every ``idle_check_interval_seconds``. Disabled when timeout is 0.
+    Idempotent against already-unloaded runners.
+    """
+
+    settings = get_settings()
+    timeout = max(0, int(settings.idle_timeout_seconds))
+    interval = max(1, int(settings.idle_check_interval_seconds))
+    if timeout <= 0:
+        log.info("idle-unload monitor disabled (OPF_IDLE_TIMEOUT_SECONDS=0)")
+        return
+    log.info(
+        "idle-unload monitor running timeout=%ds interval=%ds", timeout, interval
+    )
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            last = getattr(app.state, "last_request_at", None)
+            if last is None:
+                continue
+            elapsed = time.monotonic() - last
+            if elapsed < timeout:
+                continue
+            opf = getattr(app.state, "opf_runner", None)
+            kner = getattr(app.state, "korean_ner_runner", None)
+            any_unloaded = False
+            if opf is not None and getattr(opf, "is_loaded", False):
+                try:
+                    opf.unload()
+                    any_unloaded = True
+                except Exception:
+                    log.exception("OPF unload failed in idle monitor")
+            if kner is not None and getattr(kner, "is_loaded", False):
+                try:
+                    kner.unload()
+                    any_unloaded = True
+                except Exception:
+                    log.exception("Korean NER unload failed in idle monitor")
+            if any_unloaded:
+                app.state.idle_unloaded = True
+                log.info(
+                    "models unloaded after %.0fs idle (timeout=%ds)",
+                    elapsed,
+                    timeout,
+                )
+    except asyncio.CancelledError:
+        log.info("idle-unload monitor cancelled")
+        raise
 
 
 @asynccontextmanager
@@ -43,6 +99,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     kner_runner = KoreanNerRunner(settings=kner_settings)
     app.state.korean_ner_runner = kner_runner
 
+    app.state.last_request_at = None
+    app.state.idle_unloaded = False
+
     log.info(
         "pii-remover backend %s starting model=%s device=%s kner_model=%s",
         __version__,
@@ -53,8 +112,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         runner.load()
     except Exception:
-        # Surface as model_loaded=false in /health rather than crashing the
-        # process so docker healthcheck/restart policy can react.
         log.exception("OPF model load failed; /health will report not-loaded")
     if kner_settings.preload:
         try:
@@ -63,13 +120,42 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             log.exception(
                 "Korean NER preload failed; /redact will lazy-load Korean NER"
             )
+
+    monitor_task: asyncio.Task[None] | None = None
+    if settings.idle_timeout_seconds > 0:
+        monitor_task = asyncio.create_task(_idle_unload_monitor(app))
+
     try:
         yield
     finally:
+        if monitor_task is not None:
+            monitor_task.cancel()
+            try:
+                await monitor_task
+            except (asyncio.CancelledError, Exception):
+                pass
         app.state.opf_runner = None
         app.state.korean_ner_runner = None
         app.state.ocr_pipeline = None
         app.state.image_masker = None
+
+
+async def _track_redact_activity(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Middleware: stamp ``last_request_at`` for ``/redact*`` endpoints.
+
+    /health probes do NOT count as activity — otherwise Docker healthchecks
+    would keep the model loaded forever.
+    """
+
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/redact"):
+        request.app.state.last_request_at = time.monotonic()
+        if getattr(request.app.state, "idle_unloaded", False):
+            request.app.state.idle_unloaded = False
+    return response
 
 
 def create_app() -> FastAPI:
@@ -87,6 +173,7 @@ def create_app() -> FastAPI:
         ),
         lifespan=lifespan,
     )
+    app.middleware("http")(_track_redact_activity)
     app.include_router(health_api.router)
     app.include_router(redact_api.router)
     app.include_router(redact_image_api.router)
@@ -94,3 +181,12 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+__all__ = [
+    "app",
+    "create_app",
+    "lifespan",
+    "_idle_unload_monitor",
+    "_track_redact_activity",
+]
