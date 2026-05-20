@@ -17,6 +17,8 @@ services:
       OPF_IDLE_CHECK_INTERVAL_SECONDS: "${OPF_IDLE_CHECK_INTERVAL_SECONDS:-60}"
       OPF_BATCH_MAX: "${OPF_BATCH_MAX:-256}"
       OPF_PROFILE: "${OPF_PROFILE:-0}"
+      KNER_PROFILE: "${KNER_PROFILE:-0}"
+      KNER_PRELOAD: "${KNER_PRELOAD:-0}"
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
       interval: 30s

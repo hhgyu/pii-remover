@@ -299,12 +299,17 @@ class KoreanNerRunner:
         assert self._tokenizer is not None
         assert self._id2label is not None
 
+        import os
+        from time import perf_counter
+        profile = os.environ.get("KNER_PROFILE", "0") == "1"
+
         threshold = (
             min_confidence
             if min_confidence is not None
             else self._settings.min_confidence
         )
 
+        t0 = perf_counter() if profile else 0.0
         encoded = self._tokenizer(
             text,
             return_tensors="np",
@@ -314,16 +319,31 @@ class KoreanNerRunner:
         )
         inputs = dict(encoded)
         offsets = np.asarray(inputs.pop("offset_mapping"))[0]
+        t1 = perf_counter() if profile else 0.0
         outputs = self._session.run(None, self._session_inputs(inputs))
+        t2 = perf_counter() if profile else 0.0
         logits = np.asarray(outputs[0])[0]
         pred_ids = logits.argmax(axis=-1)
         pred_scores = _softmax(logits)
-        return _filter_min_confidence(
+        spans = _filter_min_confidence(
             _filter_short_person_spans(
                 _decode_bio(pred_ids, pred_scores, offsets, text, self._id2label),
             ),
             threshold,
         )
+        t3 = perf_counter() if profile else 0.0
+        if profile:
+            log.info(
+                "KNER_PROFILE tokenize=%.2fms inference=%.2fms decode=%.2fms "
+                "total=%.2fms text_len=%d providers=%s",
+                (t1 - t0) * 1000.0,
+                (t2 - t1) * 1000.0,
+                (t3 - t2) * 1000.0,
+                (t3 - t0) * 1000.0,
+                len(text),
+                self._session.get_providers() if self._session else "N/A",
+            )
+        return spans
 
     def _resolve_model_dir(self) -> Path:
         configured = self._settings.onnx_model_path
