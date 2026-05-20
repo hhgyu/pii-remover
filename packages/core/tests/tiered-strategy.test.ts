@@ -243,7 +243,7 @@ describe("TieredStrategy — failure handling", () => {
     expect(remote.capturedText).toHaveLength(0);
   });
 
-  test("remote fails after local succeeds: keeps local-only result + warns", async () => {
+  test("remote (non-critical) fails after local succeeds: keeps local-only result + warns", async () => {
     const warns: string[] = [];
     const local = new LocalRegexBackend();
     const remote = mockRemoteBackend({ fail: true });
@@ -257,6 +257,32 @@ describe("TieredStrategy — failure handling", () => {
     expect(cats).toContain("private_email");
     expect(warns.join("\n")).toMatch(/remote backend.*failed/i);
     expect(r.backend_name).toContain("FAILED");
+  });
+
+  test("remote (critical) fails after local succeeds: throws AggregateError — fail-closed", async () => {
+    const local = new LocalRegexBackend();
+    const remoteCritical: BackendClient = {
+      name: "critical-remote",
+      trust_tier: "self_hosted",
+      critical: true,
+      async detect() {
+        throw new Error("docker down");
+      },
+      async healthCheck() {
+        return { ok: false, latency_ms: 0 };
+      },
+    };
+    const s = new TieredStrategy({
+      local,
+      remote: remoteCritical,
+      warn: () => {},
+    });
+    await expect(
+      s.resolve("contact user@example.com", baseOpts)
+    ).rejects.toBeInstanceOf(AggregateError);
+    await expect(
+      s.resolve("contact user@example.com", baseOpts)
+    ).rejects.toThrow(/critical remote backend.*failed/i);
   });
 
   test("both fail (with on_local_failure=throw): AggregateError", async () => {

@@ -96,6 +96,7 @@ const DEFAULT_BEARER_HEADER = "authorization";
 export class RemoteHttpBackend implements BackendClient {
   readonly name: string;
   readonly trust_tier: TrustTier;
+  readonly critical: boolean = true;
   private readonly baseEndpoint: string;
   private readonly timeout_ms: number;
   private readonly retries: number;

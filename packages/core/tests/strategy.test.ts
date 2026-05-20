@@ -24,11 +24,13 @@ function det(
 function mockBackend(
   name: string,
   detections: Detection[],
-  fail = false
+  fail = false,
+  critical = false
 ): BackendClient {
   return {
     name,
     trust_tier: "local",
+    critical,
     async detect(_t: string, _o: DetectOpts): Promise<DetectionResult> {
       if (fail) throw new Error(`${name} backend down`);
       return { detections: [...detections], backend_name: name, latency_ms: 0 };
@@ -112,6 +114,51 @@ describe("MergeStrategy — multi-backend union", () => {
 
   test("requires at least one backend", () => {
     expect(() => new MergeStrategy([])).toThrow();
+  });
+
+  test("throws AggregateError when a critical backend fails even if non-critical succeeds", async () => {
+    const localOk = mockBackend(
+      "local-regex",
+      [det(0, 5, "private_email", "a@b.c")],
+      false,
+      false
+    );
+    const remoteCriticalDown = mockBackend("opf-http", [], true, true);
+    const strat = new MergeStrategy([localOk, remoteCriticalDown]);
+    await expect(strat.resolve("a@b.c", opts)).rejects.toThrow(AggregateError);
+    await expect(strat.resolve("a@b.c", opts)).rejects.toThrow(
+      /Critical backend\(s\) failed/
+    );
+  });
+
+  test("tolerates non-critical backend failure when critical (or any) succeeds", async () => {
+    const criticalOk = mockBackend(
+      "opf-http",
+      [det(0, 5, "private_email", "a@b.c")],
+      false,
+      true
+    );
+    const localFail = mockBackend("local-regex", [], true, false);
+    const strat = new MergeStrategy([localFail, criticalOk]);
+    const r = await strat.resolve("a@b.c", opts);
+    expect(r.detections).toHaveLength(1);
+  });
+
+  test("backward-compat: undefined critical behaves as non-critical (partial failure tolerated)", async () => {
+    const a: BackendClient = {
+      name: "no-critical-flag",
+      trust_tier: "local",
+      async detect() {
+        throw new Error("a down");
+      },
+      async healthCheck() {
+        return { ok: false, latency_ms: 0 };
+      },
+    };
+    const b = mockBackend("b", [det(0, 3, "private_url", "abc")], false, false);
+    const strat = new MergeStrategy([a, b]);
+    const r = await strat.resolve("abc", opts);
+    expect(r.detections).toHaveLength(1);
   });
 });
 

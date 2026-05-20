@@ -41,7 +41,12 @@ export interface TieredStrategyOptions {
  * the security boundary; tests assert that no PII substring survives.
  *
  * Failure handling:
- *  - Remote fails after local succeeds → return local-only result, warn.
+ *  - Remote fails after local succeeds:
+ *      • `remote.critical === true` (default for HTTP backends) → throw
+ *        `AggregateError`; caller's `failure_policy` (closed / hybrid /
+ *        open) decides what to do. This is the fail-closed contract.
+ *      • `remote.critical` falsy (test mocks, opt-in best-effort remotes)
+ *        → return local-only result and warn.
  *  - Local fails first → `on_local_failure` policy decides.
  *  - Both fail → `AggregateError`.
  */
@@ -92,6 +97,14 @@ export class TieredStrategy implements BackendStrategy {
     }
 
     if (remoteErr) {
+      if (this.remote.critical === true) {
+        throw new AggregateError(
+          [remoteErr],
+          `TieredStrategy: critical remote backend '${this.remote.name}' failed; ` +
+            `refusing to fall back to local-only detections (fail-closed). ` +
+            `reason=${remoteErr.message}`
+        );
+      }
       this.warn(
         `[WARN] TieredStrategy: remote backend '${this.remote.name}' failed; ` +
           `falling back to local-only detections. reason=${remoteErr.message}`

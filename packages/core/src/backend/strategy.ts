@@ -42,19 +42,34 @@ export class MergeStrategy implements BackendStrategy {
       this.backends.map((b) => b.detect(text, opts))
     );
     const errors: Error[] = [];
+    const criticalFailures: { name: string; err: Error }[] = [];
     const results: DetectionResult[] = [];
-    for (const r of settled) {
+    for (let i = 0; i < settled.length; i++) {
+      const r = settled[i]!;
+      const backend = this.backends[i]!;
       if (r.status === "fulfilled") {
         results.push(r.value);
-      } else {
-        errors.push(
-          r.reason instanceof Error ? r.reason : new Error(String(r.reason))
-        );
+        continue;
+      }
+      const err =
+        r.reason instanceof Error ? r.reason : new Error(String(r.reason));
+      errors.push(err);
+      if (backend.critical === true) {
+        criticalFailures.push({ name: backend.name, err });
       }
     }
     if (errors.length === this.backends.length) {
       const summary = errors.map((e) => e.message).join("; ");
       throw new AggregateError(errors, `All backends failed: ${summary}`);
+    }
+    if (criticalFailures.length > 0) {
+      const summary = criticalFailures
+        .map((c) => `${c.name}: ${c.err.message}`)
+        .join("; ");
+      throw new AggregateError(
+        criticalFailures.map((c) => c.err),
+        `Critical backend(s) failed: ${summary}`
+      );
     }
     const all = mergeBackendDetections(results);
     return {

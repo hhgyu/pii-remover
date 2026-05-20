@@ -260,6 +260,64 @@ describe("PIIRemover.mask — multi-backend merge", () => {
   });
 });
 
+describe("PIIRemover.mask — critical backend down + failure_policy (regression)", () => {
+  function criticalRemoteDown(): BackendClient {
+    return {
+      name: "opf-http(simulated-docker)",
+      trust_tier: "local",
+      critical: true,
+      async detect(): Promise<DetectionResult> {
+        throw new Error("fetch failed: ECONNREFUSED 127.0.0.1:8000");
+      },
+      async healthCheck(): Promise<BackendHealth> {
+        return { ok: false, latency_ms: 0 };
+      },
+    };
+  }
+
+  test("Docker down + failure_policy=closed: throws FailClosedError (no silent local-only fallback)", async () => {
+    const pii = await PIIRemover.init({
+      sessionId: "s1",
+      config: mkConfig({ failure_policy: "closed" }),
+      env: {},
+      warn: silentWarn(),
+      backends: [new LocalRegexBackend(), criticalRemoteDown()],
+    });
+    await expect(
+      pii.mask("Alice wrote user@example.com from 1600 Amphitheatre Pkwy")
+    ).rejects.toThrow(FailClosedError);
+    pii.dispose();
+  });
+
+  test("Docker down + failure_policy=hybrid: falls back to local-regex (hybrid contract)", async () => {
+    const pii = await PIIRemover.init({
+      sessionId: "s1",
+      config: mkConfig({ failure_policy: "hybrid" }),
+      env: {},
+      warn: silentWarn(),
+      backends: [new LocalRegexBackend(), criticalRemoteDown()],
+    });
+    const r = await pii.mask("contact user@example.com please");
+    expect(r.bypassed).toBe(false);
+    expect(r.text).toContain("__OPF_EMAIL_1__");
+    pii.dispose();
+  });
+
+  test("Docker down + failure_policy=open: passes through (open contract)", async () => {
+    const pii = await PIIRemover.init({
+      sessionId: "s1",
+      config: mkConfig({ failure_policy: "open" }),
+      env: {},
+      warn: silentWarn(),
+      backends: [new LocalRegexBackend(), criticalRemoteDown()],
+    });
+    const r = await pii.mask("user@example.com");
+    expect(r.text).toBe("user@example.com");
+    expect(r.tokens).toEqual([]);
+    pii.dispose();
+  });
+});
+
 describe("PIIRemover.restore — round trip (Phase 2)", () => {
   test("mask → restore round-trip preserves the original text", async () => {
     const pii = await PIIRemover.init({
