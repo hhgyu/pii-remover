@@ -438,7 +438,8 @@ class OpfRunner:
         t3 = perf_counter() if profile else 0.0
         if profile:
             log.info(
-                "OPF_PROFILE tokenize=%.2fms inference=%.2fms decode=%.2fms total=%.2fms text_len=%d providers=%s",
+                "OPF_PROFILE tokenize=%.2fms inference=%.2fms decode=%.2fms "
+                "total=%.2fms text_len=%d providers=%s",
                 (t1 - t0) * 1000.0,
                 (t2 - t1) * 1000.0,
                 (t3 - t2) * 1000.0,

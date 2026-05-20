@@ -10,6 +10,7 @@ and HTTP plumbing.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
 import time
@@ -398,10 +399,8 @@ def test_idle_monitor_unloads_after_timeout(monkeypatch) -> None:
         task = asyncio.create_task(_idle_unload_monitor(app))
         await asyncio.sleep(1.8)
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
         assert opf.unload_calls >= 1
         assert opf.is_loaded is False
         assert app.state.idle_unloaded is True
@@ -429,10 +428,8 @@ def test_idle_monitor_does_NOT_unload_when_recently_active(monkeypatch) -> None:
         task = asyncio.create_task(_idle_unload_monitor(app))
         await asyncio.sleep(1.5)
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
         assert opf.unload_calls == 0
         assert opf.is_loaded is True
 

@@ -13,6 +13,7 @@ on ``/redact*`` endpoints; the next request lazy-reloads.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -130,10 +131,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         if monitor_task is not None:
             monitor_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await monitor_task
-            except (asyncio.CancelledError, Exception):
-                pass
         app.state.opf_runner = None
         app.state.korean_ner_runner = None
         app.state.ocr_pipeline = None
@@ -184,9 +183,9 @@ app = create_app()
 
 
 __all__ = [
+    "_idle_unload_monitor",
+    "_track_redact_activity",
     "app",
     "create_app",
     "lifespan",
-    "_idle_unload_monitor",
-    "_track_redact_activity",
 ]

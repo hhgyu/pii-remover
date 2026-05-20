@@ -74,7 +74,19 @@ export function createPiiRemoverMcpServer(
     DESANITIZE_BATCH_TOOL_DEFINITION,
     createDesanitizeBatchHandler({ vaultPool, logger }),
   );
-  registerTool(mcp, ANALYZE_TOOL_DEFINITION, createAnalyzeHandler({ logger }));
+  const vp = opts.vaultPoolOptions;
+  const analyzeInitOptions: NonNullable<
+    Parameters<typeof createAnalyzeHandler>[0]["initOptions"]
+  > = {};
+  if (vp?.config !== undefined) analyzeInitOptions.config = vp.config;
+  if (vp?.configPath !== undefined) analyzeInitOptions.configPath = vp.configPath;
+  if (vp?.env !== undefined) analyzeInitOptions.env = vp.env;
+  if (vp?.warn !== undefined) analyzeInitOptions.warn = vp.warn;
+  registerTool(
+    mcp,
+    ANALYZE_TOOL_DEFINITION,
+    createAnalyzeHandler({ logger, initOptions: analyzeInitOptions }),
+  );
 
   vaultPool.startSweeper();
 

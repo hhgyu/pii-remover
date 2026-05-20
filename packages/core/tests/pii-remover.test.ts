@@ -248,7 +248,9 @@ describe("PIIRemover.mask — multi-backend merge", () => {
     ]);
     const pii = await PIIRemover.init({
       sessionId: "s1",
-      config: mkConfig(),
+      config: mkConfig({
+        backend: { ...DEFAULT_CONFIG.backend, endpoint: "" },
+      }),
       env: {},
       warn: silentWarn(),
       backends: [new LocalRegexBackend(), remote],
