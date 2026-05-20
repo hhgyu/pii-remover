@@ -118,7 +118,7 @@ async def redact(request: Request, body: RedactRequest) -> RedactResponse:
     has_korean = bool(_HANGUL_RE.search(body.text))
     kner = _kner_runner(request) if has_korean else None
     person_spans: list[KoreanNerSpan] = []
-    if kner is not None and kner.is_loaded:
+    if kner is not None:
         kner_spans = await asyncio.to_thread(
             kner.detect, body.text, body.korean_ner_min_confidence
         )
@@ -159,7 +159,7 @@ async def redact_batch(
             opf_result = runner.redact(text)
             regex_spans = find_pii_spans(text)
             person_spans: list[KoreanNerSpan] = []
-            if kner and kner.is_loaded and _HANGUL_RE.search(text):
+            if kner and _HANGUL_RE.search(text):
                 person_spans = [s for s in kner.detect(text) if s.klue_tag == "PS"]
             if regex_spans or person_spans:
                 opf_result = _merge_spans_and_mask(

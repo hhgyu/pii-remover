@@ -294,7 +294,14 @@ class KoreanNerRunner:
         if not text or not text.strip():
             return []
         if self._session is None:
-            self.load()
+            try:
+                self.load()
+            except Exception:
+                log.exception(
+                    "Korean NER lazy-load failed; returning empty detections "
+                    "(this call is dropped, future calls will retry)"
+                )
+                return []
         assert self._session is not None
         assert self._tokenizer is not None
         assert self._id2label is not None
