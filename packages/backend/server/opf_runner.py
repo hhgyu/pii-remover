@@ -414,6 +414,11 @@ class OpfRunner:
         assert self._id2label is not None
         assert self._viterbi_biases is not None
 
+        import os
+        from time import perf_counter
+        profile = os.environ.get("OPF_PROFILE", "0") == "1"
+
+        t0 = perf_counter() if profile else 0.0
         encoded = self._tokenizer(
             text,
             return_tensors="np",
@@ -423,11 +428,25 @@ class OpfRunner:
         )
         inputs = dict(encoded)
         offsets = np.asarray(inputs.pop("offset_mapping"))[0]
+        t1 = perf_counter() if profile else 0.0
         outputs = self._session.run(None, self._session_inputs(inputs))
+        t2 = perf_counter() if profile else 0.0
         logits = np.asarray(outputs[0])[0]
         pred_ids = _viterbi_decode(logits, self._id2label, self._viterbi_biases)
         pred_scores = _softmax(logits)
-        return _decode_bioes(pred_ids, pred_scores, offsets, text, self._id2label)
+        spans = _decode_bioes(pred_ids, pred_scores, offsets, text, self._id2label)
+        t3 = perf_counter() if profile else 0.0
+        if profile:
+            log.info(
+                "OPF_PROFILE tokenize=%.2fms inference=%.2fms decode=%.2fms total=%.2fms text_len=%d providers=%s",
+                (t1 - t0) * 1000.0,
+                (t2 - t1) * 1000.0,
+                (t3 - t2) * 1000.0,
+                (t3 - t0) * 1000.0,
+                len(text),
+                self._session.get_providers() if self._session else "N/A",
+            )
+        return spans
 
     def _variant_order(self) -> tuple[str, str]:
         if self._settings.opf_variant == "fp32":

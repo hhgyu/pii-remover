@@ -1,0 +1,9 @@
+fastapi>=0.115,<0.117
+uvicorn[standard]>=0.30,<0.33
+pydantic>=2.7,<3
+transformers>=4.55
+huggingface_hub>=0.24
+pytesseract>=0.3.10,<1
+Pillow>=10.0,<12
+onnxruntime-gpu>=1.18,<2
+onnx>=1.16,<2

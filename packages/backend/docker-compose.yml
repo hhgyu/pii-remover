@@ -16,6 +16,7 @@ services:
       OPF_IDLE_TIMEOUT_SECONDS: "${OPF_IDLE_TIMEOUT_SECONDS:-1800}"
       OPF_IDLE_CHECK_INTERVAL_SECONDS: "${OPF_IDLE_CHECK_INTERVAL_SECONDS:-60}"
       OPF_BATCH_MAX: "${OPF_BATCH_MAX:-256}"
+      OPF_PROFILE: "${OPF_PROFILE:-0}"
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
       interval: 30s

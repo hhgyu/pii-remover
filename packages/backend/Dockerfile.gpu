@@ -15,7 +15,7 @@
 # in the published image. BuildKit cache mounts on /root/.cache/uv and
 # /root/.cache/huggingface keep pip/HF downloads in build-time cache only.
 
-ARG CUDA_IMAGE=nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+ARG CUDA_IMAGE=nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 ARG PYTHON_VERSION=3.11
 ARG OPF_MODEL_ID=openai/privacy-filter
 ARG KNER_MODEL_ID=soddokayo/koelectra-base-klue-ner
@@ -55,13 +55,23 @@ os.makedirs(target, exist_ok=True)
 files = [
     "onnx/model_quantized.onnx",
     "onnx/model_quantized.onnx_data",
+    "onnx/model.onnx",
+    "onnx/model.onnx_data",
+    "onnx/model.onnx_data_1",
+    "onnx/model.onnx_data_2",
     "tokenizer.json",
     "tokenizer_config.json",
     "config.json",
     "viterbi_calibration.json",
 ]
 for filename in files:
-    source = hf_hub_download(repo_id=os.environ["OPF_MODEL_ID"], filename=filename)
+    try:
+        source = hf_hub_download(repo_id=os.environ["OPF_MODEL_ID"], filename=filename)
+    except Exception as exc:
+        if filename.startswith("onnx/model.onnx_data_"):
+            print(f"optional FP32 shard {filename} not present in repo (skipped): {exc}")
+            continue
+        raise
     shutil.copyfile(source, os.path.join(target, os.path.basename(filename)))
 PY
 
@@ -128,7 +138,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     OPF_PORT=8000 \
     OPF_MODEL_ID=${OPF_MODEL_ID} \
     OPF_ONNX_PATH=/models/opf-int8 \
-    OPF_VARIANT=int8 \
+    OPF_VARIANT=fp32 \
     KNER_MODEL_ID=${KNER_MODEL_ID} \
     KNER_ONNX_PATH=/models/klue-ner-int8 \
     LANG=C.UTF-8 \
@@ -150,7 +160,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements-gpu.txt requirements.txt
 RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv \
     --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     uv pip install -r requirements.txt
