@@ -42,10 +42,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/pii-remover"
-Documentation = "https://github.com/your-org/pii-remover/blob/main/packages/backend/README.md"
-Source = "https://github.com/your-org/pii-remover"
-Issues = "https://github.com/your-org/pii-remover/issues"
+Homepage = "https://github.com/hhgyu/pii-remover"
+Documentation = "https://github.com/hhgyu/pii-remover/blob/main/packages/backend/README.md"
+Source = "https://github.com/hhgyu/pii-remover"
+Issues = "https://github.com/hhgyu/pii-remover/issues"
 
 [tool.setuptools]
 packages = ["server", "server.api"]

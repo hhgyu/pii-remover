@@ -82,7 +82,7 @@ The plugin talks to a local OPF HTTP backend. Bring up the self-built
 image once:
 
 ```bash
-git clone https://github.com/<your-org>/pii-remover
+git clone https://github.com/hhgyu/pii-remover
 cd pii-remover/packages/backend
 docker compose up --build
 ```

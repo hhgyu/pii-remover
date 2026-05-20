@@ -1,6 +1,6 @@
 services:
   opf:
-    image: ghcr.io/your-org/pii-remover-backend:latest-gpu
+    image: ghcr.io/hhgyu/pii-remover-backend:latest-gpu
     build:
       context: .
       dockerfile: Dockerfile.gpu

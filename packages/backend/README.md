@@ -181,7 +181,7 @@ The workflow:
 - caches the HuggingFace download via `actions/cache`;
 - pushes to `ghcr.io/<owner>/pii-remover-backend`.
 
-Replace the `your-org` placeholder in `docker-compose.yml` and
+Replace the `hhgyu` placeholder in `docker-compose.yml` and
 `docker-compose.gpu.yml` with the actual GHCR org once it is allocated.
 
 ## Why not use `gh0stkey/opf-privacy-filter` directly?

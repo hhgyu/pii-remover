@@ -21,7 +21,7 @@ Windows에서는 PowerShell 7+ 권장.
 ## 2. 저장소 클론 및 초기 설정
 
 ```bash
-git clone https://github.com/<your-org>/pii-remover.git
+git clone https://github.com/hhgyu/pii-remover.git
 cd pii-remover
 
 # 의존성 설치 (Bun workspace)
@@ -31,7 +31,7 @@ bun install
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/<your-org>/pii-remover.git
+git clone https://github.com/hhgyu/pii-remover.git
 cd pii-remover
 bun install
 ```
