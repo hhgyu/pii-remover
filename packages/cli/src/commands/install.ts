@@ -25,6 +25,9 @@ export const OPENCODE_PLUGIN_RESTORE_SUBPATH = "@pii-remover/opencode-plugin/res
 export interface PiiRemoverConfigSlice {
   endpoint: string;
   categories: PIICategory[];
+  auto_start?: boolean;
+  compose_file?: "cpu" | "gpu" | string;
+  start_timeout_ms?: number;
 }
 
 export interface InstallOptions {
@@ -85,9 +88,10 @@ export async function loadExistingConfig(
       try {
         const raw = await fs.readFile(p);
         const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const backendRaw = (parsed.backend as Record<string, unknown> | undefined) ?? {};
         const endpoint =
-          typeof (parsed.backend as Record<string, unknown>)?.endpoint === "string"
-            ? (parsed.backend as Record<string, unknown>).endpoint as string
+          typeof backendRaw.endpoint === "string"
+            ? (backendRaw.endpoint as string)
             : DEFAULT_CONFIG.backend.endpoint;
         const cats = Array.isArray(
           (parsed.detection as Record<string, unknown>)?.enabled_categories
@@ -96,7 +100,24 @@ export async function loadExistingConfig(
               (c): c is PIICategory => ALL_CATEGORIES.includes(c as PIICategory)
             )
           : [...DEFAULT_CONFIG.detection.enabled_categories];
-        return { endpoint, categories: cats };
+        const slice: PiiRemoverConfigSlice = { endpoint, categories: cats };
+        if (typeof backendRaw.auto_start === "boolean") {
+          slice.auto_start = backendRaw.auto_start;
+        }
+        if (
+          backendRaw.compose_file === "cpu" ||
+          backendRaw.compose_file === "gpu" ||
+          (typeof backendRaw.compose_file === "string" && backendRaw.compose_file.length > 0)
+        ) {
+          slice.compose_file = backendRaw.compose_file as string;
+        }
+        if (
+          typeof backendRaw.start_timeout_ms === "number" &&
+          backendRaw.start_timeout_ms > 0
+        ) {
+          slice.start_timeout_ms = backendRaw.start_timeout_ms;
+        }
+        return slice;
       } catch {
         return null;
       }
@@ -106,12 +127,18 @@ export async function loadExistingConfig(
 }
 
 export function buildPiiRemoverJson(slice: PiiRemoverConfigSlice): string {
+  const backend = {
+    ...DEFAULT_CONFIG.backend,
+    endpoint: slice.endpoint,
+    ...(slice.auto_start !== undefined ? { auto_start: slice.auto_start } : {}),
+    ...(slice.compose_file !== undefined ? { compose_file: slice.compose_file } : {}),
+    ...(slice.start_timeout_ms !== undefined
+      ? { start_timeout_ms: slice.start_timeout_ms }
+      : {}),
+  };
   const cfg = {
     $schema: DEFAULT_CONFIG.$schema,
-    backend: {
-      ...DEFAULT_CONFIG.backend,
-      endpoint: slice.endpoint,
-    },
+    backend,
     detection: {
       ...DEFAULT_CONFIG.detection,
       enabled_categories: slice.categories,
@@ -221,8 +248,10 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
   let piiConfigPath: string | null = null;
   let piiConfigWritten = false;
   if (opts.piiConfig) {
-    const configDir = scope === "global" ? home : project;
-    piiConfigPath = join(configDir, ".pii-remover.json");
+    piiConfigPath =
+      scope === "global"
+        ? join(home, ".config", "opencode", "pii-remover.json")
+        : join(project, ".opencode", "pii-remover.json");
     if (!opts.dryRun) {
       await fs.writeFile(piiConfigPath, buildPiiRemoverJson(opts.piiConfig));
     }
@@ -230,6 +259,15 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
   }
 
   const nextSteps: string[] = [];
+  const legacyHomePath = join(home, ".pii-remover.json");
+  if (fs.exists(legacyHomePath)) {
+    nextSteps.push(
+      `WARNING: legacy config detected at ${legacyHomePath}.`,
+      `This path is NOT in the loader candidate list and is silently ignored.`,
+      `Migrate any custom values to ${piiConfigPath ?? "~/.config/opencode/pii-remover.json"}.`,
+      ``
+    );
+  }
   if (resolved) {
     nextSteps.push(
       `1) Split-mode plugin registered in ${configPath}:`,
@@ -291,14 +329,28 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
   let configWritten = false;
 
   if (opts.piiConfig) {
-    const configDir = scope === "global" ? home : project;
-    configPath = join(configDir, ".pii-remover.json");
+    configPath =
+      scope === "global"
+        ? join(home, ".config", "pii-remover", "config.json")
+        : join(project, ".pii-remover.json");
     const configJson = buildPiiRemoverJson(opts.piiConfig);
     if (!opts.dryRun) {
       await fs.writeFile(configPath, configJson);
     }
     configWritten = true;
   }
+
+  const legacyHomePath = join(home, ".pii-remover.json");
+  const nextSteps =
+    fs.exists(legacyHomePath) && scope === "global"
+      ? [
+          `WARNING: legacy config detected at ${legacyHomePath}.`,
+          `This path is NOT in the loader candidate list and is silently ignored.`,
+          `Migrate any custom values to ${configPath ?? "~/.config/pii-remover/config.json"}.`,
+          ``,
+          ...buildNextSteps(opts.commandPath),
+        ]
+      : buildNextSteps(opts.commandPath);
 
   return {
     settings_path: settingsPath,
@@ -307,7 +359,7 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
     patched_json: serialized,
     config_path: configPath,
     config_written: configWritten,
-    next_steps: buildNextSteps(opts.commandPath),
+    next_steps: nextSteps,
   };
 }
 

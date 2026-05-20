@@ -48,6 +48,24 @@ describe("parseFlags", () => {
     const f = parseFlags(["--target", "vscode"]);
     expect(f.target).toBeUndefined();
   });
+
+  test("--auto-start / --no-auto-start / --compose-file / --start-timeout-ms / --idle-timeout", () => {
+    const a = parseFlags(["--auto-start", "--compose-file", "gpu", "--start-timeout-ms", "90000"]);
+    expect(a.autoStart).toBe(true);
+    expect(a.composeFile).toBe("gpu");
+    expect(a.startTimeoutMs).toBe(90000);
+
+    const b = parseFlags(["--no-auto-start", "--idle-timeout", "3600"]);
+    expect(b.autoStart).toBe(false);
+    expect(b.idleTimeoutSeconds).toBe(3600);
+
+    const c = parseFlags(["--idle-timeout", "0"]);
+    expect(c.idleTimeoutSeconds).toBe(0);
+
+    const d = parseFlags(["--start-timeout-ms", "-5", "--idle-timeout", "-1"]);
+    expect(d.startTimeoutMs).toBeUndefined();
+    expect(d.idleTimeoutSeconds).toBeUndefined();
+  });
 });
 
 describe("runCli", () => {
@@ -128,6 +146,111 @@ describe("runCli", () => {
     expect(fs.files.size).toBeGreaterThanOrEqual(2);
     const out = io.out.join("");
     expect(out).toContain("hook");
+  });
+
+  test("install --auto-start writes backend.auto_start=true to claude-code loader-readable config", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      [
+        "install",
+        "--target", "claude-code",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--auto-start",
+        "--compose-file", "gpu",
+        "--start-timeout-ms", "90000",
+      ],
+      { ...io, installFs: fs }
+    );
+    expect(code).toBe(0);
+    const piiConfigEntry = Array.from(fs.files.entries()).find(([p]) =>
+      p.includes("pii-remover") && (p.endsWith("config.json") || p.endsWith(".pii-remover.json"))
+    );
+    expect(piiConfigEntry).toBeDefined();
+    expect(piiConfigEntry![0]).toMatch(/\.config[\\/]pii-remover[\\/]config\.json$/);
+    const cfg = JSON.parse(piiConfigEntry![1]);
+    expect(cfg.backend.auto_start).toBe(true);
+    expect(cfg.backend.compose_file).toBe("gpu");
+    expect(cfg.backend.start_timeout_ms).toBe(90000);
+    expect(io.out.join("")).toContain("Backend auto-start: ENABLED");
+  });
+
+  test("install --idle-timeout 0 emits OPF_IDLE_TIMEOUT_SECONDS guidance (disabled)", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      [
+        "install",
+        "--target", "claude-code",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--idle-timeout", "0",
+      ],
+      { ...io, installFs: fs }
+    );
+    expect(code).toBe(0);
+    const out = io.out.join("");
+    expect(out).toContain("OPF_IDLE_TIMEOUT_SECONDS=0");
+    expect(out).toContain("0 = disabled");
+  });
+
+  test("install --no-auto-start explicitly disables (writes auto_start:false)", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      [
+        "install",
+        "--target", "claude-code",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--no-auto-start",
+      ],
+      { ...io, installFs: fs }
+    );
+    expect(code).toBe(0);
+    const cfgEntry = Array.from(fs.files.entries()).find(([p]) =>
+      p.endsWith("config.json") && p.includes("pii-remover")
+    )!;
+    expect(cfgEntry).toBeDefined();
+    const cfg = JSON.parse(cfgEntry[1]);
+    expect(cfg.backend.auto_start).toBe(false);
+    expect(io.out.join("")).toContain("DISABLED");
+  });
+
+  test("install --auto-start --target opencode writes to ~/.config/opencode/pii-remover.json (loader-readable)", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      [
+        "install",
+        "--target", "opencode",
+        "--auto-start",
+      ],
+      { ...io, installFs: fs }
+    );
+    expect(code).toBe(0);
+    const cfgEntry = Array.from(fs.files.entries()).find(([p]) =>
+      p.endsWith("pii-remover.json") && p.includes("opencode")
+    );
+    expect(cfgEntry).toBeDefined();
+    expect(cfgEntry![0]).toMatch(/\.config[\\/]opencode[\\/]pii-remover\.json$/);
+    const cfg = JSON.parse(cfgEntry![1]);
+    expect(cfg.backend.auto_start).toBe(true);
+  });
+});
+
+describe("runCli — help text mentions new lifecycle flags", () => {
+  test("--auto-start / --compose-file / --idle-timeout documented", async () => {
+    const io = makeIo();
+    await runCli(["help"], io);
+    const txt = io.out.join("");
+    expect(txt).toContain("--auto-start");
+    expect(txt).toContain("--compose-file");
+    expect(txt).toContain("--idle-timeout");
   });
 
   test("detect --text masks", async () => {

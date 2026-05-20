@@ -44,6 +44,10 @@ export interface ParsedFlags {
   endpoint?: string;
   categories?: string[];
   proxyUrl?: string;
+  autoStart?: boolean;
+  composeFile?: "cpu" | "gpu" | string;
+  startTimeoutMs?: number;
+  idleTimeoutSeconds?: number;
   dryRun: boolean;
   showHelp: boolean;
 }
@@ -79,6 +83,25 @@ export function parseFlags(argv: readonly string[]): ParsedFlags {
     } else if (arg === "--categories" || arg === "-c") {
       const v = argv[++i];
       if (typeof v === "string") out.categories = v.split(",").map((s) => s.trim()).filter(Boolean);
+    } else if (arg === "--auto-start") {
+      out.autoStart = true;
+    } else if (arg === "--no-auto-start") {
+      out.autoStart = false;
+    } else if (arg === "--compose-file") {
+      const v = argv[++i];
+      if (typeof v === "string") out.composeFile = v;
+    } else if (arg === "--start-timeout-ms") {
+      const v = argv[++i];
+      if (typeof v === "string") {
+        const n = Number.parseInt(v, 10);
+        if (Number.isFinite(n) && n > 0) out.startTimeoutMs = n;
+      }
+    } else if (arg === "--idle-timeout") {
+      const v = argv[++i];
+      if (typeof v === "string") {
+        const n = Number.parseInt(v, 10);
+        if (Number.isFinite(n) && n >= 0) out.idleTimeoutSeconds = n;
+      }
     } else if (arg === "--dry-run") {
       out.dryRun = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -116,6 +139,15 @@ export function helpText(): string {
     "  --categories, -c <list>    install only: comma-separated PII categories (skips prompt).",
     "  --proxy-url <url>          install only (--target codex): set openai_base_url to this proxy URL.",
     "                             Typical: http://localhost:8765/codex/v1",
+    "  --auto-start               install only: write backend.auto_start=true (opt-in Docker spawn).",
+    "                             Default: backend must be started manually. See ADR-0019.",
+    "  --no-auto-start            install only: write backend.auto_start=false (explicit opt-out).",
+    "  --compose-file <s>         install only: backend.compose_file value. 'cpu' (default) | 'gpu'",
+    "                             | <absolute path>. Effective only with --auto-start.",
+    "  --start-timeout-ms <n>     install only: backend.start_timeout_ms (default 60000).",
+    "                             Health-poll deadline after 'docker compose up -d'.",
+    "  --idle-timeout <seconds>   install only: surface a 'set OPF_IDLE_TIMEOUT_SECONDS=<n>' hint",
+    "                             in the next-steps output. 0 = disable idle unload. Default: 1800.",
     "  --dry-run                  install only: do not write the file, just print the patched JSON.",
     "  --port, -p <n>             health only: override the local proxy port.",
     "  --url, -u <u>              health only: override the full proxy base URL.",
@@ -180,7 +212,14 @@ export async function runCli(
 
     let piiConfig: PiiRemoverConfigSlice;
 
-    if (flags.endpoint || flags.categories) {
+    const hasNonInteractive =
+      flags.endpoint ||
+      flags.categories ||
+      flags.autoStart !== undefined ||
+      flags.composeFile !== undefined ||
+      flags.startTimeoutMs !== undefined;
+
+    if (hasNonInteractive) {
       piiConfig = {
         endpoint: flags.endpoint ?? DEFAULT_CONFIG.backend.endpoint,
         categories: (flags.categories?.filter((c): c is PIICategory =>
@@ -208,6 +247,10 @@ export async function runCli(
         piiConfig = await promptForConfig(promptFn, io.stdout);
       }
     }
+
+    if (flags.autoStart !== undefined) piiConfig.auto_start = flags.autoStart;
+    if (flags.composeFile !== undefined) piiConfig.compose_file = flags.composeFile;
+    if (flags.startTimeoutMs !== undefined) piiConfig.start_timeout_ms = flags.startTimeoutMs;
 
     try {
       let r;
@@ -257,7 +300,28 @@ export async function runCli(
       if (r.config_written && r.config_path) {
         lines.push(`Config written: ${r.config_path}`);
       }
-      lines.push("", "Next steps:", ...r.next_steps, "");
+      if (piiConfig.auto_start === true) {
+        lines.push(
+          `Backend auto-start: ENABLED (compose_file=${piiConfig.compose_file ?? "cpu"})`
+        );
+      } else if (piiConfig.auto_start === false) {
+        lines.push("Backend auto-start: DISABLED (explicit opt-out)");
+      }
+      lines.push("", "Next steps:", ...r.next_steps);
+      if (flags.idleTimeoutSeconds !== undefined) {
+        lines.push(
+          "",
+          `Idle-unload timeout requested: ${flags.idleTimeoutSeconds}s`,
+          `  (config files do NOT carry OPF_IDLE_TIMEOUT_SECONDS — it is a backend-side env var)`,
+          `  Set on the backend container, e.g.:`,
+          `    OPF_IDLE_TIMEOUT_SECONDS=${flags.idleTimeoutSeconds} docker compose up -d`,
+          `  Or persist via packages/backend/docker-compose.yml or a .env file.`,
+          flags.idleTimeoutSeconds === 0
+            ? `  (0 = disabled; model stays loaded until container stops)`
+            : `  Next /redact after ${flags.idleTimeoutSeconds}s idle lazy-reloads the model.`,
+        );
+      }
+      lines.push("");
       io.stdout(lines.join("\n"));
       return 0;
     } catch (err) {

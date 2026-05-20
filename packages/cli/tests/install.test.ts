@@ -233,7 +233,9 @@ describe("runInstall", () => {
       },
     });
     expect(r.config_written).toBe(true);
-    expect(r.config_path).toBe(path.join("/home/u", ".pii-remover.json"));
+    expect(r.config_path).toBe(
+      path.join("/home/u", ".config", "pii-remover", "config.json")
+    );
     const written = fs.files.get(r.config_path!);
     expect(written).toBeDefined();
     const parsed = JSON.parse(written!);
@@ -241,7 +243,7 @@ describe("runInstall", () => {
     expect(parsed.detection.enabled_categories).toEqual(["private_email", "private_phone"]);
   });
 
-  test("piiConfig writes .pii-remover.json", async () => {
+  test("piiConfig writes claude-code global config to loader-readable path (~/.config/pii-remover/config.json)", async () => {
     const fs = memFs();
     const r = await runInstall({
       target: "claude-code",
@@ -254,8 +256,48 @@ describe("runInstall", () => {
       },
     });
     expect(r.config_written).toBe(true);
-    expect(r.config_path).toBe(require("node:path").join("/home/u", ".pii-remover.json"));
+    expect(r.config_path).toBe(
+      require("node:path").join("/home/u", ".config", "pii-remover", "config.json")
+    );
     expect(fs.files.has(r.config_path!)).toBe(true);
+  });
+
+  test("project scope writes <project>/.pii-remover.json (cwd-based loader candidate)", async () => {
+    const path = require("node:path");
+    const fs = memFs();
+    const r = await runInstall({
+      target: "claude-code",
+      scope: "project",
+      commandPath: "/abs/pii-remover",
+      homeDir: "/home/u",
+      projectDir: "/work/myproj",
+      fs,
+      piiConfig: {
+        endpoint: "http://localhost:9000/redact",
+        categories: ["private_email"],
+      },
+    });
+    expect(r.config_path).toBe(path.join("/work/myproj", ".pii-remover.json"));
+  });
+
+  test("legacy ~/.pii-remover.json triggers migration warning in next_steps", async () => {
+    const path = require("node:path");
+    const legacy = path.join("/home/u", ".pii-remover.json");
+    const fs = memFs({ [legacy]: "{}" });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/abs/pii-remover",
+      homeDir: "/home/u",
+      fs,
+      piiConfig: {
+        endpoint: "http://localhost:9000/redact",
+        categories: ["private_email"],
+      },
+    });
+    const joined = r.next_steps.join("\n");
+    expect(joined).toContain("WARNING: legacy config detected");
+    expect(joined).toContain(legacy);
+    expect(joined).toContain(".config");
   });
 
   test("dryRun skips config write", async () => {
@@ -316,6 +358,87 @@ describe("buildPiiRemoverJson", () => {
     const parsed = JSON.parse(json);
     expect(parsed.backend.endpoint).toBe("http://localhost:8000/redact");
     expect(parsed.detection.enabled_categories).toEqual(["private_email", "secret"]);
+  });
+
+  test("does NOT include auto_start / compose_file by default (backwards-compat)", () => {
+    const parsed = JSON.parse(
+      buildPiiRemoverJson({
+        endpoint: "http://localhost:8000/redact",
+        categories: ["private_email"],
+      })
+    );
+    expect(parsed.backend.auto_start).toBe(false);
+    expect(parsed.backend.compose_file).toBe("cpu");
+  });
+
+  test("includes auto_start=true when explicitly set", () => {
+    const parsed = JSON.parse(
+      buildPiiRemoverJson({
+        endpoint: "http://localhost:8000/redact",
+        categories: ["private_email"],
+        auto_start: true,
+        compose_file: "gpu",
+        start_timeout_ms: 120000,
+      })
+    );
+    expect(parsed.backend.auto_start).toBe(true);
+    expect(parsed.backend.compose_file).toBe("gpu");
+    expect(parsed.backend.start_timeout_ms).toBe(120000);
+  });
+
+  test("auto_start=false is preserved (explicit opt-out)", () => {
+    const parsed = JSON.parse(
+      buildPiiRemoverJson({
+        endpoint: "http://localhost:8000/redact",
+        categories: ["private_email"],
+        auto_start: false,
+      })
+    );
+    expect(parsed.backend.auto_start).toBe(false);
+  });
+});
+
+describe("loadExistingConfig — backend lifecycle fields (ADR-0019)", () => {
+  test("round-trips auto_start / compose_file / start_timeout_ms", async () => {
+    const path = require("node:path");
+    const configPath = path.join("/proj", ".pii-remover.json");
+    const fs = memFs({
+      [configPath]: JSON.stringify({
+        backend: {
+          endpoint: "http://ml-server/redact",
+          auto_start: true,
+          compose_file: "gpu",
+          start_timeout_ms: 90000,
+        },
+        detection: { enabled_categories: ["private_email"] },
+      }),
+    });
+    const result = await loadExistingConfig("/proj", "/home/u", fs);
+    expect(result).not.toBeNull();
+    expect(result!.auto_start).toBe(true);
+    expect(result!.compose_file).toBe("gpu");
+    expect(result!.start_timeout_ms).toBe(90000);
+  });
+
+  test("ignores invalid auto_start / compose_file types", async () => {
+    const path = require("node:path");
+    const configPath = path.join("/proj", ".pii-remover.json");
+    const fs = memFs({
+      [configPath]: JSON.stringify({
+        backend: {
+          endpoint: "http://ml-server/redact",
+          auto_start: "yes",
+          compose_file: 42,
+          start_timeout_ms: -1,
+        },
+        detection: { enabled_categories: ["private_email"] },
+      }),
+    });
+    const result = await loadExistingConfig("/proj", "/home/u", fs);
+    expect(result).not.toBeNull();
+    expect(result!.auto_start).toBeUndefined();
+    expect(result!.compose_file).toBeUndefined();
+    expect(result!.start_timeout_ms).toBeUndefined();
   });
 });
 

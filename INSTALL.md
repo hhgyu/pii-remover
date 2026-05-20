@@ -41,6 +41,57 @@ Codex hook is registered in `~/.codex/config.toml` and `openai_base_url` is set 
 
 > To choose categories interactively, omit `--endpoint` and `--categories` flags.
 
+## Config file locations (where install writes)
+
+| `--target` | `--scope` | Path the installer writes (loader will read this) |
+|---|---|---|
+| `claude-code` | `global` (default) | `~/.config/pii-remover/config.json` |
+| `claude-code` | `project` | `<project>/.pii-remover.json` |
+| `opencode` | `global` (default) | `~/.config/opencode/pii-remover.json` |
+| `opencode` | `project` | `<project>/.opencode/pii-remover.json` |
+| `codex` | `global` (default) | `~/.codex/pii-remover.json` |
+| `codex` | `project` | `<project>/.codex/pii-remover.json` |
+
+## Backend lifecycle flags (ADR-0019)
+
+The installer supports four flags that configure backend auto-start and idle-unload behaviour. All are optional and **off** by default — the existing install command continues to work unchanged.
+
+| Flag | Effect on generated `.pii-remover.json` | Default |
+| --- | --- | --- |
+| `--auto-start` | `backend.auto_start = true` — plugin / proxy / hook will run `docker compose up -d` if `/health` probe fails | `false` |
+| `--no-auto-start` | `backend.auto_start = false` (explicit opt-out, useful for overriding existing config) | — |
+| `--compose-file <s>` | `backend.compose_file = "<s>"`. `"cpu"` (default), `"gpu"`, or an absolute path to a custom `docker-compose.yml` | `"cpu"` |
+| `--start-timeout-ms <n>` | `backend.start_timeout_ms = <n>` — health-poll deadline (ms) after `docker compose up -d` | `60000` |
+| `--idle-timeout <seconds>` | **Not written to config** (it's a backend-side env var). Surfaces a copy-paste hint: `OPF_IDLE_TIMEOUT_SECONDS=<n> docker compose up -d`. `0` = disable idle unload. | `1800` (30 min) |
+
+### Examples
+
+Personal dev machine — auto-start + 1 hour idle:
+
+```bash
+npx @pii-remover/cli install --target opencode \
+  --auto-start \
+  --idle-timeout 3600
+```
+
+GPU server, CI-friendly (model permanently resident):
+
+```bash
+npx @pii-remover/cli install --target claude-code \
+  --auto-start \
+  --compose-file gpu \
+  --start-timeout-ms 120000 \
+  --idle-timeout 0
+```
+
+Existing install — explicitly turn auto-start off:
+
+```bash
+npx @pii-remover/cli install --target opencode --no-auto-start
+```
+
+Fail-closed contract: when `--auto-start` is set and the backend cannot be brought up (Docker missing / daemon down / compose missing / health timeout), the plugin/proxy/hook raises `FailClosedError` — consistent with `failure_policy: "closed"`. See [ADR-0019](./docs/ADR/0019-backend-auto-start-and-idle-unload.md).
+
 ## Start the proxy (required for actual masking)
 
 The hook detects PII but cannot rewrite prompts — the proxy does the actual masking at the HTTP layer:
