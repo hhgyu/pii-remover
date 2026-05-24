@@ -45,6 +45,7 @@ export interface RestoreResult {
   restoredCount: number;
   partialMatchCount: number;
   unknownTokenCount: number;
+  pathSkipCount: number;
 }
 
 export interface RestoreOptions {
@@ -68,6 +69,11 @@ export interface RestoreOptions {
   /** Sink for warning messages. Falls back to defaultOpts.warn (set on the
    *  Restorer) and finally to a no-op. */
   warn?: (msg: string) => void;
+  /** When true (default), tokens that appear inside a file-system path span
+   *  (Windows drive, UNC, POSIX absolute/relative, URL) are skipped and not
+   *  restored. This prevents false restoration of tokens embedded in paths
+   *  like `D:\Git\__OPF_PERSON_2__Plugin`. Set false to disable. */
+  skipPathMatches?: boolean;
 }
 
 /**
@@ -125,6 +131,7 @@ export class Restorer {
         restoredCount: 0,
         partialMatchCount: 0,
         unknownTokenCount: 0,
+        pathSkipCount: 0,
       };
     }
 
@@ -133,14 +140,13 @@ export class Restorer {
     const warnOnPartial = merged.warnOnPartial ?? true;
     const warnOnUnknownToken = merged.warnOnUnknownToken ?? true;
     const warn = merged.warn ?? noopWarn;
+    const skipPaths = merged.skipPathMatches ?? true;
 
     const allMatches = scanTokens(text);
     const matches = useLenient
       ? allMatches
       : allMatches.filter((m) => m.matchType === "strict");
 
-    // Pre-tally lenient matches as a "LLM mangled this many tokens" signal.
-    // Independent from vault-hit status — see RestoreResult JSDoc.
     let partialMatchCount = 0;
     for (const m of matches) {
       if (m.matchType === "lenient") partialMatchCount++;
@@ -148,12 +154,17 @@ export class Restorer {
 
     let restoredCount = 0;
     let unknownTokenCount = 0;
+    let pathSkipCount = 0;
 
-    // Walk right-to-left so earlier offsets stay valid after substitution.
     const reverseMatches = [...matches].sort((a, b) => b.start - a.start);
 
     let out = text;
     for (const m of reverseMatches) {
+      if (skipPaths && isInsidePath(out, m.start, m.end)) {
+        pathSkipCount++;
+        continue;
+      }
+
       const entry = this.vault.lookup(sessionId, m.normalizedToken);
 
       if (entry) {
@@ -199,6 +210,7 @@ export class Restorer {
       restoredCount,
       partialMatchCount,
       unknownTokenCount,
+      pathSkipCount,
     };
   }
 }
@@ -288,7 +300,61 @@ function mergeOptions(
     unknownTokenHandler:
       overrides.unknownTokenHandler ?? defaults.unknownTokenHandler,
     warn: overrides.warn ?? defaults.warn,
+    skipPathMatches: overrides.skipPathMatches ?? defaults.skipPathMatches,
   };
 }
 
 function noopWarn(_msg: string): void {}
+
+/**
+ * Detect whether a token match sits inside a file-system path span.
+ *
+ * Extracts the surrounding non-whitespace segment and checks for strong
+ * path evidence (drive-letter, UNC, POSIX absolute/relative, URL scheme,
+ * or multiple separators). The heuristic is intentionally conservative —
+ * it only suppresses restoration when the token is clearly part of a path
+ * so that legitimate LLM output like `"__OPF_EMAIL_1__please respond"`
+ * is never blocked.
+ *
+ * Exported for direct unit-testing.
+ */
+export function isInsidePath(text: string, start: number, end: number): boolean {
+  // --- 1. Extract the surrounding non-whitespace span ---
+  let spanStart = start;
+  while (spanStart > 0 && !/\s/.test(text[spanStart - 1]!)) spanStart--;
+  let spanEnd = end;
+  while (spanEnd < text.length && !/\s/.test(text[spanEnd]!)) spanEnd++;
+
+  const span = text.slice(spanStart, spanEnd);
+
+  // --- 2. Strong path evidence on the whole span ---
+  // Windows drive path: C:\... D:/...
+  if (/^[A-Za-z]:[\\\/]/.test(span)) return true;
+  // UNC path: \\server\share\...
+  if (/^\\\\/.test(span)) return true;
+  // POSIX absolute path: /foo/bar...
+  if (/^\//.test(span)) return true;
+  // Relative path with separator: ./foo... or ../foo...
+  if (/^\.\.?[\/\\]/.test(span)) return true;
+  // URL scheme: file://... https://...
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(span)) return true;
+
+  // --- 3. Separator adjacency: token directly touches a path separator ---
+  const charBefore = start > 0 ? text[start - 1] : "";
+  const charAfter = end < text.length ? text[end] : "";
+  const precededBySep = charBefore === "/" || charBefore === "\\";
+  const followedBySep = charAfter === "/" || charAfter === "\\";
+
+  // If the token is flanked by separators, count path separators in the
+  // surrounding span — more than 1 is very strong path evidence.
+  if (precededBySep || followedBySep) {
+    let sepCount = 0;
+    for (let i = spanStart; i < spanEnd; i++) {
+      const c = text[i];
+      if (c === "/" || c === "\\") sepCount++;
+    }
+    if (sepCount >= 2) return true;
+  }
+
+  return false;
+}

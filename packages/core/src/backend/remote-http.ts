@@ -111,9 +111,9 @@ export class RemoteHttpBackend implements BackendClient {
     }
     this.baseEndpoint = opts.endpoint.replace(/\/+$/, "");
     this.trust_tier = opts.trust_tier ?? "self_hosted";
-    this.timeout_ms = opts.timeout_ms ?? 2000;
+    this.timeout_ms = opts.timeout_ms ?? 5000;
     const r = opts.retries;
-    this.retries = typeof r === "number" && r >= 0 ? Math.floor(r) : 1;
+    this.retries = typeof r === "number" && r >= 0 ? Math.floor(r) : 2;
     this.auth = opts.auth ?? { type: "none" };
     this.tls = opts.tls;
     this.fetchImpl = opts.fetch_impl ?? fetch;

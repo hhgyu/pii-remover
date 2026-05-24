@@ -86,7 +86,7 @@ export class OpfHttpBackend implements BackendClient {
     }
     this.baseEndpoint = opts.endpoint.replace(/\/+$/, "");
     this.trust_tier = opts.trust_tier ?? "local";
-    this.timeout_ms = opts.timeout_ms ?? 2000;
+    this.timeout_ms = opts.timeout_ms ?? 5000;
     this.auth = opts.auth ?? { type: "none" };
     this.fetchImpl = opts.fetch_impl ?? fetch;
     this.name = opts.name ?? `opf-http(${this.baseEndpoint})`;

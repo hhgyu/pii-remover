@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Restorer, scanTokens } from "../src/restorer/index.js";
+import { Restorer, scanTokens, isInsidePath } from "../src/restorer/index.js";
 import type { TokenMatch } from "../src/restorer/index.js";
 import { VaultManager } from "../src/vault/manager.js";
 import type { Detection, PIICategory } from "../src/types.js";
@@ -127,6 +127,7 @@ describe("Restorer.restore — happy path", () => {
       restoredCount: 0,
       partialMatchCount: 0,
       unknownTokenCount: 0,
+      pathSkipCount: 0,
     });
   });
 
@@ -406,5 +407,152 @@ describe("Restorer.restore — edge cases", () => {
     expect(types).toEqual(["strict", "lenient", "strict"]);
     expect(out.unknownTokenCount).toBe(3);
     expect(out.partialMatchCount).toBe(1);
+  });
+});
+
+describe("isInsidePath — path-context detection", () => {
+  function findToken(text: string, token: string): { start: number; end: number } {
+    const idx = text.indexOf(token);
+    expect(idx).toBeGreaterThanOrEqual(0);
+    return { start: idx, end: idx + token.length };
+  }
+
+  test("Windows drive path with token embedded in directory name", () => {
+    const { start, end } = findToken(
+      "NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_2__Plugin)",
+      "__OPF_PERSON_2__"
+    );
+    expect(isInsidePath("NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_2__Plugin)", start, end)).toBe(true);
+  });
+
+  test("POSIX absolute path with token", () => {
+    const path = "/tmp/__OPF_PERSON_2__Plugin";
+    const { start, end } = findToken(path, "__OPF_PERSON_2__");
+    expect(isInsidePath(path, start, end)).toBe(true);
+  });
+
+  test("UNC path", () => {
+    const path = "\\\\server\\share\\__OPF_EMAIL_1__dir";
+    const { start, end } = findToken(path, "__OPF_EMAIL_1__");
+    expect(isInsidePath(path, start, end)).toBe(true);
+  });
+
+  test("relative path with ./ prefix", () => {
+    const path = "./src/__OPF_PERSON_1__file.ts";
+    const { start, end } = findToken(path, "__OPF_PERSON_1__");
+    expect(isInsidePath(path, start, end)).toBe(true);
+  });
+
+  test("file:// URL", () => {
+    const path = "file:///home/__OPF_EMAIL_1__dir";
+    const { start, end } = findToken(path, "__OPF_EMAIL_1__");
+    expect(isInsidePath(path, start, end)).toBe(true);
+  });
+
+  test("token followed by regular text (NOT a path)", () => {
+    const text = "__OPF_EMAIL_1__please respond";
+    const { start, end } = findToken(text, "__OPF_EMAIL_1__");
+    expect(isInsidePath(text, start, end)).toBe(false);
+  });
+
+  test("token in normal sentence (NOT a path)", () => {
+    const text = "see __OPF_PERSON_1__ here";
+    const { start, end } = findToken(text, "__OPF_PERSON_1__");
+    expect(isInsidePath(text, start, end)).toBe(false);
+  });
+
+  test("token at sentence start (NOT a path)", () => {
+    const text = "__OPF_EMAIL_1__ is the email";
+    const { start, end } = findToken(text, "__OPF_EMAIL_1__");
+    expect(isInsidePath(text, start, end)).toBe(false);
+  });
+
+  test("token followed by newline (NOT a path)", () => {
+    const text = "see __OPF_PERSON_2__\nnext line";
+    const { start, end } = findToken(text, "__OPF_PERSON_2__");
+    expect(isInsidePath(text, start, end)).toBe(false);
+  });
+
+  test("https:// URL with token in path segment", () => {
+    const text = "https://example.com/__OPF_PERSON_2__page";
+    const { start, end } = findToken(text, "__OPF_PERSON_2__");
+    expect(isInsidePath(text, start, end)).toBe(true);
+  });
+});
+
+describe("Restorer.restore — path-skip behavior", () => {
+  test("token inside Windows path is skipped (not restored)", () => {
+    const v = makeVault("s1", [
+      { category: "private_person", text: "Alice" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore(
+      "NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_1__Plugin)",
+      "s1"
+    );
+    expect(out.text).toBe("NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_1__Plugin)");
+    expect(out.pathSkipCount).toBe(1);
+    expect(out.restoredCount).toBe(0);
+  });
+
+  test("token inside POSIX path is skipped", () => {
+    const v = makeVault("s1", [
+      { category: "private_person", text: "Bob" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore("error: /tmp/__OPF_PERSON_1__dir not found", "s1");
+    expect(out.text).toBe("error: /tmp/__OPF_PERSON_1__dir not found");
+    expect(out.pathSkipCount).toBe(1);
+  });
+
+  test("token adjacent to text is still restored (legitimate LLM output)", () => {
+    const v = makeVault("s1", [
+      { category: "private_email", text: "alice@example.com" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore("__OPF_EMAIL_1__please respond", "s1");
+    expect(out.text).toBe("alice@example.complease respond");
+    expect(out.restoredCount).toBe(1);
+    expect(out.pathSkipCount).toBe(0);
+  });
+
+  test("mixed: path token skipped, normal token restored", () => {
+    const v = makeVault("s1", [
+      { category: "private_person", text: "Charlie" },
+      { category: "private_email", text: "charlie@ex.com" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore(
+      "D:\\Git\\__OPF_PERSON_1__Plugin and __OPF_EMAIL_1__ please",
+      "s1"
+    );
+    expect(out.text).toBe("D:\\Git\\__OPF_PERSON_1__Plugin and charlie@ex.com please");
+    expect(out.pathSkipCount).toBe(1);
+    expect(out.restoredCount).toBe(1);
+  });
+
+  test("skipPathMatches:false disables path-aware skipping", () => {
+    const v = makeVault("s1", [
+      { category: "private_person", text: "Dave" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore(
+      "D:\\Git\\__OPF_PERSON_1__Plugin",
+      "s1",
+      { skipPathMatches: false }
+    );
+    expect(out.text).toBe("D:\\Git\\DavePlugin");
+    expect(out.pathSkipCount).toBe(0);
+    expect(out.restoredCount).toBe(1);
+  });
+
+  test("pathSkipCount is 0 when no tokens are in paths", () => {
+    const v = makeVault("s1", [
+      { category: "private_email", text: "x@y.z" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore("see __OPF_EMAIL_1__ here", "s1");
+    expect(out.pathSkipCount).toBe(0);
+    expect(out.restoredCount).toBe(1);
   });
 });
