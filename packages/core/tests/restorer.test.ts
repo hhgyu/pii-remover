@@ -481,28 +481,57 @@ describe("isInsidePath — path-context detection", () => {
 });
 
 describe("Restorer.restore — path-skip behavior", () => {
-  test("token inside Windows path is skipped (not restored)", () => {
+  test("token inside Windows path is restored when vault has the entry", () => {
     const v = makeVault("s1", [
       { category: "private_person", text: "Alice" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore(
+      "NotFound: FileSystem.access (D:\\Git\\AlicePlugin)",
+      "s1"
+    );
+    expect(out.text).toBe("NotFound: FileSystem.access (D:\\Git\\AlicePlugin)");
+    expect(out.restoredCount).toBe(0);
+    expect(out.pathSkipCount).toBe(0);
+  });
+
+  test("unknown token inside path is skipped (not counted as unknown)", () => {
+    const v = makeVault("s1", [
+      { category: "private_email", text: "x@y.z" },
+    ]);
+    const r = new Restorer(v);
+    const out = r.restore(
+      "error: D:\\Git\\__OPF_PERSON_99__Plugin not found",
+      "s1"
+    );
+    expect(out.text).toBe("error: D:\\Git\\__OPF_PERSON_99__Plugin not found");
+    expect(out.pathSkipCount).toBe(1);
+    expect(out.unknownTokenCount).toBe(0);
+  });
+
+  test("vault token inside path is always restored", () => {
+    const v = makeVault("s1", [
+      { category: "private_person", text: "__OPF_PERSON_6__" },
     ]);
     const r = new Restorer(v);
     const out = r.restore(
       "NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_1__Plugin)",
       "s1"
     );
-    expect(out.text).toBe("NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_1__Plugin)");
-    expect(out.pathSkipCount).toBe(1);
-    expect(out.restoredCount).toBe(0);
+    expect(out.text).toBe("NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_6__Plugin)");
+    expect(out.restoredCount).toBe(1);
+    expect(out.pathSkipCount).toBe(0);
   });
 
-  test("token inside POSIX path is skipped", () => {
+  test("token inside POSIX path is restored when vault has it", () => {
     const v = makeVault("s1", [
       { category: "private_person", text: "Bob" },
     ]);
     const r = new Restorer(v);
     const out = r.restore("error: /tmp/__OPF_PERSON_1__dir not found", "s1");
-    expect(out.text).toBe("error: /tmp/__OPF_PERSON_1__dir not found");
-    expect(out.pathSkipCount).toBe(1);
+    expect(out.text).toBe("error: /tmp/Bobdir not found");
+    expect(out.restoredCount).toBe(1);
+    expect(out.pathSkipCount).toBe(0);
   });
 
   test("token adjacent to text is still restored (legitimate LLM output)", () => {
@@ -516,19 +545,20 @@ describe("Restorer.restore — path-skip behavior", () => {
     expect(out.pathSkipCount).toBe(0);
   });
 
-  test("mixed: path token skipped, normal token restored", () => {
+  test("mixed: vault token in path restored, unknown standalone token counted", () => {
     const v = makeVault("s1", [
-      { category: "private_person", text: "Charlie" },
-      { category: "private_email", text: "charlie@ex.com" },
+      { category: "private_person", text: "__OPF_PERSON_6__" },
+      { category: "private_email", text: "__OPF_EMAIL_5__" },
     ]);
     const r = new Restorer(v);
     const out = r.restore(
-      "D:\\Git\\__OPF_PERSON_1__Plugin and __OPF_EMAIL_1__ please",
+      "D:\\Git\\__OPF_PERSON_1__Plugin and __OPF_EMAIL_1__ and __OPF_PERSON_99__dir",
       "s1"
     );
-    expect(out.text).toBe("D:\\Git\\__OPF_PERSON_1__Plugin and charlie@ex.com please");
-    expect(out.pathSkipCount).toBe(1);
-    expect(out.restoredCount).toBe(1);
+    expect(out.text).toBe("D:\\Git\\__OPF_PERSON_6__Plugin and __OPF_EMAIL_5__ and __OPF_PERSON_99__dir");
+    expect(out.restoredCount).toBe(2);
+    expect(out.unknownTokenCount).toBe(1);
+    expect(out.pathSkipCount).toBe(0);
   });
 
   test("skipPathMatches:false disables path-aware skipping", () => {

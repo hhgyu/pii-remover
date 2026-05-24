@@ -160,11 +160,6 @@ export class Restorer {
 
     let out = text;
     for (const m of reverseMatches) {
-      if (skipPaths && isInsidePath(out, m.start, m.end)) {
-        pathSkipCount++;
-        continue;
-      }
-
       const entry = this.vault.lookup(sessionId, m.normalizedToken);
 
       if (entry) {
@@ -175,6 +170,11 @@ export class Restorer {
             `[WARN] PII restore: lenient match '${m.token}' resolved as '${m.normalizedToken}' (LLM transformation suspected)`
           );
         }
+        continue;
+      }
+
+      if (skipPaths && isInsidePath(out, m.start, m.end)) {
+        pathSkipCount++;
         continue;
       }
 

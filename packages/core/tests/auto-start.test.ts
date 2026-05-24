@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import {
   deriveHealthUrl,
   maybeAutoStartBackend,
+  _resetAutoStartDedup,
   type AutoStartOptions,
 } from "../src/backend/auto-start.js";
 import { FailClosedError } from "../src/policy/failure.js";
@@ -107,6 +108,24 @@ describe("maybeAutoStartBackend", () => {
     expect(spawnCalls).toBe(0);
   });
 
+  test("skips spawn when container is up but model is idle-unloaded", async () => {
+    let spawnCalls = 0;
+    const logs: string[] = [];
+    const warn = (msg: string) => logs.push(msg);
+    await maybeAutoStartBackend({
+      ...base,
+      warn,
+      fetchImpl: mkFetch([{ ok: true, loaded: false }]),
+      spawnImpl: (() => {
+        spawnCalls += 1;
+        return mkSpawn({ exitCode: 0 });
+      }) as never,
+      composePathResolver: () => "/fake/docker-compose.yml",
+    });
+    expect(spawnCalls).toBe(0);
+    expect(logs.some((l) => l.includes("model unloaded/idle"))).toBe(true);
+  });
+
   test("throws FailClosedError when compose path cannot be resolved", async () => {
     await expect(
       maybeAutoStartBackend({
@@ -170,5 +189,42 @@ describe("maybeAutoStartBackend", () => {
         composePathResolver: () => "/fake/docker-compose.yml",
       })
     ).rejects.toThrow(FailClosedError);
+  });
+
+  test("deduplicates concurrent calls — docker compose runs only once", async () => {
+    _resetAutoStartDedup();
+    let spawnCalls = 0;
+    const logs: string[] = [];
+    const warn = (msg: string) => logs.push(msg);
+
+    const countingSpawn = (...args: unknown[]) => {
+      spawnCalls += 1;
+      const fn = mkSpawn({ exitCode: 0 }) as (...a: unknown[]) => unknown;
+      return fn(...args);
+    };
+
+    const mkOpts = (): AutoStartOptions => ({
+      ...base,
+      warn,
+      startTimeoutMs: 4000,
+      fetchImpl: mkFetch([
+        { ok: false, loaded: false },
+        { ok: false, loaded: false },
+        { ok: true, loaded: true },
+      ]),
+      spawnImpl: countingSpawn as never,
+      composePathResolver: () => "/fake/docker-compose.yml",
+    });
+
+    const [r1, r2] = await Promise.allSettled([
+      maybeAutoStartBackend(mkOpts()),
+      maybeAutoStartBackend(mkOpts()),
+    ]);
+    if (r1.status === "rejected") console.error("r1 rejected:", r1.reason);
+    if (r2.status === "rejected") console.error("r2 rejected:", r2.reason);
+    expect(r1.status).toBe("fulfilled");
+    expect(r2.status).toBe("fulfilled");
+    expect(spawnCalls).toBe(1);
+    expect(logs.some((l) => l.includes("auto-start already in progress"))).toBe(true);
   });
 });

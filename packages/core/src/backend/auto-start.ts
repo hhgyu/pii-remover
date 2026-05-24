@@ -37,57 +37,93 @@ export interface AutoStartOptions {
 const HEALTH_POLL_INTERVAL_MS = 1000;
 const HEALTH_PROBE_TIMEOUT_MS = 1500;
 
+const inFlightAutoStart = new Map<string, Promise<void>>();
+
+/**
+ * Reset the in-flight map. Intended **only** for use in tests between
+ * test cases so that each case starts with a clean slate.
+ */
+export function _resetAutoStartDedup(): void {
+  inFlightAutoStart.clear();
+}
+
 export async function maybeAutoStartBackend(opts: AutoStartOptions): Promise<void> {
   if (!opts.enabled) return;
 
   const healthUrl = deriveHealthUrl(opts.endpoint);
   const fetchImpl = opts.fetchImpl ?? fetch;
 
-  if (await isHealthy(healthUrl, fetchImpl, HEALTH_PROBE_TIMEOUT_MS)) {
+  const existing = inFlightAutoStart.get(healthUrl);
+  if (existing) {
     opts.warn(
-      `[pii-remover] backend already healthy at ${healthUrl}; auto-start skipped`
+      `[pii-remover] auto-start already in progress for ${healthUrl}; waiting`
     );
+    await existing;
     return;
   }
 
-  const resolver = opts.composePathResolver ?? defaultComposePathResolver;
-  const composePath = resolver(opts.composeFile);
-  if (composePath === null) {
-    throw new FailClosedError(
-      `PII Remover: backend.auto_start=true but compose file '${opts.composeFile}' ` +
-        `could not be resolved (set backend.compose_file to an absolute path)`,
-      { backend: "auto-start", bypass_env: opts.bypassEnv }
-    );
-  }
-
-  opts.warn(
-    `[pii-remover] auto-starting backend via 'docker compose -f ${composePath} up -d'`
-  );
-
-  try {
-    await runComposeUp(composePath, opts.spawnImpl ?? spawn);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new FailClosedError(
-      `PII Remover: backend auto-start failed: ${reason}`,
-      { backend: "auto-start", cause: err, bypass_env: opts.bypassEnv }
-    );
-  }
-
-  const deadline = Date.now() + Math.max(1000, opts.startTimeoutMs);
-  while (Date.now() < deadline) {
+  const work = (async () => {
     if (await isHealthy(healthUrl, fetchImpl, HEALTH_PROBE_TIMEOUT_MS)) {
-      opts.warn(`[pii-remover] backend healthy at ${healthUrl}`);
+      opts.warn(
+        `[pii-remover] backend already healthy at ${healthUrl}; auto-start skipped`
+      );
       return;
     }
-    await sleep(HEALTH_POLL_INTERVAL_MS);
-  }
 
-  throw new FailClosedError(
-    `PII Remover: backend did not become healthy at ${healthUrl} within ` +
-      `${opts.startTimeoutMs}ms after 'docker compose up -d'`,
-    { backend: "auto-start", bypass_env: opts.bypassEnv }
-  );
+    if (await isContainerUp(healthUrl, fetchImpl, HEALTH_PROBE_TIMEOUT_MS)) {
+      opts.warn(
+        `[pii-remover] backend container up (model unloaded/idle) at ${healthUrl}; auto-start skipped`
+      );
+      return;
+    }
+
+    const resolver = opts.composePathResolver ?? defaultComposePathResolver;
+    const composePath = resolver(opts.composeFile);
+    if (composePath === null) {
+      throw new FailClosedError(
+        `PII Remover: backend.auto_start=true but compose file '${opts.composeFile}' ` +
+          `could not be resolved (set backend.compose_file to an absolute path)`,
+        { backend: "auto-start", bypass_env: opts.bypassEnv }
+      );
+    }
+
+    opts.warn(
+      `[pii-remover] auto-starting backend via 'docker compose -f ${composePath} up -d'`
+    );
+
+    try {
+      await runComposeUp(composePath, opts.spawnImpl ?? spawn);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new FailClosedError(
+        `PII Remover: backend auto-start failed: ${reason}`,
+        { backend: "auto-start", cause: err, bypass_env: opts.bypassEnv }
+      );
+    }
+
+    const deadline = Date.now() + Math.max(1000, opts.startTimeoutMs);
+    while (Date.now() < deadline) {
+      if (await isHealthy(healthUrl, fetchImpl, HEALTH_PROBE_TIMEOUT_MS)) {
+        opts.warn(`[pii-remover] backend healthy at ${healthUrl}`);
+        return;
+      }
+      await sleep(HEALTH_POLL_INTERVAL_MS);
+    }
+
+    throw new FailClosedError(
+      `PII Remover: backend did not become healthy at ${healthUrl} within ` +
+        `${opts.startTimeoutMs}ms after 'docker compose up -d'`,
+      { backend: "auto-start", bypass_env: opts.bypassEnv }
+    );
+  })();
+
+  inFlightAutoStart.set(healthUrl, work);
+
+  try {
+    await work;
+  } finally {
+    inFlightAutoStart.delete(healthUrl);
+  }
 }
 
 export function deriveHealthUrl(endpoint: string): string {
@@ -110,6 +146,25 @@ async function isHealthy(
     if (!res.ok) return false;
     const data = (await res.json()) as { ok?: unknown; model_loaded?: unknown };
     return Boolean(data?.ok) && data?.model_loaded === true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function isContainerUp(
+  url: string,
+  fetchImpl: (input: string | URL, init?: RequestInit) => Promise<Response>,
+  timeoutMs: number
+): Promise<boolean> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(url, { method: "GET", signal: ctrl.signal });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { ok?: unknown };
+    return Boolean(data?.ok);
   } catch {
     return false;
   } finally {
