@@ -722,7 +722,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     remover.dispose();
   });
 
-  test("tool.state.input with path/name/id-shaped keys is masked (strict — no skip-list)", async () => {
+  test("tool.state.input path/name/id-shaped keys are preserved (non-strict)", async () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const output = {
@@ -757,12 +757,12 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
         };
       };
     })?.state?.input;
-    expect(inp?.user_name).not.toContain("김철수");
-    expect(inp?.user_name).toContain("__OPF_PERSON_");
-    expect(inp?.contact_id).not.toContain("alice@example.com");
-    expect(inp?.contact_id).toContain("__OPF_EMAIL_");
-    expect(inp?.profile_url).not.toContain("alice@example.com");
-    expect(inp?.profile_url).toContain("__OPF_EMAIL_");
+    // Fields ending in _name, _id, _url are skipped by heuristic so the LLM
+    // sees real values (prevents token-index confusion in paths).
+    expect(inp?.user_name).toBe("김철수님 long string for detection");
+    expect(inp?.contact_id).toBe("alice@example.com long enough string");
+    expect(inp?.profile_url).toBe("alice@example.com long form here");
+    // Non-path fields are still masked.
     expect(inp?.unrelated).not.toContain("010-1234-5678");
     expect(inp?.unrelated).toContain("__OPF_PHONE_");
     remover.dispose();

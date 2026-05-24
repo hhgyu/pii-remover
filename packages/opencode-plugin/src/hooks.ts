@@ -394,7 +394,10 @@ export function createPluginHooks(
       const state = part.state;
       if (state && typeof state === "object") {
         if (state.input !== undefined && state.input !== null) {
-          state.input = await maskTextFieldsStrict(
+          // Use maskTextFields (with path-skip) instead of strict so the LLM
+          // sees real filesystem paths. This prevents token-index confusion
+          // where the LLM picks the wrong __OPF_PERSON_N__ for a path.
+          state.input = await maskTextFields(
             state.input,
             maskMessagePartText
           );
@@ -490,8 +493,19 @@ export function createPluginHooks(
         output.args = restored;
         return;
       }
+      // 1. Restore first: the LLM may produce args containing vault tokens
+      //    (e.g. "D:\Git\__OPF_PERSON_1__Plugin" from masked context).
+      //    Restoring before the permission dialog + execution ensures the
+      //    user sees real paths and the tool hits the real filesystem.
+      //    Empty skip-set so ALL fields (including path-shaped ones) are restored.
+      const restored = await restoreTextFields(output.args, restoreFieldText, {
+        skipFields: new Set(),
+      });
+
+      // 2. Mask the restored args so any freshly-disclosed PII in non-path
+      //    fields still gets tokenised before the tool sees it.
       const next = await maskTextFields(
-        output.args,
+        restored,
         maskText,
         options.maskOptions ?? {}
       );
