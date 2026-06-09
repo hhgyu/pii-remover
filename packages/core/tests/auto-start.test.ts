@@ -12,11 +12,39 @@ function silentWarn(): (msg: string) => void {
   return () => {};
 }
 
+type WarmupBehavior =
+  | { kind: "success"; loaded?: boolean }
+  | { kind: "http_error"; status: number; body?: string }
+  | { kind: "throw"; error: Error };
+
 function mkFetch(
-  script: ReadonlyArray<{ ok: boolean; loaded: boolean }>
+  script: ReadonlyArray<{ ok: boolean; loaded: boolean }>,
+  warmup: WarmupBehavior = { kind: "success" }
 ): (input: string | URL, init?: RequestInit) => Promise<Response> {
   let i = 0;
-  return async () => {
+  return async (input, init) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const method = init?.method ?? "GET";
+    if (method === "POST" && url.includes("/warmup")) {
+      if (warmup.kind === "throw") throw warmup.error;
+      if (warmup.kind === "http_error") {
+        return new Response(warmup.body ?? "", {
+          status: warmup.status,
+          headers: { "content-type": "text/plain" },
+        });
+      }
+      const loaded = warmup.loaded ?? true;
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          model_loaded: loaded,
+          korean_ner_loaded: false,
+          elapsed_ms: 100,
+          warnings: [],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    }
     const step = script[Math.min(i, script.length - 1)]!;
     i += 1;
     if (!step.ok) {
@@ -108,14 +136,41 @@ describe("maybeAutoStartBackend", () => {
     expect(spawnCalls).toBe(0);
   });
 
-  test("skips spawn when container is up but model is idle-unloaded", async () => {
+  test("warms up backend when container is up but model is idle-unloaded", async () => {
     let spawnCalls = 0;
+    const fetchCalls: { url: string; method: string }[] = [];
     const logs: string[] = [];
     const warn = (msg: string) => logs.push(msg);
+
+    const tracingFetch = async (
+      input: string | URL,
+      init?: RequestInit
+    ): Promise<Response> => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = init?.method ?? "GET";
+      fetchCalls.push({ url, method });
+      if (method === "POST" && url.includes("/warmup")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            model_loaded: true,
+            korean_ner_loaded: false,
+            elapsed_ms: 200,
+            warnings: [],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true, model_loaded: false }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    };
+
     await maybeAutoStartBackend({
       ...base,
       warn,
-      fetchImpl: mkFetch([{ ok: true, loaded: false }]),
+      fetchImpl: tracingFetch,
       spawnImpl: (() => {
         spawnCalls += 1;
         return mkSpawn({ exitCode: 0 });
@@ -123,7 +178,56 @@ describe("maybeAutoStartBackend", () => {
       composePathResolver: () => "/fake/docker-compose.yml",
     });
     expect(spawnCalls).toBe(0);
-    expect(logs.some((l) => l.includes("model unloaded/idle"))).toBe(true);
+    expect(
+      fetchCalls.some(
+        (c) => c.method === "POST" && c.url.endsWith("/warmup")
+      )
+    ).toBe(true);
+    expect(logs.some((l) => l.includes("warming up"))).toBe(true);
+    expect(logs.some((l) => l.includes("warmup complete"))).toBe(true);
+  });
+
+  test("throws FailClosedError when warmup returns HTTP 503", async () => {
+    await expect(
+      maybeAutoStartBackend({
+        ...base,
+        fetchImpl: mkFetch([{ ok: true, loaded: false }], {
+          kind: "http_error",
+          status: 503,
+          body: "OPF load failed: simulated",
+        }),
+        spawnImpl: mkSpawn({ exitCode: 0 }) as never,
+        composePathResolver: () => "/fake/docker-compose.yml",
+      })
+    ).rejects.toThrow(FailClosedError);
+  });
+
+  test("throws FailClosedError when warmup network call throws", async () => {
+    await expect(
+      maybeAutoStartBackend({
+        ...base,
+        fetchImpl: mkFetch([{ ok: true, loaded: false }], {
+          kind: "throw",
+          error: new Error("ECONNRESET"),
+        }),
+        spawnImpl: mkSpawn({ exitCode: 0 }) as never,
+        composePathResolver: () => "/fake/docker-compose.yml",
+      })
+    ).rejects.toThrow(FailClosedError);
+  });
+
+  test("throws FailClosedError when warmup returns model_loaded=false", async () => {
+    await expect(
+      maybeAutoStartBackend({
+        ...base,
+        fetchImpl: mkFetch([{ ok: true, loaded: false }], {
+          kind: "success",
+          loaded: false,
+        }),
+        spawnImpl: mkSpawn({ exitCode: 0 }) as never,
+        composePathResolver: () => "/fake/docker-compose.yml",
+      })
+    ).rejects.toThrow(/warmup failed/);
   });
 
   test("throws FailClosedError when compose path cannot be resolved", async () => {

@@ -38,11 +38,14 @@ ONNX 모델 weights 가 컨테이너 RAM 에 항상 상주한다. 개인 PC 에�
 
 `backend.auto_start: true` 일 때만 활성. 기본 `false`. 활성화되면:
 
-1. 플러그인 init 시 `<endpoint>/health` 를 짧은 timeout 으로 probe → 이미 healthy 면 spawn 생략 후 종료
-2. 아니면 `docker compose -f <resolved-path> up -d` 를 spawn
-3. spawn 실패 (Docker 미설치/데몬 꺼짐/compose 파일 missing/exit code !=0) → **`FailClosedError` throw**
-4. spawn 성공 시 `start_timeout_ms` 동안 1초 간격으로 `/health` 폴링
-5. `model_loaded: true` 응답을 얻으면 정상 진행, 아니면 `FailClosedError` throw
+1. 플러그인 init 시 `<endpoint>/health` 를 짧은 timeout 으로 probe → 이미 healthy (`ok && model_loaded`) 면 spawn 생략 후 종료
+2. **컨테이너는 떠 있지만 모델이 idle-unloaded 인 경우** (`ok=true && model_loaded=false`) → spawn 생략하고 `POST <endpoint>/warmup` 호출. 응답 timeout 은 `start_timeout_ms`. 백엔드가 `model_loaded: true` 로 응답하면 정상 진행, 아니면 **`FailClosedError` throw**
+3. 둘 다 아니면 `docker compose -f <resolved-path> up -d` 를 spawn
+4. spawn 실패 (Docker 미설치/데몬 꺼짐/compose 파일 missing/exit code !=0) → **`FailClosedError` throw**
+5. spawn 성공 시 `start_timeout_ms` 동안 1초 간격으로 `/health` 폴링
+6. `model_loaded: true` 응답을 얻으면 정상 진행, 아니면 `FailClosedError` throw
+
+**왜 `/warmup` 이 필요한가**: 컨테이너만 올라와 있고 모델이 idle-unloaded 인 상태에서 클라이언트의 첫 `/redact` 요청은 백엔드의 lazy-reload 경로 (1~3초)에 부딪힌다. 그러나 클라이언트의 기본 request timeout 은 5초이고 `OpfHttpBackend` 에는 재시도가 없다. cold reload 가 5초를 살짝 넘기면 첫 요청이 그대로 `FailClosedError` 로 차단된다 ("씹힘"). auto-start 가 `/warmup` 으로 cold-start 비용을 미리 지불해 사용자의 첫 요청이 항상 warm 모델에 부딪히도록 한다.
 
 **compose_file** 셀렉터:
 - `"cpu"` (default) → `packages/backend/docker-compose.yml` 자동 탐색
@@ -130,7 +133,8 @@ ONNX 모델 weights 가 컨테이너 RAM 에 항상 상주한다. 개인 PC 에�
 
 - [ADR-0006](./0006-fail-closed-default.md) — fail-closed default
 - [ADR-0008](./0008-detection-backend-self-built-docker.md) — 자체 Docker 이미지
-- [`packages/core/src/backend/auto-start.ts`](../../packages/core/src/backend/auto-start.ts) — 구현
+- [`packages/core/src/backend/auto-start.ts`](../../packages/core/src/backend/auto-start.ts) — 구현 (probe → warmup → spawn → poll 4단계)
 - [`packages/backend/server/main.py`](../../packages/backend/server/main.py) — idle monitor task + middleware
+- [`packages/backend/server/api/warmup.py`](../../packages/backend/server/api/warmup.py) — `POST /warmup` — idle-unloaded 모델 강제 reload
 - [`packages/backend/server/opf_runner.py`](../../packages/backend/server/opf_runner.py) — `OpfRunner.unload()`
 - [`packages/backend/server/korean_ner_runner.py`](../../packages/backend/server/korean_ner_runner.py) — `KoreanNerRunner.unload()`

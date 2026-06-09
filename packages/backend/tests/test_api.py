@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 from server import __version__
 from server.api import health as health_api
 from server.api import redact as redact_api
+from server.api import warmup as warmup_api
 from server.main import _idle_unload_monitor, _track_redact_activity
 from server.opf_runner import OpfRunner, _mask_text
 from server.schemas import Detection, RedactResponse
@@ -437,3 +438,136 @@ def test_idle_monitor_does_NOT_unload_when_recently_active(monkeypatch) -> None:
         asyncio.run(runner())
     finally:
         config.get_settings.cache_clear()
+
+
+class _FakeKorenNerRunnerStub:
+    """KNER stand-in for /warmup tests; no onnxruntime, tracks load_calls."""
+
+    def __init__(self, *, loaded: bool = True, fail: bool = False) -> None:
+        self._loaded = loaded
+        self._fail = fail
+        self.load_calls = 0
+
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded
+
+    def load(self) -> None:
+        self.load_calls += 1
+        if self._fail:
+            raise RuntimeError("simulated KNER load failure")
+        self._loaded = True
+
+
+def test_warmup_loads_opf_when_idle_unloaded() -> None:
+    app = FastAPI()
+    app.include_router(warmup_api.router)
+    runner = UnloadableFakeOpfRunner()
+    runner.unload()
+    assert runner.is_loaded is False
+    app.state.opf_runner = runner
+    app.state.korean_ner_runner = None
+
+    with TestClient(app) as c:
+        response = c.post("/warmup")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["model_loaded"] is True
+        assert body["korean_ner_loaded"] is False
+        assert body["warnings"] == []
+        assert body["elapsed_ms"] >= 0.0
+
+    assert runner.is_loaded is True
+    assert runner.load_calls == 1
+
+
+def test_warmup_is_idempotent_when_already_loaded() -> None:
+    app = FastAPI()
+    app.include_router(warmup_api.router)
+    runner = UnloadableFakeOpfRunner()
+    assert runner.is_loaded is True
+    app.state.opf_runner = runner
+    app.state.korean_ner_runner = None
+
+    with TestClient(app) as c:
+        response = c.post("/warmup")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["model_loaded"] is True
+
+    assert runner.load_calls == 0
+
+
+def test_warmup_loads_korean_ner_when_present() -> None:
+    app = FastAPI()
+    app.include_router(warmup_api.router)
+    runner = UnloadableFakeOpfRunner()
+    runner.unload()
+    kner = _FakeKorenNerRunnerStub(loaded=False)
+    app.state.opf_runner = runner
+    app.state.korean_ner_runner = kner
+
+    with TestClient(app) as c:
+        response = c.post("/warmup")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["model_loaded"] is True
+        assert body["korean_ner_loaded"] is True
+        assert body["warnings"] == []
+
+    assert runner.load_calls == 1
+    assert kner.load_calls == 1
+
+
+def test_warmup_returns_503_when_opf_load_fails() -> None:
+    class FailingRunner(UnloadableFakeOpfRunner):
+        def load(self) -> None:
+            self.load_calls += 1
+            raise RuntimeError("simulated OPF load failure")
+
+    app = FastAPI()
+    app.include_router(warmup_api.router)
+    runner = FailingRunner()
+    runner.unload()
+    app.state.opf_runner = runner
+    app.state.korean_ner_runner = None
+
+    with TestClient(app) as c:
+        response = c.post("/warmup")
+        assert response.status_code == 503
+        assert "OPF load failed" in response.json()["detail"]
+
+
+def test_warmup_kner_failure_surfaces_as_warning_not_503() -> None:
+    app = FastAPI()
+    app.include_router(warmup_api.router)
+    runner = UnloadableFakeOpfRunner()
+    kner = _FakeKorenNerRunnerStub(loaded=False, fail=True)
+    app.state.opf_runner = runner
+    app.state.korean_ner_runner = kner
+
+    with TestClient(app) as c:
+        response = c.post("/warmup")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["model_loaded"] is True
+        assert body["korean_ner_loaded"] is False
+        assert len(body["warnings"]) == 1
+        assert body["warnings"][0].startswith("korean_ner_load_failed:")
+
+
+def test_warmup_does_NOT_count_as_redact_activity() -> None:
+    app = FastAPI()
+    app.middleware("http")(_track_redact_activity)
+    app.include_router(warmup_api.router)
+    app.state.opf_runner = UnloadableFakeOpfRunner()
+    app.state.korean_ner_runner = None
+    app.state.last_request_at = None
+    app.state.idle_unloaded = True
+
+    with TestClient(app) as c:
+        c.post("/warmup")
+        assert app.state.last_request_at is None
+        assert app.state.idle_unloaded is True

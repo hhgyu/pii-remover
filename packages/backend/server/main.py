@@ -25,6 +25,7 @@ from . import __version__
 from .api import health as health_api
 from .api import redact as redact_api
 from .api import redact_image as redact_image_api
+from .api import warmup as warmup_api
 from .config import get_korean_ner_settings, get_settings
 from .korean_ner_runner import KoreanNerRunner
 from .opf_runner import OpfRunner
@@ -174,6 +175,7 @@ def create_app() -> FastAPI:
     )
     app.middleware("http")(_track_redact_activity)
     app.include_router(health_api.router)
+    app.include_router(warmup_api.router)
     app.include_router(redact_api.router)
     app.include_router(redact_image_api.router)
     return app

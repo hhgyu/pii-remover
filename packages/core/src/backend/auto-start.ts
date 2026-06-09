@@ -9,10 +9,15 @@ import { FailClosedError } from "../policy/failure.js";
  * Backend auto-start: optionally spawn `docker compose up -d` for the
  * detection backend, then poll `/health` until the model is loaded.
  *
+ * When the container is already up but the model has been idle-unloaded
+ * (ADR-0019), skip the spawn and POST `/warmup` instead. This forces a
+ * synchronous lazy-reload before the user's first `/redact`, so the
+ * cold-start cost is not paid under the default 5s request timeout.
+ *
  * Opt-in (`backend.auto_start: true`), fail-closed on every failure path:
  * Docker not installed, daemon down, compose file missing, health probe
- * timeout — all raise `FailClosedError` so the caller's `failure_policy`
- * gate decides what to do.
+ * timeout, `/warmup` failure — all raise `FailClosedError` so the
+ * caller's `failure_policy` gate decides what to do.
  *
  * The compose file is resolved by walking parent directories from this
  * module's location looking for `packages/backend/docker-compose.yml`
@@ -72,9 +77,23 @@ export async function maybeAutoStartBackend(opts: AutoStartOptions): Promise<voi
 
     if (await isContainerUp(healthUrl, fetchImpl, HEALTH_PROBE_TIMEOUT_MS)) {
       opts.warn(
-        `[pii-remover] backend container up (model unloaded/idle) at ${healthUrl}; auto-start skipped`
+        `[pii-remover] backend container up at ${healthUrl} but model is idle-unloaded; warming up`
       );
-      return;
+      try {
+        await warmupBackend(
+          healthUrl,
+          fetchImpl,
+          Math.max(1000, opts.startTimeoutMs)
+        );
+        opts.warn(`[pii-remover] backend warmup complete at ${healthUrl}`);
+        return;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        throw new FailClosedError(
+          `PII Remover: backend warmup failed at ${healthUrl}: ${reason}`,
+          { backend: "auto-start", cause: err, bypass_env: opts.bypassEnv }
+        );
+      }
     }
 
     const resolver = opts.composePathResolver ?? defaultComposePathResolver;
@@ -169,6 +188,53 @@ async function isContainerUp(
     return false;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function deriveWarmupUrl(healthUrl: string): string {
+  return healthUrl.replace(/\/health$/, "/warmup");
+}
+
+async function warmupBackend(
+  healthUrl: string,
+  fetchImpl: (input: string | URL, init?: RequestInit) => Promise<Response>,
+  timeoutMs: number
+): Promise<void> {
+  const warmupUrl = deriveWarmupUrl(healthUrl);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(warmupUrl, {
+      method: "POST",
+      headers: { accept: "application/json" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const detail = await safeReadDetail(res);
+      throw new Error(
+        `HTTP ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}`
+      );
+    }
+    const data = (await res.json()) as {
+      ok?: unknown;
+      model_loaded?: unknown;
+    };
+    if (!data?.ok || data.model_loaded !== true) {
+      throw new Error(
+        `backend reported not-ready after warmup: ${JSON.stringify(data)}`
+      );
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function safeReadDetail(res: Response): Promise<string | null> {
+  try {
+    const text = await res.text();
+    return text.length > 0 ? text.slice(0, 200) : null;
+  } catch {
+    return null;
   }
 }
 

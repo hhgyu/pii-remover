@@ -149,6 +149,51 @@ class HealthResponse(BaseModel):
     )
 
 
+class WarmupResponse(BaseModel):
+    """Response body for ``POST /warmup``.
+
+    The ``/warmup`` endpoint forces a synchronous lazy-reload of the OPF
+    runner (and the Korean NER runner when initialised). It is intended
+    for the TypeScript core's auto-start flow (ADR-0019): when the
+    container is already up but the model has been idle-unloaded, the
+    client calls ``/warmup`` with a generous timeout so the user's first
+    ``/redact`` request hits a warm model and does not pay cold-start
+    cost under the default 5s request timeout.
+
+    OPF failures map to ``503``. Korean NER failures are non-fatal and
+    are surfaced via ``warnings`` so the client can log them — this
+    mirrors the silent fall-through in ``KoreanNerRunner.detect``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool = Field(
+        ...,
+        description="True when the OPF runner is loaded after the call.",
+    )
+    model_loaded: bool = Field(
+        ...,
+        description="True when the OPF runner is loaded after the call.",
+    )
+    korean_ner_loaded: bool = Field(
+        ...,
+        description=(
+            "True when the Korean NER runner is loaded after the call. "
+            "False when the runner is not initialised or its load failed."
+        ),
+    )
+    elapsed_ms: float = Field(
+        ..., ge=0.0, description="Wall-clock duration of the warmup call."
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Non-fatal issues surfaced during warmup (e.g. Korean NER "
+            "load failure). Each entry is a short tagged string."
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Phase 6 / ADR-0009: image redaction schemas
 # ---------------------------------------------------------------------------

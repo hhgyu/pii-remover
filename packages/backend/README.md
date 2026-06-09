@@ -88,6 +88,46 @@ Docker `HEALTHCHECK` uses this endpoint; the `start_period` is set to 120s
 for the prebuilt images and 900s for `:slim` so the first download doesn't
 trip the restart policy.
 
+### `POST /warmup`
+
+Forces a synchronous lazy-reload of the OPF runner (and the Korean NER
+runner when configured). Designed for the TypeScript core's auto-start
+flow ([ADR-0019](../../docs/ADR/0019-backend-auto-start-and-idle-unload.md)):
+when the container is up but the model has been idle-unloaded, the
+client calls `/warmup` with a generous timeout so the user's first
+`/redact` hits a warm model.
+
+Idempotent — already-loaded runners return immediately. `/warmup` does
+not count as `/redact` activity (the idle timer is not bumped).
+
+Response (success):
+```json
+{
+  "ok": true,
+  "model_loaded": true,
+  "korean_ner_loaded": true,
+  "elapsed_ms": 1342.8,
+  "warnings": []
+}
+```
+
+Korean NER failures are non-fatal — `/redact` falls through to OPF +
+regex without it. The failure is reported via `warnings`:
+```json
+{
+  "ok": true,
+  "model_loaded": true,
+  "korean_ner_loaded": false,
+  "elapsed_ms": 850.1,
+  "warnings": ["korean_ner_load_failed: <reason>"]
+}
+```
+
+OPF load failures map to `503`:
+```json
+{ "detail": "OPF load failed: <reason>" }
+```
+
 ### `POST /redact`
 
 Request:
