@@ -722,6 +722,77 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     remover.dispose();
   });
 
+  test("object-shaped tool.state.output (MCP structuredContent) is masked", async () => {
+    const remover = await buildRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const output = {
+      messages: [
+        {
+          info: { role: "assistant" },
+          parts: [
+            {
+              type: "tool",
+              state: {
+                status: "completed",
+                output: {
+                  content: [
+                    { type: "text", text: "contact alice@example.com soon" },
+                  ],
+                  structuredContent: { email: "alice@example.com here too" },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    await hooks["experimental.chat.messages.transform"]?.({}, output);
+    const state = (output.messages[0]?.parts?.[0] as {
+      state?: {
+        output?: {
+          content: Array<{ text: string }>;
+          structuredContent: { email: string };
+        };
+      };
+    }).state;
+    expect(state?.output?.content[0]?.text).not.toContain("alice@example.com");
+    expect(state?.output?.content[0]?.text).toContain("__OPF_EMAIL_");
+    expect(state?.output?.structuredContent.email).not.toContain(
+      "alice@example.com"
+    );
+    expect(state?.output?.structuredContent.email).toContain("__OPF_EMAIL_");
+    remover.dispose();
+  });
+
+  test("object-shaped tool.state.metadata is masked", async () => {
+    const remover = await buildRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const output = {
+      messages: [
+        {
+          info: { role: "assistant" },
+          parts: [
+            {
+              type: "tool",
+              state: {
+                status: "completed",
+                output: "done",
+                metadata: { note: "ssn-ish contact dev@example.com record" },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    await hooks["experimental.chat.messages.transform"]?.({}, output);
+    const meta = (output.messages[0]?.parts?.[0] as {
+      state?: { metadata?: { note: string } };
+    }).state?.metadata;
+    expect(meta?.note).not.toContain("dev@example.com");
+    expect(meta?.note).toContain("__OPF_EMAIL_");
+    remover.dispose();
+  });
+
   test("tool.state.input path/name/id-shaped keys are preserved (non-strict)", async () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });

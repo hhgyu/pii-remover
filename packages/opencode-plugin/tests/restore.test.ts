@@ -61,7 +61,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     expect(output.title).toBe("Result for user@example.com");
   });
 
-  test("leaves non-string output untouched", async () => {
+  test("leaves token-free non-string output structurally unchanged", async () => {
     const remover = await makeRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
 
@@ -73,6 +73,51 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     await hooks["tool.execute.after"]!({ tool: "ls", sessionID: "s", callID: "c", args: {} },
     output);
     expect(output.output as unknown).toEqual({ nested: 42 });
+  });
+
+  test("restores tokens inside object-shaped MCP tool output", async () => {
+    const remover = await makeRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+
+    const masked = await maskString(remover, "Email alice@example.com now.");
+    expect(masked).toContain("__OPF_EMAIL_1__");
+
+    const output = {
+      output: {
+        content: [{ type: "text", text: masked }],
+        structuredContent: { summary: masked },
+      } as unknown as string,
+      title: "ok",
+      metadata: {},
+    };
+    await hooks["tool.execute.after"]!({ tool: "mcp_server_search", sessionID: "s", callID: "c", args: {} },
+    output);
+    const restored = output.output as unknown as {
+      content: Array<{ text: string }>;
+      structuredContent: { summary: string };
+    };
+    expect(restored.content[0]!.text).toContain("alice@example.com");
+    expect(restored.content[0]!.text).not.toContain("__OPF_EMAIL_");
+    expect(restored.structuredContent.summary).toContain("alice@example.com");
+  });
+
+  test("restores tokens inside tool output.metadata", async () => {
+    const remover = await makeRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+
+    const masked = await maskString(remover, "Reach dev@example.com here.");
+    expect(masked).toContain("__OPF_EMAIL_1__");
+
+    const output = {
+      output: "done",
+      title: "ok",
+      metadata: { result: { note: masked } } as unknown,
+    };
+    await hooks["tool.execute.after"]!({ tool: "mcp_server_fetch", sessionID: "s", callID: "c", args: {} },
+    output);
+    const meta = output.metadata as { result: { note: string } };
+    expect(meta.result.note).toContain("dev@example.com");
+    expect(meta.result.note).not.toContain("__OPF_EMAIL_");
   });
 
   test("hallucinated tokens stay as-is (vault miss)", async () => {

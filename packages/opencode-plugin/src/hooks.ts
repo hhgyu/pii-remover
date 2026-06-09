@@ -68,8 +68,8 @@ interface ToolAfterInput {
 }
 
 interface ToolAfterOutput {
-  title: string;
-  output: string;
+  title: unknown;
+  output: unknown;
   metadata: unknown;
 }
 
@@ -404,9 +404,17 @@ export function createPluginHooks(
         }
         if (typeof state.output === "string") {
           state.output = await maskMessagePartText(state.output);
+        } else if (state.output !== undefined && state.output !== null) {
+          state.output = await maskTextFields(state.output, maskMessagePartText);
         }
         if (typeof state.title === "string") {
           state.title = await maskMessagePartText(state.title);
+        }
+        if (state.metadata !== undefined && state.metadata !== null) {
+          state.metadata = await maskTextFields(
+            state.metadata,
+            maskMessagePartText
+          );
         }
       }
       return;
@@ -521,9 +529,20 @@ export function createPluginHooks(
       if (disposed) return;
       if (typeof output.output === "string") {
         output.output = restoreText(output.output, "tool.execute.after");
+      } else if (output.output !== undefined && output.output !== null) {
+        output.output = await restoreTextFields(output.output, restoreFieldText, {
+          skipFields: new Set(),
+        });
       }
       if (typeof output.title === "string") {
         output.title = restoreText(output.title, "tool.execute.after");
+      }
+      if (output.metadata !== undefined && output.metadata !== null) {
+        output.metadata = await restoreTextFields(
+          output.metadata,
+          restoreFieldText,
+          { skipFields: new Set() }
+        );
       }
     };
   }
