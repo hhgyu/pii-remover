@@ -47,6 +47,7 @@ export interface KoreanHeuristicsConfig {
 export interface DetectionConfig {
   enabled_categories: PIICategory[];
   korean_heuristics: KoreanHeuristicsConfig;
+  generic_secret_scan?: boolean;
 }
 
 export type RestorationMode = "token" | "synthetic";
@@ -152,6 +153,7 @@ export const DEFAULT_CONFIG: PiiRemoverConfig = {
       surname_list_path: null,
       stopwords_path: null,
     },
+    generic_secret_scan: false,
   },
   restoration: {
     token_format: "__OPF_{CATEGORY}_{INDEX}__",

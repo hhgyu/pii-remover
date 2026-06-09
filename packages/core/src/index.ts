@@ -85,6 +85,8 @@ export type {
 
 export { Detector } from "./detector/index.js";
 export type { DetectorOptions } from "./detector/index.js";
+export { findSecrets, SECRET_PATTERNS } from "./detector/secret-scanner.js";
+export type { FindSecretsOptions } from "./detector/secret-scanner.js";
 
 export { AuditEmitter, aggregateAuditCategories } from "./audit/index.js";
 export type {

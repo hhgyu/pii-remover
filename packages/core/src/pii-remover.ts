@@ -24,6 +24,8 @@ import {
   type BackendStrategy,
 } from "./backend/strategy.js";
 import { Detector } from "./detector/index.js";
+import { findSecrets } from "./detector/secret-scanner.js";
+import { mergeDetections } from "./backend/strategy.js";
 import {
   Restorer,
   type RestoreOptions,
@@ -220,6 +222,21 @@ export class PIIRemover {
         });
       }
       throw err;
+    }
+
+    if (
+      detection.backend_name !== "passthrough" &&
+      this.config.detection.enabled_categories.includes("secret")
+    ) {
+      const secrets = findSecrets(text, {
+        generic: this.config.detection.generic_secret_scan === true,
+      });
+      if (secrets.length > 0) {
+        detection.detections = mergeDetections([
+          ...secrets,
+          ...detection.detections,
+        ]);
+      }
     }
 
     const tokens = this.vault.assign(this.sessionId, detection.detections);

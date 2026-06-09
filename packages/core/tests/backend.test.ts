@@ -165,6 +165,43 @@ describe("LocalRegexBackend — English-only PII (Phase 1)", () => {
     expect(secrets[0]!.start).toBe(0);
   });
 
+  test("secret: detects Supabase publishable key (sb_publishable_ prefix)", async () => {
+    const b = new LocalRegexBackend();
+    const r = await b.detect(
+      "Publishable | sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+      opts
+    );
+    const secrets = r.detections.filter((d) => d.category === "secret");
+    expect(secrets).toHaveLength(1);
+    expect(secrets[0]!.text).toBe(
+      "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
+    );
+    expect(secrets[0]!.confidence).toBe(0.99);
+  });
+
+  test("secret: detects Supabase secret key (sb_secret_ prefix)", async () => {
+    const b = new LocalRegexBackend();
+    const r = await b.detect(
+      "Secret | sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
+      opts
+    );
+    const secrets = r.detections.filter((d) => d.category === "secret");
+    expect(secrets).toHaveLength(1);
+    expect(secrets[0]!.text).toBe("sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz");
+  });
+
+  test("secret: detects Supabase secret key at start of string", async () => {
+    const b = new LocalRegexBackend();
+    const r = await b.detect(
+      "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz leaked",
+      opts
+    );
+    const secrets = r.detections.filter((d) => d.category === "secret");
+    expect(secrets).toHaveLength(1);
+    expect(secrets[0]!.text).toBe("sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz");
+    expect(secrets[0]!.start).toBe(0);
+  });
+
   test("secret: detects GitHub PAT (ghp_ prefix)", async () => {
     const b = new LocalRegexBackend();
     const r = await b.detect(

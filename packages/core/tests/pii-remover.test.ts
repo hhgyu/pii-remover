@@ -132,6 +132,93 @@ describe("PIIRemover.mask — round trip (Phase 1)", () => {
   });
 });
 
+describe("PIIRemover.mask — always-on secret scanner (Oracle recommendation)", () => {
+  function noSecretBackend(): BackendClient {
+    return {
+      name: "no-secret",
+      trust_tier: "local",
+      async detect(_t: string, _o: DetectOpts): Promise<DetectionResult> {
+        return { detections: [], backend_name: "no-secret", latency_ms: 0 };
+      },
+      async healthCheck(): Promise<BackendHealth> {
+        return { ok: true, latency_ms: 0 };
+      },
+    };
+  }
+
+  test("masks Supabase secret key even when injected strategy has no secret backend", async () => {
+    const pii = await PIIRemover.init({
+      sessionId: "secret-scan-1",
+      config: mkConfig(),
+      env: {},
+      warn: silentWarn(),
+      strategy: new SingleStrategy(noSecretBackend()),
+    });
+    const r = await pii.mask(
+      "key sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz here"
+    );
+    expect(r.text).not.toContain("sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz");
+    expect(r.text).toContain("__OPF_SECRET_1__");
+    expect(r.tokens).toHaveLength(1);
+    expect(r.tokens[0]!.category).toBe("secret");
+    pii.dispose();
+  });
+
+  test("does not double-count when backend already detects the secret", async () => {
+    const pii = await PIIRemover.init({
+      sessionId: "secret-scan-2",
+      config: mkConfig(),
+      env: {},
+      warn: silentWarn(),
+      strategy: new SingleStrategy(new LocalRegexBackend()),
+    });
+    const r = await pii.mask("aws AKIAIOSFODNN7EXAMPLE leaked");
+    const secretTokens = r.tokens.filter((t) => t.category === "secret");
+    expect(secretTokens).toHaveLength(1);
+    pii.dispose();
+  });
+
+  test("skips secret scan when 'secret' category is disabled", async () => {
+    const config = mkConfig({
+      detection: {
+        ...DEFAULT_CONFIG.detection,
+        enabled_categories: DEFAULT_CONFIG.detection.enabled_categories.filter(
+          (c: PIICategory) => c !== "secret"
+        ),
+      },
+    });
+    const pii = await PIIRemover.init({
+      sessionId: "secret-scan-3",
+      config,
+      env: {},
+      warn: silentWarn(),
+      strategy: new SingleStrategy(noSecretBackend()),
+    });
+    const r = await pii.mask(
+      "key sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz here"
+    );
+    expect(r.text).toContain("sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz");
+    expect(r.tokens).toHaveLength(0);
+    pii.dispose();
+  });
+
+  test("does not run secret scan on bypass passthrough", async () => {
+    const pii = await PIIRemover.init({
+      sessionId: "secret-scan-4",
+      config: mkConfig(),
+      env: { PII_REMOVER_BYPASS: "1" },
+      warn: silentWarn(),
+      strategy: new SingleStrategy(noSecretBackend()),
+    });
+    const r = await pii.mask(
+      "key sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz here"
+    );
+    expect(r.bypassed).toBe(true);
+    expect(r.text).toContain("sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz");
+    pii.dispose();
+  });
+});
+
 describe("PIIRemover.mask — bypass (ADR-0006)", () => {
   test("PII_REMOVER_BYPASS=1 short-circuits to passthrough", async () => {
     const pii = await PIIRemover.init({
