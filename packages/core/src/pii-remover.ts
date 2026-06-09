@@ -162,8 +162,9 @@ export class PIIRemover {
     });
     const vault = this.vault.getOrCreate(this.sessionId);
     if (bypass) {
-      recordBypass();
-      this.warn(bypassWarningMessage({ envName: this.config.bypass_env }));
+      if (recordBypass() === 1) {
+        this.warn(bypassWarningMessage({ envName: this.config.bypass_env }));
+      }
       const latencyMs = performance.now() - t0;
       this.audit.bypassEvent({
         vault_id: vault.vault_id,

@@ -248,6 +248,26 @@ describe("PIIRemover.mask — bypass (ADR-0006)", () => {
     expect(r.bypassed).toBe(true);
     pii.dispose();
   });
+
+  test("bypass warning is emitted only once across repeated mask calls", async () => {
+    const warnings: string[] = [];
+    const pii = await PIIRemover.init({
+      sessionId: "s1",
+      config: mkConfig(),
+      env: { PII_REMOVER_BYPASS: "1" },
+      warn: (msg) => warnings.push(msg),
+      strategy: new SingleStrategy(new LocalRegexBackend()),
+    });
+    await pii.mask("first user@example.com");
+    await pii.mask("second user@example.com");
+    await pii.mask("third user@example.com");
+    const bypassWarnings = warnings.filter((w) =>
+      w.includes("PII REDACTION BYPASSED")
+    );
+    expect(bypassWarnings).toHaveLength(1);
+    expect(getBypassCount()).toBe(3);
+    pii.dispose();
+  });
 });
 
 describe("PIIRemover.mask — failure_policy (ADR-0006)", () => {
