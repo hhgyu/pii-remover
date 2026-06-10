@@ -302,7 +302,10 @@ describe("e2e: developer corpus via plugin + mock HTTP backend", () => {
       warn: () => {},
       strategy: mergedStrategy(mock.url),
     });
-    const hooks = createPluginHooks(remover, { warn: () => {} });
+    const hooks = createPluginHooks(remover, {
+      warn: () => {},
+      experimental: false,
+    });
 
     let detected = 0;
     const failures: string[] = [];
@@ -342,7 +345,10 @@ describe("e2e: developer corpus via plugin + mock HTTP backend", () => {
       warn: () => {},
       strategy: mergedStrategy(mock.url),
     });
-    const hooks = createPluginHooks(remover, { warn: () => {} });
+    const hooks = createPluginHooks(remover, {
+      warn: () => {},
+      experimental: false,
+    });
 
     let falsePositives = 0;
     const offenders: string[] = [];
@@ -376,7 +382,10 @@ describe("e2e: developer corpus via plugin + mock HTTP backend", () => {
       warn: () => {},
       strategy: new SingleStrategy(new OpfHttpBackend({ endpoint: mock.url })),
     });
-    const hooks = createPluginHooks(remover, { warn: () => {} });
+    const hooks = createPluginHooks(remover, {
+      warn: () => {},
+      experimental: false,
+    });
     const output = {
       args: {
         file_path: "/home/john/work/repo/main.ts",
@@ -425,12 +434,12 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
     let restored = 0;
     const failures: string[] = [];
     for (const entry of koreanEntries) {
-      const maskOut = { args: { text: entry.text } };
-      await hooks["tool.execute.before"](
-        { tool: "task", sessionID: "s", callID: `c-${restored}` },
-        maskOut
+      const part = { type: "text", text: entry.text };
+      await hooks["experimental.chat.messages.transform"]!(
+        {},
+        { messages: [{ info: { role: "user" }, parts: [part] }] }
       );
-      const masked = (maskOut.args as { text: string }).text;
+      const masked = part.text;
       const llmEcho = { text: masked };
       await handler(
         { sessionID: "s", messageID: "m", partID: "p" },
@@ -493,7 +502,10 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
       warn: () => {},
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    const hooks = createPluginHooks(remover, { warn: () => {} });
+    const hooks = createPluginHooks(remover, {
+      warn: () => {},
+      experimental: false,
+    });
 
     let detected = 0;
     const misses: string[] = [];
@@ -529,7 +541,10 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
       warn: () => {},
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    const hooks = createPluginHooks(remover, { warn: () => {} });
+    const hooks = createPluginHooks(remover, {
+      warn: () => {},
+      experimental: false,
+    });
 
     let falsePositives = 0;
     const offenders: string[] = [];

@@ -65,9 +65,13 @@ describe("createPluginHooks — mode split", () => {
     remover.dispose();
   });
 
-  test("mode=mask masks tool args", async () => {
+  test("mode=mask masks tool args (experimental:false legacy net)", async () => {
     const remover = await buildRemover();
-    const hooks = createPluginHooks(remover, { warn: silentWarn(), mode: "mask" });
+    const hooks = createPluginHooks(remover, {
+      warn: silentWarn(),
+      mode: "mask",
+      experimental: false,
+    });
     const output = { args: { content: "email alice@example.com" } };
 
     await hooks["tool.execute.before"]!(
@@ -103,7 +107,11 @@ describe("createPluginHooks — mode split", () => {
   test("shared remover: mask mode vault is readable by restore mode", async () => {
     const remover = await buildRemover();
 
-    const maskHooks = createPluginHooks(remover, { warn: silentWarn(), mode: "mask" });
+    const maskHooks = createPluginHooks(remover, {
+      warn: silentWarn(),
+      mode: "mask",
+      experimental: false,
+    });
     const restoreHooks = createPluginHooks(remover, { warn: silentWarn(), mode: "restore" });
 
     const output = { args: { content: "contact bob@corp.io for details" } };

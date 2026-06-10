@@ -115,7 +115,10 @@ describe("integration — plugin + OpfHttpBackend (mock HTTP)", () => {
       warn: () => {},
       strategy: new SingleStrategy(new OpfHttpBackend({ endpoint: mock.url })),
     });
-    const hooks = createPluginHooks(remover, { warn: () => {} });
+    const hooks = createPluginHooks(remover, {
+      warn: () => {},
+      experimental: false,
+    });
 
     const output = {
       args: { content: "Please email alice@example.com about the meeting" },
@@ -129,7 +132,7 @@ describe("integration — plugin + OpfHttpBackend (mock HTTP)", () => {
     remover.dispose();
   });
 
-  test("end-to-end: session.idle disposes the underlying vault", async () => {
+  test("end-to-end: vault survives session.idle (restore works after idle)", async () => {
     const remover = await PIIRemover.init({
       sessionId: "integration-session-2",
       config: configWithEndpoint(mock.url),
@@ -137,18 +140,28 @@ describe("integration — plugin + OpfHttpBackend (mock HTTP)", () => {
       warn: () => {},
       strategy: new SingleStrategy(new OpfHttpBackend({ endpoint: mock.url })),
     });
-    const hooks = createPluginHooks(remover, { warn: () => {} });
+    const hooks = createPluginHooks(remover, {
+      warn: () => {},
+      experimental: false,
+    });
 
     const first = { args: { msg: "contact alice@example.com" } };
     await hooks["tool.execute.before"]!({ tool: "task", sessionID: "s", callID: "c1" },
     first);
-    expect((first.args as { msg: string }).msg).toContain("__OPF_EMAIL_1__");
+    const maskedMsg = (first.args as { msg: string }).msg;
+    expect(maskedMsg).toContain("__OPF_EMAIL_1__");
 
     await hooks.event({
       event: { type: "session.idle", properties: { sessionID: "s" } },
     });
 
-    await expect(remover.mask("anything alice@example.com")).rejects.toThrow(/disposed/);
+    const toolOutput = { title: "", output: maskedMsg, metadata: {} };
+    await hooks["tool.execute.after"]!(
+      { tool: "read", sessionID: "s", callID: "c2", args: {} },
+      toolOutput
+    );
+    expect(toolOutput.output).toBe("contact alice@example.com");
+    remover.dispose();
   });
 
   test("PiiRemoverPlugin factory: full path with health check via mock server", async () => {
@@ -156,6 +169,7 @@ describe("integration — plugin + OpfHttpBackend (mock HTTP)", () => {
       config: configWithEndpoint(mock.url),
       warn: () => {},
       backends: [new OpfHttpBackend({ endpoint: mock.url })],
+      experimental: false,
     });
 
     const hooks = await factory({

@@ -134,7 +134,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     expect(output.output).toBe("ghost __OPF_FAKE_99__ never seen");
   });
 
-  test("noop after dispose (session.idle)", async () => {
+  test("still restores after session.idle (idle no longer disposes the vault)", async () => {
     const remover = await makeRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     await maskString(remover, "user@example.com");
@@ -144,9 +144,9 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     });
 
     const output = { output: "__OPF_EMAIL_1__", title: "x", metadata: {} };
-    await hooks["tool.execute.after"]!({ tool: "after-dispose", sessionID: "s", callID: "c", args: {} },
+    await hooks["tool.execute.after"]!({ tool: "after-idle", sessionID: "s", callID: "c", args: {} },
     output);
-    expect(output.output).toBe("__OPF_EMAIL_1__");
+    expect(output.output).toBe("user@example.com");
   });
 });
 
@@ -231,7 +231,7 @@ describe("createPluginHooks — round-trip integration", () => {
     expect(output.output).not.toContain("__OPF_");
   });
 
-  test("dispose makes subsequent restores a no-op", async () => {
+  test("text.complete still restores after session.idle", async () => {
     const remover = await makeRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     await maskString(remover, "alice@example.com");
@@ -245,7 +245,7 @@ describe("createPluginHooks — round-trip integration", () => {
       { sessionID: "s", messageID: "m", partID: "p" },
       textOutput
     );
-    expect(textOutput.text).toBe("__OPF_EMAIL_1__");
+    expect(textOutput.text).toBe("alice@example.com");
   });
 });
 

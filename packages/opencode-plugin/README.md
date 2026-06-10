@@ -140,12 +140,12 @@ for the full surface area and defaults.
 
 | Hook | Phase | Stability | Purpose |
 | --- | --- | --- | --- |
-| `tool.execute.before` | 1 / **5** | stable | For non-display tools: walks `output.args` recursively, replacing every eligible string field with vault tokens. Skips path-shaped fields (`file_path`, `path`, `cwd`, `uri`, `url`, plus `*_path` / `*_dir` / `*_id` / `*_uri` / `*_url` / `*_name`) and strings whose trimmed length is ≤ 8 chars. **For display tools (`question`, `todowrite`, MCP `*_question` / `*_todowrite`)**: restores tokens in args so the UI renders real PII to the user. See [`displayTools`](#display-tools-restoration) and [ADR-0015](../../docs/ADR/0015-display-tool-restoration.md). |
+| `tool.execute.before` | 1 / **5** | stable | Restores vault tokens in **every** arg field — including path-shaped ones (`filePath`, `workdir`, `*_path`, ...) — so tool execution, OpenCode's `external_directory` permission prompt, and display-tool UIs all see real values instead of `__OPF_*`. Args originate from the LLM, so masking them here adds no LLM-side privacy; the LLM boundary is enforced by `experimental.chat.messages.transform`. Only when that boundary mask is disabled (`experimental: false`) does this hook fall back to the legacy Phase-1 behavior: masking eligible string fields (skipping path-shaped fields and strings ≤ 8 chars). See [`displayTools`](#display-tools-restoration) and [ADR-0015](../../docs/ADR/0015-display-tool-restoration.md). |
 | `tool.execute.after` | **2** | stable | Restores tokens (`__OPF_*__`) found in `output.output` and `output.title` back to vault originals. Lets the assistant reason about real file contents / shell stdout after a tool round-trip. |
 | `experimental.text.complete` | **2** | **experimental** | Restores tokens in the assistant's final response `output.text`. Disable with `experimental: false` if you prefer to wait for the Phase 3 local proxy (ADR-0004) instead. |
-| `experimental.chat.messages.transform` | **5** | **experimental** | **NEW**: Comprehensive LLM-boundary mask for every role (user / assistant / tool) and every text-bearing part type (`text`, `reasoning`, `tool.state.input/output/title`, `subtask.prompt/description`, `file.source.text.value`, `agent.source.value`). Unknown part types are recursively masked with a fail-closed strict policy so a new OpenCode part type cannot leak raw PII to the LLM. See [ADR-0015](../../docs/ADR/0015-display-tool-restoration.md). |
+| `experimental.chat.messages.transform` | **5** | **experimental** | **NEW**: Comprehensive LLM-boundary mask for every role (user / assistant / tool) and every text-bearing part type (`text`, `reasoning`, `tool.state.input/output/title`, `subtask.prompt/description`, `file.source.text.value`, `agent.source.value`). Unknown part types are recursively masked with a fail-closed strict policy so a new OpenCode part type cannot leak raw PII to the LLM. **Dead tokens** — `__OPF_*` strings persisted by a previous process (session resume) with no mapping in the current vault — are replaced with `[UNRESTORABLE]` so the LLM cannot copy them into new tool calls; live tokens pass through untouched. See [ADR-0015](../../docs/ADR/0015-display-tool-restoration.md). |
 | `experimental.chat.system.transform` | 2 | experimental | Injects a one-line note into the system prompt telling the LLM that placeholders like `__OPF_PERSON_1__` are privacy-preserving stand-ins. |
-| `event` | 1 | stable | Watches the OpenCode event stream and disposes the vault when a `session.idle` event lands. Idempotent on repeat. |
+| `event` | 1 | stable | Registered but intentionally inert. `session.idle` is **not** a disposal trigger: OpenCode emits it after every completed turn and for every subagent session, so disposing the vault there destroyed live token mappings mid-conversation. The vault (in-memory, deduplicated, ~300B per unique PII value) lives for the process lifetime. |
 
 Intentionally **not** registered:
 
@@ -156,16 +156,20 @@ Intentionally **not** registered:
 
 Some tools render their args directly to the user — the args themselves are
 the UI. For these, masked tokens in args produce a broken UX (the user sees
-`__OPF_PERSON_27__` instead of `김철수`). `tool.execute.before` branches:
+`__OPF_PERSON_27__` instead of `김철수`).
 
-| Tool name | Behavior |
+With the boundary mask active (`experimental` default), **all** tools get
+token restoration in `tool.execute.before`, so the display-tool distinction
+only matters when the boundary mask is off (`experimental: false`):
+
+| Tool name | `experimental: false` behavior |
 | --- | --- |
-| `question` (built-in) | **restore** args |
-| `todowrite` (built-in) | **restore** args |
-| `omo_question`, `server_Question`, any `*_question` (MCP) | **restore** args |
-| `omo_todowrite`, `server_Todowrite`, any `*_todowrite` (MCP) | **restore** args |
-| `questionnaire`, `question_followup`, any name without delimited `_question` / `_todowrite` suffix | mask args (default) |
-| All other tools (`write`, `bash`, `read`, `task`, ...) | mask args (existing behavior) |
+| `question` (built-in) | **restore** args (requires `allowWithoutBoundaryMask`) |
+| `todowrite` (built-in) | **restore** args (requires `allowWithoutBoundaryMask`) |
+| `omo_question`, `server_Question`, any `*_question` (MCP) | **restore** args (requires `allowWithoutBoundaryMask`) |
+| `omo_todowrite`, `server_Todowrite`, any `*_todowrite` (MCP) | **restore** args (requires `allowWithoutBoundaryMask`) |
+| `questionnaire`, `question_followup`, any name without delimited `_question` / `_todowrite` suffix | mask args (legacy Phase-1 net) |
+| All other tools (`write`, `bash`, `read`, `task`, ...) | mask args (legacy Phase-1 net) |
 
 **Primary security invariant**: raw PII never reaches the external LLM API.
 This is enforced by `experimental.chat.messages.transform`, which re-masks

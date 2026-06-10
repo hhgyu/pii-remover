@@ -166,7 +166,7 @@ describe("maskTextFields — skip-list overrides", () => {
 
 describe("DEFAULT_SKIP_FIELDS shape", () => {
   test("contains the canonical path-shaped keys", () => {
-    for (const k of ["file_path", "path", "cwd", "uri", "url"]) {
+    for (const k of ["file_path", "path", "cwd", "workdir", "worktree", "uri", "url"]) {
       expect(DEFAULT_SKIP_FIELDS.has(k)).toBe(true);
     }
   });
@@ -204,12 +204,26 @@ describe("restoreTextFields — restore walker", () => {
     expect(out.short).toBe("[restored-1]");
   });
 
-  test("skips path-shaped fields (same default skip list as mask)", async () => {
+  test("restores tokens in path-shaped fields (LLM echoes masked paths)", async () => {
+    const args = {
+      file_path: "/tmp/file__OPF_PERSON_1__.txt",
+      workdir: "D:\\Git\\__OPF_PERSON_1__-tools",
+      content: "Body __OPF_PERSON_1__ here",
+    };
+    const out = (await restoreTextFields(args, unwrap)) as typeof args;
+    expect(out.file_path).toBe("/tmp/file[restored-1].txt");
+    expect(out.workdir).toBe("D:\\Git\\[restored-1]-tools");
+    expect(out.content).toBe("Body [restored-1] here");
+  });
+
+  test("explicit skipFields option is still honored", async () => {
     const args = {
       file_path: "/tmp/file__OPF_PERSON_1__.txt",
       content: "Body __OPF_PERSON_1__ here",
     };
-    const out = (await restoreTextFields(args, unwrap)) as typeof args;
+    const out = (await restoreTextFields(args, unwrap, {
+      skipFields: new Set(["file_path"]),
+    })) as typeof args;
     expect(out.file_path).toBe("/tmp/file__OPF_PERSON_1__.txt");
     expect(out.content).toBe("Body [restored-1] here");
   });

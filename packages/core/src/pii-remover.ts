@@ -291,6 +291,10 @@ export class PIIRemover {
     return result;
   }
 
+  hasToken(token: string): boolean {
+    return this.vault.lookup(this.sessionId, token) !== null;
+  }
+
   vaultId(): string {
     return this.vault.getOrCreate(this.sessionId).vault_id;
   }

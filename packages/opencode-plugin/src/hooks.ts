@@ -315,7 +315,7 @@ export function createPluginHooks(
     options.displayTools?.allowWithoutBoundaryMask === true;
   const displayRestoreEnabled =
     registerExperimental || allowDisplayRestoreWithoutBoundary;
-  let disposed = false;
+  const warnedDeadTokens = new Set<string>();
 
   if (!registerExperimental && !allowDisplayRestoreWithoutBoundary) {
     warn(
@@ -329,7 +329,6 @@ export function createPluginHooks(
   }
 
   async function maskText(text: string): Promise<string> {
-    if (disposed) return text;
     try {
       const r = await remover.mask(text);
       return r.text;
@@ -341,7 +340,6 @@ export function createPluginHooks(
   }
 
   async function maskMessagePartText(text: string): Promise<string> {
-    if (disposed) return text;
     if (typeof text !== "string" || text.length === 0) return text;
     try {
       const r = await remover.mask(text);
@@ -356,7 +354,6 @@ export function createPluginHooks(
   }
 
   function restoreText(text: string, where: string): string {
-    if (disposed) return text;
     if (typeof text !== "string" || text.length === 0) return text;
     if (!text.includes("__OPF_") && !/__opf_/i.test(text)) return text;
     try {
@@ -379,9 +376,40 @@ export function createPluginHooks(
     return text.replace(/__OPF_[A-Z_]+_\d+__/gi, "[REDACTED]");
   }
 
+  // Tokens whose vault mapping no longer exists (minted by a previous
+  // process before a session resume) can never be restored. Left as-is the
+  // LLM copies them verbatim into new tool args — surfacing __OPF_* in
+  // permission prompts and broken filesystem paths. Replacing them forces
+  // the LLM onto a normal failure path (re-discover or ask the user).
+  // Live tokens are preserved so the LLM can keep reusing them.
+  function neutralizeDeadTokens(text: string): string {
+    if (!/__opf_/i.test(text)) return text;
+    return text.replace(
+      /__OPF_([A-Z_]+)_(\d+)__/gi,
+      (raw, label: string, index: string) => {
+        const normalized = `__OPF_${label.toUpperCase()}_${index}__`;
+        if (remover.hasToken(normalized)) return raw;
+        if (!warnedDeadTokens.has(normalized)) {
+          warnedDeadTokens.add(normalized);
+          warn(
+            `[pii-remover] neutralized dead token ${normalized} ` +
+            "(no vault mapping — likely minted by a previous process)"
+          );
+        }
+        return "[UNRESTORABLE]";
+      }
+    );
+  }
+
   async function maskPartInPlace(part: ChatMessageTransformPart): Promise<void> {
     if (!part || typeof part !== "object") return;
     const type = part.type;
+
+    // Compaction parts strip EVERY token to [REDACTED] below, so the
+    // dead-token sweep would only change the placeholder text.
+    if (type !== "compaction") {
+      await maskTextFieldsStrict(part, neutralizeDeadTokens);
+    }
 
     if (type === "text" || type === "reasoning") {
       if (typeof part.text === "string") {
@@ -471,19 +499,13 @@ export function createPluginHooks(
   const isRestore = mode === "restore" || mode === "full";
 
   const hooks: CreatedHooks = {
-    async event(input: EventEnvelope): Promise<void> {
-      const ev = input?.event;
-      if (!ev || typeof ev.type !== "string") return;
-      if (ev.type === "session.idle" && !disposed) {
-        disposed = true;
-        try {
-          remover.dispose();
-        } catch (err) {
-          const reason = err instanceof Error ? err.message : String(err);
-          warn(`[pii-remover] dispose on session.idle failed: ${reason}`);
-        }
-      }
-    },
+    // `session.idle` is deliberately NOT handled: OpenCode emits it after
+    // EVERY completed turn and for every subagent session, so disposing the
+    // vault here destroyed live mappings mid-conversation (unrestorable
+    // __OPF_* tokens in permission prompts and tool args). The vault is
+    // in-memory only and deduplicated, so process lifetime is the correct
+    // and affordable disposal boundary.
+    async event(_input: EventEnvelope): Promise<void> {},
   };
 
   if (isMask) {
@@ -491,27 +513,31 @@ export function createPluginHooks(
       input: ToolBeforeInput,
       output: ToolBeforeOutput
     ): Promise<void> => {
-      if (disposed) return;
       if (output.args === undefined || output.args === null) return;
+
+      // Restore vault tokens the LLM echoed into args (e.g.
+      // "D:\Git\__OPF_PERSON_1__Plugin" composed from masked context) so
+      // the permission dialog and the tool both see the real filesystem.
+      const restored = await restoreTextFields(output.args, restoreFieldText);
+      output.args = restored;
+
+      // Args originate FROM the LLM, so masking them here adds no LLM-side
+      // privacy — the boundary mask (experimental.chat.messages.transform)
+      // re-tokenises everything before the next dispatch. Re-masking here
+      // would re-introduce __OPF_* into paths right after restoring them,
+      // breaking execution and the external_directory permission prompt.
+      if (registerExperimental) return;
+
+      // Boundary mask absent (experimental: false): keep the legacy
+      // Phase-1 execution-time mask as a best-effort net. Display tools
+      // stay restored only when the user explicitly opted in via
+      // displayTools.allowWithoutBoundaryMask (ADR-0015).
       if (
         displayRestoreEnabled &&
         isDisplayTool(input.tool, displayToolConfig)
       ) {
-        const restored = await restoreTextFields(output.args, restoreFieldText);
-        output.args = restored;
         return;
       }
-      // 1. Restore first: the LLM may produce args containing vault tokens
-      //    (e.g. "D:\Git\__OPF_PERSON_1__Plugin" from masked context).
-      //    Restoring before the permission dialog + execution ensures the
-      //    user sees real paths and the tool hits the real filesystem.
-      //    Empty skip-set so ALL fields (including path-shaped ones) are restored.
-      const restored = await restoreTextFields(output.args, restoreFieldText, {
-        skipFields: new Set(),
-      });
-
-      // 2. Mask the restored args so any freshly-disclosed PII in non-path
-      //    fields still gets tokenised before the tool sees it.
       const next = await maskTextFields(
         restored,
         maskText,
@@ -526,13 +552,10 @@ export function createPluginHooks(
       _input: ToolAfterInput,
       output: ToolAfterOutput
     ): Promise<void> => {
-      if (disposed) return;
       if (typeof output.output === "string") {
         output.output = restoreText(output.output, "tool.execute.after");
       } else if (output.output !== undefined && output.output !== null) {
-        output.output = await restoreTextFields(output.output, restoreFieldText, {
-          skipFields: new Set(),
-        });
+        output.output = await restoreTextFields(output.output, restoreFieldText);
       }
       if (typeof output.title === "string") {
         output.title = restoreText(output.title, "tool.execute.after");
@@ -540,8 +563,7 @@ export function createPluginHooks(
       if (output.metadata !== undefined && output.metadata !== null) {
         output.metadata = await restoreTextFields(
           output.metadata,
-          restoreFieldText,
-          { skipFields: new Set() }
+          restoreFieldText
         );
       }
     };
@@ -553,7 +575,6 @@ export function createPluginHooks(
         _input: SystemTransformInput,
         output: SystemTransformOutput
       ): Promise<void> => {
-        if (disposed) return;
         if (!Array.isArray(output.system)) return;
         if (!output.system.includes(OPF_PLACEHOLDER_SYSTEM_NOTE)) {
           output.system.push(OPF_PLACEHOLDER_SYSTEM_NOTE);
@@ -563,7 +584,6 @@ export function createPluginHooks(
         _input: {},
         output: ChatMessagesTransformOutput
       ): Promise<void> => {
-        if (disposed) return;
         if (!Array.isArray(output.messages)) return;
         for (const message of output.messages) {
           if (!message || !Array.isArray(message.parts)) continue;
@@ -578,7 +598,6 @@ export function createPluginHooks(
         _input: TextCompleteInput,
         output: TextCompleteOutput
       ): Promise<void> => {
-        if (disposed) return;
         if (typeof output.text !== "string") return;
         output.text = restoreText(output.text, "experimental.text.complete");
       };

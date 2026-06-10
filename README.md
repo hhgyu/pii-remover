@@ -173,7 +173,7 @@ Backend-side; `OpfRunner.unload()` + `KoreanNerRunner.unload()` release ONNX ses
 ## Security Model
 
 - **The hook cannot replace the prompt** (both Claude Code and Codex are source-verified). Masking always happens at the proxy. The hook is detection + fail-closed gate only.
-- **Vault is in-memory, session-scoped**: process memory only, never persisted to disk.
+- **Vault is in-memory, project-scoped**: process memory only, never persisted to disk. Lives for the host process lifetime (all chat/subagent sessions of a project share it — required so subagents can restore tokens minted in the parent session); tokens that survive a process restart in persisted history are neutralized to `[UNRESTORABLE]` at the LLM boundary.
 - **Token format `__OPF_<CATEGORY>_<INDEX>__`**: identifier-safe — survives translation, Markdown formatting, and code generation contexts.
 - **4-tier backend trust model**: localhost (default) → self-hosted+TLS → vendor+DPA → public SaaS (discouraged). See [`docs/TRUST_TIERS.md`](./docs/TRUST_TIERS.md).
 - **Fail-closed by default**: any detection failure blocks the LLM call. `PII_REMOVER_BYPASS=1` is the only escape.

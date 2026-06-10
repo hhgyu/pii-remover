@@ -55,20 +55,50 @@ async function buildRemover(opts: {
 }
 
 describe("createPluginHooks — tool.execute.before", () => {
-  test("masks string fields in tool args via the underlying remover", async () => {
+  test("leaves fresh PII in args untouched when the boundary mask is active (default)", async () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const output = { args: { content: "contact alice@example.com please" } };
     await hooks["tool.execute.before"]!({ tool: "write", sessionID: "s", callID: "c1" },
     output);
     const args = output.args as { content: string };
-    expect(args.content).toBe("contact __OPF_EMAIL_1__ please");
+    expect(args.content).toBe("contact alice@example.com please");
     remover.dispose();
   });
 
-  test("does NOT mask path-shaped fields", async () => {
+  test("restores vault tokens in args, including path-shaped fields", async () => {
     const remover = await buildRemover();
+    const masked = await remover.mask("연락처 alice@example.com 입니다");
+    const token = masked.text.match(/__OPF_EMAIL_\d+__/)?.[0];
+    expect(token).toBeDefined();
+
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const output = {
+      args: {
+        file_path: `/home/${token}/repo/main.ts`,
+        workdir: `D:\\Git\\${token}-tools`,
+        content: `body ${token} here`,
+      },
+    };
+    await hooks["tool.execute.before"]!({ tool: "read", sessionID: "s", callID: "c1" },
+    output);
+    const args = output.args as {
+      file_path: string;
+      workdir: string;
+      content: string;
+    };
+    expect(args.file_path).toBe("/home/alice@example.com/repo/main.ts");
+    expect(args.workdir).toBe("D:\\Git\\alice@example.com-tools");
+    expect(args.content).toBe("body alice@example.com here");
+    remover.dispose();
+  });
+
+  test("experimental:false masks string fields but NOT path-shaped fields (legacy net)", async () => {
+    const remover = await buildRemover();
+    const hooks = createPluginHooks(remover, {
+      warn: silentWarn(),
+      experimental: false,
+    });
     const output = {
       args: {
         file_path: "/home/alice/work/repo/main.ts",
@@ -83,9 +113,12 @@ describe("createPluginHooks — tool.execute.before", () => {
     remover.dispose();
   });
 
-  test("walks nested arrays/objects", async () => {
+  test("experimental:false walks nested arrays/objects", async () => {
     const remover = await buildRemover();
-    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const hooks = createPluginHooks(remover, {
+      warn: silentWarn(),
+      experimental: false,
+    });
     const output = {
       args: {
         messages: [
@@ -219,7 +252,11 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
 
     const hooks = createPluginHooks(remover, {
       warn: silentWarn(),
-      displayTools: { excludeNames: ["todowrite"] },
+      experimental: false,
+      displayTools: {
+        excludeNames: ["todowrite"],
+        allowWithoutBoundaryMask: true,
+      },
     });
     const output = {
       args: { todos: [{ content: masked.text, status: "pending", priority: "high" }] },
@@ -252,9 +289,12 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
     remover.dispose();
   });
 
-  test("non-display tool `write` still masks (regression — existing behavior)", async () => {
+  test("non-display tool `write` masks under experimental:false (legacy net)", async () => {
     const remover = await buildRemover();
-    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const hooks = createPluginHooks(remover, {
+      warn: silentWarn(),
+      experimental: false,
+    });
     const output = { args: { content: "contact alice@example.com please" } };
     await hooks["tool.execute.before"]!(
       { tool: "write", sessionID: "s", callID: "c1" },
@@ -271,7 +311,11 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
 
   test("`questionnaire` (substring match) is NOT a display tool", async () => {
     const remover = await buildRemover();
-    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const hooks = createPluginHooks(remover, {
+      warn: silentWarn(),
+      experimental: false,
+      displayTools: { allowWithoutBoundaryMask: true },
+    });
     const output = { args: { content: "contact alice@example.com please" } };
     await hooks["tool.execute.before"]!(
       { tool: "questionnaire", sessionID: "s", callID: "c1" },
@@ -374,19 +418,46 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
   });
 });
 
-describe("createPluginHooks — event hook (session.idle)", () => {
-  test("disposes remover when session.idle event is received", async () => {
+describe("createPluginHooks — event hook (session.idle survives)", () => {
+  test("session.idle does NOT dispose the vault (fires after every turn)", async () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const masked = await remover.mask("contact alice@example.com");
+    expect(masked.text).toContain("__OPF_EMAIL_1__");
+
     await hooks.event({
       event: { type: "session.idle", properties: { sessionID: "test-session" } },
     });
-    await expect(remover.mask("anything alice@example.com")).rejects.toThrow(
-      /disposed/
-    );
+    await hooks.event({
+      event: { type: "session.idle", properties: { sessionID: "subagent-session" } },
+    });
+
+    const restored = remover.restore(masked.text);
+    expect(restored.text).toBe("contact alice@example.com");
+    remover.dispose();
   });
 
-  test("does not dispose on unrelated events", async () => {
+  test("restore hook still works after session.idle (mid-conversation idle race)", async () => {
+    const remover = await buildRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const masked = await remover.mask("연락처 alice@example.com 입니다");
+    const token = masked.text.match(/__OPF_EMAIL_\d+__/)?.[0];
+    expect(token).toBeDefined();
+
+    await hooks.event({
+      event: { type: "session.idle", properties: { sessionID: "other-session" } },
+    });
+
+    const output = { args: { file_path: `/home/${token}/main.ts` } };
+    await hooks["tool.execute.before"]!({ tool: "read", sessionID: "s", callID: "c" },
+    output);
+    expect((output.args as { file_path: string }).file_path).toBe(
+      "/home/alice@example.com/main.ts"
+    );
+    remover.dispose();
+  });
+
+  test("unrelated events are ignored", async () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     await hooks.event({
@@ -398,32 +469,6 @@ describe("createPluginHooks — event hook (session.idle)", () => {
     const r = await remover.mask("contact alice@example.com");
     expect(r.text).toContain("__OPF_EMAIL_1__");
     remover.dispose();
-  });
-
-  test("event hook is idempotent on repeated session.idle", async () => {
-    const remover = await buildRemover();
-    const hooks = createPluginHooks(remover, { warn: silentWarn() });
-    await hooks.event({
-      event: { type: "session.idle", properties: { sessionID: "test-session" } },
-    });
-    await hooks.event({
-      event: { type: "session.idle", properties: { sessionID: "test-session" } },
-    });
-    await expect(remover.mask("x alice@example.com")).rejects.toThrow(/disposed/);
-  });
-
-  test("after dispose, tool.execute.before becomes a no-op", async () => {
-    const remover = await buildRemover();
-    const hooks = createPluginHooks(remover, { warn: silentWarn() });
-    await hooks.event({
-      event: { type: "session.idle", properties: { sessionID: "s" } },
-    });
-    const output = { args: { content: "alice@example.com here" } };
-    await hooks["tool.execute.before"]!({ tool: "write", sessionID: "s", callID: "c" },
-    output);
-    expect((output.args as { content: string }).content).toBe(
-      "alice@example.com here"
-    );
   });
 });
 
@@ -941,6 +986,72 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     remover.dispose();
   });
 
+  test("dead tokens (no vault mapping) are neutralized to [UNRESTORABLE]", async () => {
+    const remover = await buildRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const output = {
+      messages: [
+        {
+          info: { role: "assistant" },
+          parts: [
+            {
+              type: "tool",
+              state: {
+                status: "completed",
+                input: { filePath: "D:\\Git\\__OPF_PERSON_7__-tools\\x.ts" },
+                output: "done",
+              },
+            },
+            { type: "text", text: "stale __OPF_EMAIL_42__ reference" },
+          ],
+        },
+      ],
+    };
+    await hooks["experimental.chat.messages.transform"]!({}, output as never);
+    const toolPart = output.messages[0]!.parts[0] as {
+      state: { input: { filePath: string } };
+    };
+    expect(toolPart.state.input.filePath).toBe(
+      "D:\\Git\\[UNRESTORABLE]-tools\\x.ts"
+    );
+    const textPart = output.messages[0]!.parts[1] as { text: string };
+    expect(textPart.text).toContain("[UNRESTORABLE]");
+    expect(textPart.text).not.toContain("__OPF_EMAIL_42__");
+    remover.dispose();
+  });
+
+  test("live tokens survive the boundary pass (LLM may keep reusing them)", async () => {
+    const remover = await buildRemover();
+    const masked = await remover.mask("contact alice@example.com");
+    const token = masked.text.match(/__OPF_EMAIL_\d+__/)?.[0];
+    expect(token).toBeDefined();
+
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const output = {
+      messages: [
+        {
+          info: { role: "assistant" },
+          parts: [
+            {
+              type: "tool",
+              state: {
+                status: "completed",
+                input: { filePath: `/home/${token}/x.ts` },
+                output: "done",
+              },
+            },
+          ],
+        },
+      ],
+    };
+    await hooks["experimental.chat.messages.transform"]!({}, output as never);
+    const toolPart = output.messages[0]!.parts[0] as {
+      state: { input: { filePath: string } };
+    };
+    expect(toolPart.state.input.filePath).toBe(`/home/${token}/x.ts`);
+    remover.dispose();
+  });
+
   test("empty messages array is safe", async () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
@@ -990,6 +1101,7 @@ describe("PiiRemoverPlugin — top-level factory", () => {
       backends: [captureBackend],
       warn: silentWarn(),
       healthCheck: false,
+      experimental: false,
     });
     const hooks = await factory({
       project: { id: "my-project-abc" },

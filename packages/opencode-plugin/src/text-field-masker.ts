@@ -6,11 +6,14 @@
  * Walker contract (shared by `maskTextFields` and `restoreTextFields`):
  *  - Walks `args` depth-first, calling the `transform` function on every
  *    eligible string leaf.
- *  - Path-shaped fields are NEVER transformed (`file_path`, `path`, `cwd`,
- *    `uri`, `url` and their case-insensitive variants). For masking, these
- *    are tool plumbing and would yield false positives against the
- *    OPF/regex backends. For restoration, OpenCode resolves them as paths
- *    and they typically do not carry vault tokens.
+ *  - For MASKING, path-shaped fields are never transformed (`file_path`,
+ *    `path`, `cwd`, `uri`, `url` and their case-insensitive variants):
+ *    they are tool plumbing and would yield false positives against the
+ *    OPF/regex backends.
+ *  - For RESTORATION, NO field is skipped. Vault tokens demonstrably end
+ *    up inside path-shaped fields (the LLM echoes masked paths back in
+ *    `filePath` / `workdir` args), and restoring is a no-op on strings
+ *    without an `__OPF_` substring, so skipping has no upside.
  *  - Strings whose trimmed length is <= `MIN_MASK_LENGTH` (8) are skipped
  *    during masking (statistically unlikely to carry PII). Restoration
  *    uses a 0-length minimum because vault tokens themselves can be
@@ -29,6 +32,8 @@ export const DEFAULT_SKIP_FIELDS: ReadonlySet<string> = new Set([
   "filepath",
   "path",
   "cwd",
+  "workdir",
+  "worktree",
   "uri",
   "url",
   "directory",
@@ -52,6 +57,8 @@ export const DEFAULT_SKIP_FIELDS: ReadonlySet<string> = new Set([
 
 /** Strings whose trimmed length is <= this threshold are skipped. */
 export const MIN_MASK_LENGTH = 8;
+
+const EMPTY_SKIP_FIELDS: ReadonlySet<string> = new Set();
 
 export type MaskFn = (text: string) => string | Promise<string>;
 export type RestoreFn = (text: string) => string | Promise<string>;
@@ -165,11 +172,13 @@ export async function maskTextFields(
 }
 
 /**
- * Recursively restores vault tokens in every string leaf in `args`. Mirrors
- * `maskTextFields` so the same skip-list / path-protection rules apply, but
- * uses a 0-length minimum because the `restore` function is fast and safe
- * on strings that contain no tokens (see `Restorer.restore` — text without
- * an `__OPF_` substring returns identical input).
+ * Recursively restores vault tokens in every string leaf in `args`.
+ * Unlike `maskTextFields`, NO field is skipped by default and no value
+ * heuristic applies: vault tokens land inside path-shaped fields when the
+ * LLM echoes masked paths back (`filePath: "D:\\__OPF_PERSON_1__\\x"`),
+ * and restoring a token-free string is a no-op (see `Restorer.restore`).
+ * An explicit `options.skipFields` is still honored for callers that must
+ * keep specific fields untouched.
  */
 export async function restoreTextFields(
   args: unknown,
@@ -179,10 +188,10 @@ export async function restoreTextFields(
   if (args === null || args === undefined) return args;
   const ctx: TransformContext = {
     transform: restore,
-    skip: options.skipFields ?? DEFAULT_SKIP_FIELDS,
+    skip: options.skipFields ?? EMPTY_SKIP_FIELDS,
     minLength: 0,
     visited: new WeakSet<object>(),
-    skipHeuristic: true,
+    skipHeuristic: false,
   };
 
   if (typeof args === "string") {
