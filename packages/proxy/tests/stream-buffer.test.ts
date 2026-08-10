@@ -4,8 +4,8 @@ import {
   findUnsafeBoundary,
 } from "../src/stream/buffer.js";
 
-const TOKEN_A = "__OPF_PERSON_1__";
-const TOKEN_B = "__OPF_EMAIL_2__";
+const TOKEN_A = "__OPF_PERSON__0123456789abcdef__";
+const TOKEN_B = "__OPF_EMAIL__fedcba9876543210__";
 
 function feedChunks(chunks: string[]): { emitted: string; remainder: string } {
   const buf = createStreamBuffer({ bufferWindow: 64 });
@@ -31,7 +31,7 @@ describe("findUnsafeBoundary — token-prefix boundary detection", () => {
   });
 
   test("complete token at end → length (all safe, token is whole)", () => {
-    const s = "see __OPF_PERSON_1__";
+    const s = `see ${TOKEN_A}`;
     expect(findUnsafeBoundary(s)).toBe(s.length);
   });
 
@@ -55,7 +55,7 @@ describe("findUnsafeBoundary — token-prefix boundary detection", () => {
   });
 
   test("token followed by trailing text → length (token complete + suffix safe)", () => {
-    const s = "x __OPF_PERSON_1__ y";
+    const s = `x ${TOKEN_A} y`;
     expect(findUnsafeBoundary(s)).toBe(s.length);
   });
 
@@ -131,14 +131,14 @@ describe("StreamBuffer.push/flush — round-trip with fuzz splits (ADR-0004 §12
   });
 
   test("10) lenient lowercase token split survives", () => {
-    const lenient = "__opf_email_1__";
+    const lenient = "__opf_email__0123456789abcdef__";
     const chunks = splitEvery(lenient, 1);
     const { emitted, remainder } = feedChunks(chunks);
     expect(emitted + remainder).toBe(lenient);
   });
 
   test("11) lenient token without trailing __ split survives", () => {
-    const lenient = "__opf_email_1";
+    const lenient = "__opf_email__0123456789abcdef";
     const chunks = splitEvery(lenient, 1);
     const { emitted, remainder } = feedChunks(chunks);
     expect(emitted + remainder).toBe(lenient);
@@ -184,20 +184,20 @@ describe("StreamBuffer.push/flush — round-trip with fuzz splits (ADR-0004 §12
     const buf = createStreamBuffer();
     const emit1 = buf.push("intro __");
     expect(emit1).toBe("intro ");
-    const emit2 = buf.push("OPF_PERSON_1__ outro");
-    expect((emit1 + emit2)).toBe("intro __OPF_PERSON_1__ outro");
+    const emit2 = buf.push("OPF_PERSON__0123456789abcdef__ outro");
+    expect((emit1 + emit2)).toBe(`intro ${TOKEN_A} outro`);
     expect(buf.flush()).toBe("");
   });
 
   test("18) korean PII token RRN split survives", () => {
-    const token = "__OPF_RRN_1__";
+    const token = "__OPF_RRN__0123456789abcdef__";
     const sentence = `주민 ${token} 등록됨`;
     const { emitted, remainder } = feedChunks(splitEvery(sentence, 1));
     expect(emitted + remainder).toBe(sentence);
   });
 
-  test("19) double-digit index token split survives", () => {
-    const token = "__OPF_PERSON_42__";
+  test("19) hash token split survives", () => {
+    const token = "__OPF_PERSON__ffffffffffffffff__";
     const chunks = splitEvery(token, 1);
     const { emitted, remainder } = feedChunks(chunks);
     expect(emitted + remainder).toBe(token);
@@ -208,17 +208,17 @@ describe("StreamBuffer.push/flush — round-trip with fuzz splits (ADR-0004 §12
       `Hi ${TOKEN_A}.`,
       `Email ${TOKEN_B} now.`,
       `${TOKEN_A} and ${TOKEN_B}`,
-      `Call __OPF_PHONE_1__ tomorrow`,
-      `RRN __OPF_RRN_5__ 등록`,
+      `Call __OPF_PHONE__0123456789abcdef__ tomorrow`,
+      `RRN __OPF_RRN__fedcba9876543210__ 등록`,
       "no tokens here",
       "single _ underscore",
       "double __ underscore",
       "partial __OPF",
       "partial __OPF_PE",
       "partial __OPF_PERSON_",
-      "mixed text __OPF_PERSON_99__ end",
-      "__OPF_EMAIL_1____OPF_EMAIL_2__",
-      "prefix__OPF_URL_1__suffix",
+      "mixed text __OPF_PERSON__ffffffffffffffff__ end",
+      "__OPF_EMAIL__0123456789abcdef____OPF_EMAIL__fedcba9876543210__",
+      "prefix__OPF_URL__0123456789abcdef__suffix",
       `${TOKEN_A}${TOKEN_B}${TOKEN_A}`,
     ];
     for (const text of cases) {

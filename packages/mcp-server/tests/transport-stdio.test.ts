@@ -53,7 +53,7 @@ describe("MCP transport JSON-RPC roundtrip (in-memory)", () => {
       vault_id: string;
       token_count: number;
     };
-    expect(m.text).toBe("ping __OPF_EMAIL_1__ please");
+    expect(m.text).toMatch(/^ping __OPF_EMAIL__[a-z0-9]{16}__ please$/);
     expect(m.token_count).toBe(1);
     expect(m.vault_id.length).toBeGreaterThan(0);
 
@@ -76,7 +76,7 @@ describe("MCP transport JSON-RPC roundtrip (in-memory)", () => {
     const { server, client } = await setup();
     const result = await client.callTool({
       name: "desanitize",
-      arguments: { text: "__OPF_EMAIL_1__", vault_id: "no_such" },
+      arguments: { text: "__OPF_EMAIL__ffffffffffffffff__", vault_id: "no_such" },
     });
     expect(result.isError).toBe(true);
     const err = result.structuredContent as { error_code?: string };
@@ -115,8 +115,8 @@ describe("MCP transport JSON-RPC roundtrip (in-memory)", () => {
       results: Array<{ text: string }>;
       vault_id: string;
     };
-    expect(out.results[0]!.text).toContain("__OPF_EMAIL_1__");
-    expect(out.results[1]!.text).toContain("__OPF_EMAIL_1__");
+    const token = out.results[0]!.text.match(/__OPF_EMAIL__[a-z0-9]{16}__/)![0];
+    expect(out.results[1]!.text).toContain(token);
     await client.close();
     await server.shutdown();
   });

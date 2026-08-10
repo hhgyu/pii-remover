@@ -187,7 +187,7 @@ const PLACEHOLDER_VALUES: ReadonlySet<string> = new Set([
 ]);
 
 function isHighEntropySecret(value: string): boolean {
-  if (/__OPF_[A-Z_]+_\d+__/i.test(value)) return false;
+  if (/__OPF_[A-Z][A-Z0-9_]*?__[a-z0-9]{16}__/i.test(value)) return false;
   if (PLACEHOLDER_VALUES.has(value.toLowerCase())) return false;
   if (/[<>${}]/.test(value)) return false;
   if (HEX_ONLY_REGEX.test(value)) {

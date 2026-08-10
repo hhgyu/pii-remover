@@ -39,7 +39,7 @@ describe("ProxySessionPool — default + per-session vault management", () => {
     const pool = new ProxySessionPool({ backends: backends() });
     const { remover } = await pool.get(new Headers());
     const masked = await remover.mask("alice@example.com here");
-    expect(masked.text).toContain("__OPF_EMAIL_1__");
+    expect(masked.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
 
     const restored = remover.restore(masked.text);
     expect(restored.text).toContain("alice@example.com");

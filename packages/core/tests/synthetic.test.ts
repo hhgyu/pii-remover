@@ -161,11 +161,11 @@ describe("applyTokens — mode dispatch", () => {
           category: "private_person",
           confidence: 1,
           text: "x",
-          token: "__OPF_PERSON_1__",
+          token: "__OPF_PERSON__0123456789abcdef__",
         },
       ],
     );
-    expect(out).toBe("__OPF_PERSON_1__");
+    expect(out).toBe("__OPF_PERSON__0123456789abcdef__");
   });
 
   test("mode='synthetic' uses syntheticValue when present", () => {
@@ -178,7 +178,7 @@ describe("applyTokens — mode dispatch", () => {
           category: "private_person",
           confidence: 1,
           text: "x",
-          token: "__OPF_PERSON_1__",
+          token: "__OPF_PERSON__0123456789abcdef__",
           syntheticValue: "Jane Doe",
         },
       ],
@@ -197,12 +197,12 @@ describe("applyTokens — mode dispatch", () => {
           category: "secret",
           confidence: 1,
           text: "x",
-          token: "__OPF_SECRET_1__",
+          token: "__OPF_SECRET__0123456789abcdef__",
         },
       ],
       "synthetic",
     );
-    expect(out).toBe("__OPF_SECRET_1__");
+    expect(out).toBe("__OPF_SECRET__0123456789abcdef__");
   });
 });
 
@@ -213,7 +213,7 @@ describe("restoreSynthetic — direct API", () => {
         label: "private_person",
         text: "Alice Kim",
         canonical_text: "Alice Kim",
-        index: 1,
+        id: "0123456789abcdef",
         synthetic_value: "Jane Doe",
       },
     ]);
@@ -227,7 +227,7 @@ describe("restoreSynthetic — direct API", () => {
         label: "private_person",
         text: "Alice",
         canonical_text: "Alice",
-        index: 1,
+        id: "0123456789abcdef",
         synthetic_value: "Jane",
       },
     ]);
@@ -240,7 +240,7 @@ describe("restoreSynthetic — direct API", () => {
         label: "private_person",
         text: "Alice",
         canonical_text: "Alice",
-        index: 1,
+        id: "0123456789abcdef",
       },
     ]);
     expect(out.restoredCount).toBe(0);
@@ -252,7 +252,7 @@ describe("restoreSynthetic — direct API", () => {
         label: "private_person",
         text: "위석호",
         canonical_text: "위석호",
-        index: 1,
+        id: "0123456789abcdef",
         synthetic_value: "김민준",
       },
     ]);
@@ -266,7 +266,7 @@ describe("restoreSynthetic — direct API", () => {
         label: "private_person",
         text: "위석호",
         canonical_text: "위석호",
-        index: 1,
+        id: "0123456789abcdef",
         synthetic_value: "김민준",
       },
     ]);
@@ -279,14 +279,14 @@ describe("restoreSynthetic — direct API", () => {
         label: "private_person",
         text: "Alice",
         canonical_text: "Alice",
-        index: 1,
+        id: "0123456789abcdef",
         synthetic_value: "Jane Doe",
       },
       {
         label: "private_person",
         text: "Bob",
         canonical_text: "Bob",
-        index: 2,
+        id: "fedcba9876543210",
         synthetic_value: "Jane",
       },
     ]);
@@ -338,7 +338,7 @@ describe("PIIRemover — synthetic round-trip", () => {
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
     const masked = await pii.mask("contact user@example.com please");
-    expect(masked.text).toContain("__OPF_EMAIL_1__");
+    expect(masked.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(masked.text).not.toContain("synthetic.user");
     const restored = pii.restore(masked.text);
     expect(restored.text).toBe("contact user@example.com please");

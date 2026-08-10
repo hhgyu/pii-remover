@@ -1,4 +1,4 @@
-import { TOKEN_PREFIX } from "@pii-remover/core";
+import { TOKEN_PREFIX, TOKEN_HASH_LENGTH } from "@pii-remover/core";
 
 export interface StreamBufferOptions {
   bufferWindow?: number;
@@ -30,12 +30,15 @@ function buildUnsafePrefixGroup(): string {
 }
 
 export const COMPLETE_TOKEN_AT_END_REGEX = new RegExp(
-  `${PREFIX_REGEX_SOURCE}[A-Z_]+_\\d+__$`,
+  `${PREFIX_REGEX_SOURCE}[A-Z][A-Z0-9_]*?__[a-z0-9]{${TOKEN_HASH_LENGTH}}__$`,
   "i"
 );
 
+// Incomplete token tail held back until the rest of the stream arrives:
+// the prefix may be partial, or category/delimiter/hash may still be in
+// progress (hash up to TOKEN_HASH_LENGTH chars, then trailing "__").
 export const UNSAFE_TOKEN_TAIL_REGEX = new RegExp(
-  `(?:${buildUnsafePrefixGroup()}|${PREFIX_REGEX_SOURCE}[A-Z_]*\\d*_?_?)$`,
+  `(?:${buildUnsafePrefixGroup()}|${PREFIX_REGEX_SOURCE}[A-Z][A-Z0-9_]*?(?:_?_?[a-z0-9]{0,${TOKEN_HASH_LENGTH}}_?_?)?)$`,
   "i"
 );
 

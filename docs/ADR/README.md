@@ -14,7 +14,7 @@
 | #    | Title | Status | Date |
 |------|---|---|---|
 | 0001 | [TypeScript 단일 core 언어](./0001-typescript-single-core.md) | Accepted | 2026-05-12 |
-| 0002 | [토큰 형식 `__OPF_<CATEGORY>_<INDEX>__`](./0002-token-format-opf-underscore.md) | Accepted | 2026-05-12 |
+| 0002 | [토큰 형식 `__OPF_<CATEGORY>_<INDEX>__`](./0002-token-format-opf-underscore.md) | Superseded by 0020 | 2026-05-12 |
 | 0003 | [Vault: 세션 스코프 인메모리, `opf.reversible.v1`](./0003-vault-session-in-memory.md) | Accepted | 2026-05-12 |
 | 0004 | [로컬 LLM 프록시 + path prefix 라우팅 + SSE 스트리밍 v1](./0004-local-llm-proxy-streaming.md) | Accepted | 2026-05-12 |
 | 0005 | [Backend Strategy 인터페이스 + 4-Tier 신뢰 모델](./0005-backend-strategy-trust-tiers.md) | Accepted | 2026-05-12 |
@@ -32,6 +32,7 @@
 | 0017 | [Personal Data Library — 사용자 정의 PII 사전 등록](./0017-personal-data-library.md) | Accepted | 2026-05-19 |
 | 0018 | [Synthetic Substitution 모드 — 토큰 대신 그럴듯한 가짜 값](./0018-synthetic-substitution.md) | Accepted | 2026-05-19 |
 | 0019 | [Backend auto-start (opt-in) + idle model unload (default-on)](./0019-backend-auto-start-and-idle-unload.md) | Accepted | 2026-05-20 |
+| 0020 | [결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__`](./0020-deterministic-hash-token.md) | Accepted | 2026-06-12 |
 
 ## ADR 카테고리별 그룹
 
@@ -45,7 +46,8 @@
 - **ADR-0016**: MCP Server 노출 (`@pii-remover/mcp-server`) — stdio + Streamable HTTP, opaque vault_id, 5 tool surface
 
 ### 데이터 모델
-- **ADR-0002**: 토큰 형식 `__OPF_<CATEGORY>_<INDEX>__`
+- **ADR-0002**: 토큰 형식 `__OPF_<CATEGORY>_<INDEX>__` (Superseded by 0020)
+- **ADR-0020**: 결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__` (정수 인덱스 → HMAC 해시)
 - **ADR-0003**: Vault 스키마 + 세션 스코프 인메모리
 - **ADR-0010**: PII 카테고리 (OPF 8 + 한국 3)
 - **ADR-0018**: Synthetic Substitution 모드 — 토큰 vs 가짜 자연어 값 선택 가능

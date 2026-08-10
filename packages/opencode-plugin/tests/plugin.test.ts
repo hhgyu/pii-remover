@@ -37,6 +37,8 @@ function fakeBackend(detections: DetectionResult["detections"] = []): BackendCli
   };
 }
 
+const EMAIL_TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+
 async function buildRemover(opts: {
   sessionId?: string;
   failure?: typeof DEFAULT_CONFIG.failure_policy;
@@ -69,7 +71,7 @@ describe("createPluginHooks — tool.execute.before", () => {
   test("restores vault tokens in args, including path-shaped fields", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("연락처 alice@example.com 입니다");
-    const token = masked.text.match(/__OPF_EMAIL_\d+__/)?.[0];
+    const token = masked.text.match(EMAIL_TOKEN_RE)?.[0];
     expect(token).toBeDefined();
 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
@@ -109,7 +111,7 @@ describe("createPluginHooks — tool.execute.before", () => {
     output);
     const args = output.args as { file_path: string; content: string };
     expect(args.file_path).toBe("/home/alice/work/repo/main.ts");
-    expect(args.content).toBe("contact __OPF_EMAIL_1__ please");
+    expect(args.content).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__ please$/);
     remover.dispose();
   });
 
@@ -130,8 +132,9 @@ describe("createPluginHooks — tool.execute.before", () => {
     await hooks["tool.execute.before"]!({ tool: "task", sessionID: "s", callID: "c1" },
     output);
     const msgs = (output.args as { messages: { text: string }[] }).messages;
-    expect(msgs[0]!.text).toBe("email __OPF_EMAIL_1__ please");
-    expect(msgs[1]!.text).toBe("or __OPF_EMAIL_2__");
+    expect(msgs[0]!.text).toMatch(/^email __OPF_EMAIL__[a-z0-9]{16}__ please$/);
+    expect(msgs[1]!.text).toMatch(/^or __OPF_EMAIL__[a-z0-9]{16}__$/);
+    expect(msgs[0]!.text.match(EMAIL_TOKEN_RE)![0]).not.toBe(msgs[1]!.text.match(EMAIL_TOKEN_RE)![0]);
     remover.dispose();
   });
 
@@ -423,7 +426,7 @@ describe("createPluginHooks — event hook (session.idle survives)", () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const masked = await remover.mask("contact alice@example.com");
-    expect(masked.text).toContain("__OPF_EMAIL_1__");
+    expect(masked.text).toMatch(EMAIL_TOKEN_RE);
 
     await hooks.event({
       event: { type: "session.idle", properties: { sessionID: "test-session" } },
@@ -441,7 +444,7 @@ describe("createPluginHooks — event hook (session.idle survives)", () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const masked = await remover.mask("연락처 alice@example.com 입니다");
-    const token = masked.text.match(/__OPF_EMAIL_\d+__/)?.[0];
+    const token = masked.text.match(EMAIL_TOKEN_RE)?.[0];
     expect(token).toBeDefined();
 
     await hooks.event({
@@ -467,7 +470,7 @@ describe("createPluginHooks — event hook (session.idle survives)", () => {
       },
     });
     const r = await remover.mask("contact alice@example.com");
-    expect(r.text).toContain("__OPF_EMAIL_1__");
+    expect(r.text).toMatch(EMAIL_TOKEN_RE);
     remover.dispose();
   });
 });
@@ -973,7 +976,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
           parts: [
             {
               type: "compaction",
-              text: "User shared __OPF_EMAIL_1__ and __OPF_PERSON_2__ for the project.",
+              text: "User shared __OPF_EMAIL__0123456789abcdef__ and __OPF_PERSON__fedcba9876543210__ for the project.",
             },
           ],
         },
@@ -998,11 +1001,11 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
               type: "tool",
               state: {
                 status: "completed",
-                input: { filePath: "D:\\Git\\__OPF_PERSON_7__-tools\\x.ts" },
+                input: { filePath: "D:\\Git\\__OPF_PERSON__0123456789abcdef__-tools\\x.ts" },
                 output: "done",
               },
             },
-            { type: "text", text: "stale __OPF_EMAIL_42__ reference" },
+            { type: "text", text: "stale __OPF_EMAIL__ffffffffffffffff__ reference" },
           ],
         },
       ],
@@ -1016,14 +1019,14 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     );
     const textPart = output.messages[0]!.parts[1] as { text: string };
     expect(textPart.text).toContain("[UNRESTORABLE]");
-    expect(textPart.text).not.toContain("__OPF_EMAIL_42__");
+    expect(textPart.text).not.toContain("__OPF_EMAIL__ffffffffffffffff__");
     remover.dispose();
   });
 
   test("live tokens survive the boundary pass (LLM may keep reusing them)", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("contact alice@example.com");
-    const token = masked.text.match(/__OPF_EMAIL_\d+__/)?.[0];
+    const token = masked.text.match(EMAIL_TOKEN_RE)?.[0];
     expect(token).toBeDefined();
 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });

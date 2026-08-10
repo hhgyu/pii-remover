@@ -26,7 +26,7 @@ describe("createPiiRemoverMcpServer", () => {
     });
     const remover = await server.vaultPool.resolve();
     const masked = await remover.mask("contact user@example.com");
-    expect(masked.text).toBe("contact __OPF_EMAIL_1__");
+    expect(masked.text).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__$/);
     const restored = remover.restore(masked.text);
     expect(restored.text).toBe("contact user@example.com");
     await server.shutdown();

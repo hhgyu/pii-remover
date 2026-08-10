@@ -10,6 +10,7 @@ import {
 import { startProxy, type ProxyServer, type FetchLike } from "../src/server.js";
 
 const ANTHROPIC_PATH = "/anthropic/v1/messages";
+const TOKEN_RE = /__OPF_[A-Z_]+__[a-z0-9]{16}__/;
 
 async function makeRemover() {
   return PIIRemover.init({
@@ -33,7 +34,7 @@ describe("transformAnthropicRequest — non-streaming masking", () => {
     );
     expect(out.rejection).toBeUndefined();
     const masked = (out.body.messages[0]!.content as string);
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(masked).not.toContain("alice@example.com");
   });
 
@@ -55,7 +56,7 @@ describe("transformAnthropicRequest — non-streaming masking", () => {
       remover
     );
     const blocks = out.body.messages[0]!.content as Array<{ type: string; text?: string }>;
-    expect(blocks[0]!.text).toContain("__OPF_CARD_1__");
+    expect(blocks[0]!.text).toMatch(/__OPF_CARD__[a-z0-9]{16}__/);
     expect(blocks[0]!.text).not.toContain("4242 4242");
     expect(blocks[1]!.type).toBe("image");
   });
@@ -71,7 +72,7 @@ describe("transformAnthropicRequest — non-streaming masking", () => {
       remover
     );
     expect(typeof out.body.system).toBe("string");
-    expect((out.body.system as string)).toContain("__OPF_EMAIL_1__");
+    expect((out.body.system as string)).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
   });
 
   test("system as array is masked element-by-element", async () => {
@@ -88,7 +89,7 @@ describe("transformAnthropicRequest — non-streaming masking", () => {
       remover
     );
     const sysArr = out.body.system as Array<{ text: string }>;
-    expect(sysArr[0]!.text).toContain("__OPF_EMAIL_1__");
+    expect(sysArr[0]!.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(sysArr[1]!.text).toBe("no PII here");
   });
 
@@ -105,19 +106,20 @@ describe("transformAnthropicRequest — non-streaming masking", () => {
     expect(out.rejection).toBeUndefined();
     expect(out.body.stream).toBe(true);
     const masked = out.body.messages[0]!.content as string;
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
   });
 });
 
 describe("restoreAnthropicResponse — token restoration", () => {
   test("restores text blocks in content array", async () => {
     const remover = await makeRemover();
-    await remover.mask("Reach me at bob@example.com");
+    const masked = await remover.mask("Reach me at bob@example.com");
+    const token = masked.tokens[0]!.token;
     const restored = await restoreAnthropicResponse(
       {
         type: "message",
         role: "assistant",
-        content: [{ type: "text", text: "I'll email __OPF_EMAIL_1__ tomorrow." }],
+        content: [{ type: "text", text: `I'll email ${token} tomorrow.` }],
       },
       remover
     );
@@ -128,8 +130,8 @@ describe("restoreAnthropicResponse — token restoration", () => {
 
   test("restores tool_use.input nested fields", async () => {
     const remover = await makeRemover();
-    await remover.mask("김철수");
-    await remover.mask("alice@example.com");
+    const person = (await remover.mask("김철수")).tokens[0]!.token;
+    const email = (await remover.mask("alice@example.com")).tokens[0]!.token;
     const restored = await restoreAnthropicResponse(
       {
         type: "message",
@@ -142,10 +144,10 @@ describe("restoreAnthropicResponse — token restoration", () => {
             input: {
               questions: [
                 {
-                  question: "__OPF_PERSON_1__님의 이메일을 확인할까요?",
+                  question: `${person}님의 이메일을 확인할까요?`,
                   header: "확인",
                   options: [
-                    { label: "예", description: "__OPF_EMAIL_1__로 발송" },
+                    { label: "예", description: `${email}로 발송` },
                   ],
                 },
               ],
@@ -201,12 +203,15 @@ describe("startProxy — Anthropic round-trip via mock upstream", () => {
         (init?.headers as Record<string, string>) ?? {}
       );
       lastUpstreamBody = init?.body ? JSON.parse(init.body as string) : null;
+      const upstreamText = ((lastUpstreamBody as { messages?: Array<{ content?: string }> })
+        .messages?.[0]?.content ?? "");
+      const token = upstreamText.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
       return new Response(
         JSON.stringify({
           id: "msg_test",
           type: "message",
           role: "assistant",
-          content: [{ type: "text", text: "Got it, will email __OPF_EMAIL_1__." }],
+          content: [{ type: "text", text: `Got it, will email ${token}.` }],
           model: "claude-test",
           stop_reason: "end_turn",
         }),
@@ -251,7 +256,7 @@ describe("startProxy — Anthropic round-trip via mock upstream", () => {
     expect(upstreamCalls).toBe(1);
     const upstreamMessages = (lastUpstreamBody as { messages: Array<{ content: string }> })
       .messages;
-    expect(upstreamMessages[0]!.content).toContain("__OPF_EMAIL_1__");
+    expect(upstreamMessages[0]!.content).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(lastUpstreamHeaders?.get("authorization")).toBe("Bearer test-key");
   });
 

@@ -28,6 +28,9 @@ async function maskString(remover: PIIRemover, text: string): Promise<string> {
   return r.text;
 }
 
+const TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+const FAKE_TOKEN = "__OPF_FAKE__ffffffffffffffff__";
+
 describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable hook)", () => {
   test("restores email tokens emitted from tool.output", async () => {
     const remover = await makeRemover();
@@ -37,7 +40,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
       remover,
       "Contact alice@example.com about the report."
     );
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(TOKEN_RE);
 
     const output = { output: `Read file: ${masked}`, title: "ok", metadata: {} };
     await hooks["tool.execute.after"]!({ tool: "read", sessionID: "s", callID: "c", args: {} },
@@ -50,10 +53,11 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     const remover = await makeRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
 
-    await maskString(remover, "user@example.com");
+    const masked = await maskString(remover, "user@example.com");
+    const token = masked.match(TOKEN_RE)![0];
     const output = {
       output: "completed",
-      title: "Result for __OPF_EMAIL_1__",
+      title: `Result for ${token}`,
       metadata: {},
     };
     await hooks["tool.execute.after"]!({ tool: "task", sessionID: "s", callID: "c", args: {} },
@@ -80,7 +84,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
 
     const masked = await maskString(remover, "Email alice@example.com now.");
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(TOKEN_RE);
 
     const output = {
       output: {
@@ -106,7 +110,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
 
     const masked = await maskString(remover, "Reach dev@example.com here.");
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(TOKEN_RE);
 
     const output = {
       output: "done",
@@ -125,25 +129,26 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
 
     const output = {
-      output: "ghost __OPF_FAKE_99__ never seen",
+      output: `ghost ${FAKE_TOKEN} never seen`,
       title: "x",
       metadata: {},
     };
     await hooks["tool.execute.after"]!({ tool: "echo", sessionID: "s", callID: "c", args: {} },
     output);
-    expect(output.output).toBe("ghost __OPF_FAKE_99__ never seen");
+    expect(output.output).toBe(`ghost ${FAKE_TOKEN} never seen`);
   });
 
   test("still restores after session.idle (idle no longer disposes the vault)", async () => {
     const remover = await makeRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
-    await maskString(remover, "user@example.com");
+    const masked = await maskString(remover, "user@example.com");
+    const token = masked.match(TOKEN_RE)![0];
 
     await hooks.event({
       event: { type: "session.idle", properties: { sessionID: "s" } },
     });
 
-    const output = { output: "__OPF_EMAIL_1__", title: "x", metadata: {} };
+    const output = { output: token, title: "x", metadata: {} };
     await hooks["tool.execute.after"]!({ tool: "after-idle", sessionID: "s", callID: "c", args: {} },
     output);
     expect(output.output).toBe("user@example.com");
@@ -174,9 +179,9 @@ describe("createPluginHooks — restore via experimental.text.complete (ADR-0011
       remover,
       "Reach me at dev@example.com please."
     );
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(TOKEN_RE);
 
-    const output = { text: `Got it. I will email ${masked.match(/__OPF_EMAIL_\d+__/)?.[0]}.` };
+    const output = { text: `Got it. I will email ${masked.match(TOKEN_RE)?.[0]}.` };
     await hooks["experimental.text.complete"]!(
       { sessionID: "s", messageID: "m", partID: "p" },
       output
@@ -188,9 +193,10 @@ describe("createPluginHooks — restore via experimental.text.complete (ADR-0011
   test("handles LLM case-folding (lenient match)", async () => {
     const remover = await makeRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
-    await maskString(remover, "test@example.com");
+    const masked = await maskString(remover, "test@example.com");
+    const token = masked.match(TOKEN_RE)![0].toLowerCase();
 
-    const output = { text: "see __opf_email_1__ for details" };
+    const output = { text: `see ${token} for details` };
     await hooks["experimental.text.complete"]!(
       { sessionID: "s", messageID: "m", partID: "p" },
       output
@@ -234,13 +240,14 @@ describe("createPluginHooks — round-trip integration", () => {
   test("text.complete still restores after session.idle", async () => {
     const remover = await makeRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
-    await maskString(remover, "alice@example.com");
+    const masked = await maskString(remover, "alice@example.com");
+    const token = masked.match(TOKEN_RE)![0];
 
     await hooks.event({
       event: { type: "session.idle", properties: { sessionID: "s" } },
     });
 
-    const textOutput = { text: "__OPF_EMAIL_1__" };
+    const textOutput = { text: token };
     await hooks["experimental.text.complete"]!(
       { sessionID: "s", messageID: "m", partID: "p" },
       textOutput

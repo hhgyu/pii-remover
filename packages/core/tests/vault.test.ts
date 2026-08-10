@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { VaultManager } from "../src/vault/manager.js";
 import type { Detection, PIICategory } from "../src/types.js";
 
+const TOKEN_RE = /^__OPF_[A-Z_]+__[a-z0-9]{16}__$/;
+const EMAIL_UNKNOWN = "__OPF_EMAIL__ffffffffffffffff__";
+
 function det(
   start: number,
   end: number,
@@ -16,8 +19,8 @@ describe("VaultManager — dedup and indexing (ADR-0003)", () => {
     const v = new VaultManager();
     const a = v.assign("s1", [det(0, 5, "private_person", "Alice")]);
     const b = v.assign("s1", [det(20, 25, "private_person", "Alice")]);
-    expect(a[0]!.token).toBe("__OPF_PERSON_1__");
-    expect(b[0]!.token).toBe("__OPF_PERSON_1__");
+    expect(a[0]!.token).toMatch(TOKEN_RE);
+    expect(b[0]!.token).toBe(a[0]!.token);
     expect(v.size("s1")).toBe(1);
   });
 
@@ -28,50 +31,52 @@ describe("VaultManager — dedup and indexing (ADR-0003)", () => {
     expect(b[0]!.token).toBe(a[0]!.token);
   });
 
-  test("different surface text advances the index", () => {
+  test("different surface text yields different deterministic tokens", () => {
     const v = new VaultManager();
     const r = v.assign("s1", [
       det(0, 5, "private_person", "Alice"),
       det(10, 13, "private_person", "Bob"),
     ]);
-    expect(r[0]!.token).toBe("__OPF_PERSON_1__");
-    expect(r[1]!.token).toBe("__OPF_PERSON_2__");
+    expect(r[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
+    expect(r[1]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
+    expect(r[0]!.token).not.toBe(r[1]!.token);
   });
 
-  test("different label uses an independent index family", () => {
+  test("different label uses category-specific token labels", () => {
     const v = new VaultManager();
     const r = v.assign("s1", [
       det(0, 3, "private_person", "foo"),
       det(10, 13, "secret", "foo"),
     ]);
-    expect(r[0]!.token).toBe("__OPF_PERSON_1__");
-    expect(r[1]!.token).toBe("__OPF_SECRET_1__");
+    expect(r[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
+    expect(r[1]!.token).toMatch(/^__OPF_SECRET__[a-z0-9]{16}__$/);
+    expect(r[0]!.token).not.toBe(r[1]!.token);
   });
 });
 
 describe("VaultManager — session isolation (ADR-0003)", () => {
-  test("PERSON_1 in session A and session B are independent", () => {
+  test("same category tokens in session A and session B are independent", () => {
     const v = new VaultManager();
     const a = v.assign("A", [det(0, 5, "private_person", "Alice")]);
     const b = v.assign("B", [det(0, 3, "private_person", "Bob")]);
-    expect(a[0]!.token).toBe("__OPF_PERSON_1__");
-    expect(b[0]!.token).toBe("__OPF_PERSON_1__");
+    expect(a[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
+    expect(b[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
     const vaA = v.getOrCreate("A");
     const vaB = v.getOrCreate("B");
     expect(vaA.vault_id).not.toBe(vaB.vault_id);
-    expect(v.lookup("A", "__OPF_PERSON_1__")!.text).toBe("Alice");
-    expect(v.lookup("B", "__OPF_PERSON_1__")!.text).toBe("Bob");
+    expect(v.lookup("A", a[0]!.token)!.text).toBe("Alice");
+    expect(v.lookup("B", b[0]!.token)!.text).toBe("Bob");
   });
 
   test("dispose only removes the targeted session", () => {
     const v = new VaultManager();
     v.assign("A", [det(0, 5, "private_email", "a@b.c")]);
-    v.assign("B", [det(0, 5, "private_email", "x@y.z")]);
+    const b = v.assign("B", [det(0, 5, "private_email", "x@y.z")]);
     v.dispose("A");
     expect(v.has("A")).toBe(false);
     expect(v.has("B")).toBe(true);
-    expect(v.lookup("A", "__OPF_EMAIL_1__")).toBeNull();
-    expect(v.lookup("B", "__OPF_EMAIL_1__")!.text).toBe("x@y.z");
+    expect(v.lookup("A", b[0]!.token)).toBeNull();
+    expect(v.lookup("B", b[0]!.token)!.text).toBe("x@y.z");
   });
 });
 
@@ -100,7 +105,7 @@ describe("VaultManager — schema and ids", () => {
   test("new vault carries schema_version and a UUID-like vault_id", () => {
     const v = new VaultManager();
     const vault = v.getOrCreate("s1");
-    expect(vault.schema_version).toBe("opf.reversible.v1");
+    expect(vault.schema_version).toBe("opf.reversible.v2");
     expect(typeof vault.vault_id).toBe("string");
     expect(vault.vault_id.length).toBeGreaterThan(8);
   });
@@ -108,6 +113,6 @@ describe("VaultManager — schema and ids", () => {
   test("lookup returns null for unknown token", () => {
     const v = new VaultManager();
     v.assign("s1", [det(0, 5, "private_email", "u@e.c")]);
-    expect(v.lookup("s1", "__OPF_EMAIL_99__")).toBeNull();
+    expect(v.lookup("s1", EMAIL_UNKNOWN)).toBeNull();
   });
 });

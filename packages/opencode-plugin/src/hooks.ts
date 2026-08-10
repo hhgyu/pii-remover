@@ -151,7 +151,7 @@ export interface CreatedHooks {
 }
 
 const OPF_PLACEHOLDER_SYSTEM_NOTE =
-  "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>_<N>__. " +
+  "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. " +
   "Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. " +
   "When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written.";
 
@@ -373,7 +373,7 @@ export function createPluginHooks(
   }
 
   function stripTokens(text: string): string {
-    return text.replace(/__OPF_[A-Z_]+_\d+__/gi, "[REDACTED]");
+    return text.replace(/__OPF_[A-Z][A-Z0-9_]*?__[a-z0-9]{16}__/gi, "[REDACTED]");
   }
 
   // Tokens whose vault mapping no longer exists (minted by a previous
@@ -385,9 +385,9 @@ export function createPluginHooks(
   function neutralizeDeadTokens(text: string): string {
     if (!/__opf_/i.test(text)) return text;
     return text.replace(
-      /__OPF_([A-Z_]+)_(\d+)__/gi,
-      (raw, label: string, index: string) => {
-        const normalized = `__OPF_${label.toUpperCase()}_${index}__`;
+      /__OPF_([A-Z][A-Z0-9_]*?)__([a-z0-9]{16})__/gi,
+      (raw, label: string, hash: string) => {
+        const normalized = `__OPF_${label.toUpperCase()}__${hash.toLowerCase()}__`;
         if (remover.hasToken(normalized)) return raw;
         if (!warnedDeadTokens.has(normalized)) {
           warnedDeadTokens.add(normalized);

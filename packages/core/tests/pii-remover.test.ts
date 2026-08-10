@@ -13,6 +13,12 @@ import type {
   PIICategory,
 } from "../src/types.js";
 
+const H1 = "0123456789abcdef";
+const H2 = "fedcba9876543210";
+const EMAIL_RE = /^__OPF_EMAIL__[a-z0-9]{16}__$/;
+const EMAIL_UNKNOWN = "__OPF_EMAIL__ffffffffffffffff__";
+const FAKE_UNKNOWN = "__OPF_FAKE__ffffffffffffffff__";
+
 function mkConfig(overrides: Partial<typeof DEFAULT_CONFIG> = {}) {
   return { ...DEFAULT_CONFIG, ...overrides };
 }
@@ -39,7 +45,7 @@ describe("applyTokens", () => {
         category: "private_email",
         confidence: 0.9,
         text: "user@example.com",
-        token: "__OPF_EMAIL_1__",
+        token: `__OPF_EMAIL__${H1}__`,
       },
       {
         start: 27,
@@ -47,10 +53,10 @@ describe("applyTokens", () => {
         category: "card",
         confidence: 0.99,
         text: "4242 4242 4242 4242",
-        token: "__OPF_CARD_1__",
+        token: `__OPF_CARD__${H2}__`,
       },
     ]);
-    expect(out).toBe("email __OPF_EMAIL_1__ and __OPF_CARD_1__");
+    expect(out).toBe(`email __OPF_EMAIL__${H1}__ and __OPF_CARD__${H2}__`);
   });
 
   test("returns unchanged text when there are no tokens", () => {
@@ -70,9 +76,9 @@ describe("PIIRemover.mask — round trip (Phase 1)", () => {
     });
     const r = await pii.mask("contact user@example.com please");
     expect(r.bypassed).toBe(false);
-    expect(r.text).toBe("contact __OPF_EMAIL_1__ please");
+    expect(r.text).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__ please$/);
     expect(r.tokens).toHaveLength(1);
-    expect(r.tokens[0]!.token).toBe("__OPF_EMAIL_1__");
+    expect(r.tokens[0]!.token).toMatch(EMAIL_RE);
     expect(typeof r.vault_id).toBe("string");
     pii.dispose();
   });
@@ -96,8 +102,8 @@ describe("PIIRemover.mask — round trip (Phase 1)", () => {
     });
     const ra = await a.mask("call alice@example.com");
     const rb = await b.mask("call bob@example.com");
-    expect(ra.tokens[0]!.token).toBe("__OPF_EMAIL_1__");
-    expect(rb.tokens[0]!.token).toBe("__OPF_EMAIL_1__");
+    expect(ra.tokens[0]!.token).toMatch(EMAIL_RE);
+    expect(rb.tokens[0]!.token).toMatch(EMAIL_RE);
     expect(ra.vault_id).not.toBe(rb.vault_id);
     a.dispose();
     b.dispose();
@@ -158,7 +164,7 @@ describe("PIIRemover.mask — always-on secret scanner (Oracle recommendation)",
       "key sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz here"
     );
     expect(r.text).not.toContain("sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz");
-    expect(r.text).toContain("__OPF_SECRET_1__");
+    expect(r.text).toMatch(/__OPF_SECRET__[a-z0-9]{16}__/);
     expect(r.tokens).toHaveLength(1);
     expect(r.tokens[0]!.category).toBe("secret");
     pii.dispose();
@@ -306,7 +312,7 @@ describe("PIIRemover.mask — failure_policy (ADR-0006)", () => {
     });
     const r = await pii.mask("contact user@example.com please");
     expect(r.bypassed).toBe(false);
-    expect(r.text).toContain("__OPF_EMAIL_1__");
+    expect(r.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     pii.dispose();
   });
 
@@ -408,7 +414,7 @@ describe("PIIRemover.mask — critical backend down + failure_policy (regression
     });
     const r = await pii.mask("contact user@example.com please");
     expect(r.bypassed).toBe(false);
-    expect(r.text).toContain("__OPF_EMAIL_1__");
+    expect(r.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     pii.dispose();
   });
 
@@ -439,8 +445,8 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
     const original = "Contact alice@example.com or visit https://example.com";
     const masked = await pii.mask(original);
     expect(masked.text).not.toBe(original);
-    expect(masked.text).toContain("__OPF_EMAIL_1__");
-    expect(masked.text).toContain("__OPF_URL_1__");
+    expect(masked.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(masked.text).toMatch(/__OPF_URL__[a-z0-9]{16}__/);
 
     const restored = pii.restore(masked.text);
     expect(restored.text).toBe(original);
@@ -458,8 +464,9 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       warn: silentWarn(),
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    await pii.mask("contact alice@example.com today");
-    const restored = pii.restore("see __opf_email_1__ tomorrow");
+    const masked = await pii.mask("contact alice@example.com today");
+    const token = masked.tokens[0]!.token.toLowerCase();
+    const restored = pii.restore(`see ${token} tomorrow`);
     expect(restored.text).toBe("see alice@example.com tomorrow");
     expect(restored.restoredCount).toBe(1);
     expect(restored.partialMatchCount).toBeGreaterThan(0);
@@ -474,8 +481,9 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       warn: silentWarn(),
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    await pii.mask("contact alice@example.com today");
-    const restored = pii.restore("see __OPF_EMAIL_1 tomorrow");
+    const masked = await pii.mask("contact alice@example.com today");
+    const token = masked.tokens[0]!.token.slice(0, -2);
+    const restored = pii.restore(`see ${token} tomorrow`);
     expect(restored.text).toBe("see alice@example.com tomorrow");
     expect(restored.restoredCount).toBe(1);
     expect(restored.partialMatchCount).toBe(1);
@@ -490,8 +498,8 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       warn: silentWarn(),
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    const restored = pii.restore("see __OPF_FAKE_99__ here");
-    expect(restored.text).toBe("see __OPF_FAKE_99__ here");
+    const restored = pii.restore(`see ${FAKE_UNKNOWN} here`);
+    expect(restored.text).toBe(`see ${FAKE_UNKNOWN} here`);
     expect(restored.restoredCount).toBe(0);
     expect(restored.unknownTokenCount).toBe(1);
     pii.dispose();
@@ -567,7 +575,7 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
     pii.dispose();
-    expect(() => pii.restore("__OPF_EMAIL_1__")).toThrow(/disposed/);
+    expect(() => pii.restore(EMAIL_UNKNOWN)).toThrow(/disposed/);
   });
 
   test("session isolation: session A's tokens are unknown in session B", async () => {
@@ -603,7 +611,7 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       warn: (m) => captured.push(m),
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    pii.restore("__OPF_FAKE_99__ hello");
+    pii.restore(`${FAKE_UNKNOWN} hello`);
     expect(captured.length).toBeGreaterThanOrEqual(1);
     expect(captured.some((m) => /hallucinated/.test(m))).toBe(true);
     pii.dispose();
@@ -619,7 +627,7 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       warn: (m) => initCaptured.push(m),
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    pii.restore("__OPF_FAKE_1__", { warn: (m) => callCaptured.push(m) });
+    pii.restore(FAKE_UNKNOWN, { warn: (m) => callCaptured.push(m) });
     expect(initCaptured).toEqual([]);
     expect(callCaptured.length).toBeGreaterThanOrEqual(1);
     pii.dispose();

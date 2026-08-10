@@ -19,12 +19,12 @@ export interface TokenMatch {
   end: number;
   /** Original surface form that was matched (may differ from normalizedToken). */
   token: string;
-  /** Canonical form used for vault lookup: `__OPF_<CATEGORY>_<INDEX>__`. */
+  /** Canonical form used for vault lookup: `__OPF_<CATEGORY>__<HASH>__`. */
   normalizedToken: string;
   /** Uppercase category label (e.g. "PERSON", "EMAIL", "BIZ_NUM"). */
   category: string;
-  /** 1-based vault index. */
-  index: number;
+  /** Deterministic base36 hash identifier (ADR-0020). */
+  hash: string;
   /** Which regex matched: strict (canonical) or lenient (variant). */
   matchType: "strict" | "lenient";
 }
@@ -235,15 +235,15 @@ export function scanTokens(text: string): TokenMatch[] {
     const start = m.index ?? 0;
     const end = start + m[0].length;
     const category = m[1]!;
-    const index = Number(m[2]);
+    const hash = m[2]!.toLowerCase();
     strictRanges.push([start, end]);
     matches.push({
       start,
       end,
       token: m[0],
-      normalizedToken: buildNormalized(category, index),
+      normalizedToken: buildNormalized(category, hash),
       category,
-      index,
+      hash,
       matchType: "strict",
     });
   }
@@ -254,14 +254,14 @@ export function scanTokens(text: string): TokenMatch[] {
     const end = start + m[0].length;
     if (overlapsAny(strictRanges, start, end)) continue;
     const category = m[1]!.toUpperCase();
-    const index = Number(m[2]);
+    const hash = m[2]!.toLowerCase();
     matches.push({
       start,
       end,
       token: m[0],
-      normalizedToken: buildNormalized(category, index),
+      normalizedToken: buildNormalized(category, hash),
       category,
-      index,
+      hash,
       matchType: "lenient",
     });
   }
@@ -270,8 +270,8 @@ export function scanTokens(text: string): TokenMatch[] {
   return matches;
 }
 
-function buildNormalized(category: string, index: number): string {
-  return `__OPF_${category}_${index}__`;
+function buildNormalized(category: string, hash: string): string {
+  return `__OPF_${category}__${hash}__`;
 }
 
 function overlapsAny(

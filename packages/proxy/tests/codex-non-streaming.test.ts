@@ -25,7 +25,7 @@ describe("transformCodexResponsesRequest", () => {
     );
     expect(out.rejection).toBeUndefined();
     expect(typeof out.body.input).toBe("string");
-    expect(out.body.input as string).toContain("__OPF_EMAIL_1__");
+    expect(out.body.input as string).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(out.body.input as string).not.toContain("carol@example.com");
   });
 
@@ -39,7 +39,7 @@ describe("transformCodexResponsesRequest", () => {
       },
       remover
     );
-    expect(out.body.instructions).toContain("__OPF_EMAIL_1__");
+    expect(out.body.instructions).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(out.body.instructions).not.toContain("admin@example.com");
   });
 
@@ -67,7 +67,7 @@ describe("transformCodexResponsesRequest", () => {
     }>;
     const textPart = items[0]!.content![0]!;
     const imagePart = items[0]!.content![1]!;
-    expect(textPart.text).toContain("__OPF_CARD_1__");
+    expect(textPart.text).toMatch(/__OPF_CARD__[a-z0-9]{16}__/);
     expect(textPart.text).not.toContain("5555-5555-5555-4444");
     expect(imagePart.type).toBe("input_image");
   });
@@ -172,7 +172,7 @@ describe("restoreCodexResponsesResponse", () => {
       content?: Array<{ type: string; text?: string }>;
     }>;
     const maskedText = items[0]!.content![0]!.text!;
-    expect(maskedText).toContain("__OPF_EMAIL_1__");
+    expect(maskedText).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
 
     const restored = await restoreCodexResponsesResponse(
       {

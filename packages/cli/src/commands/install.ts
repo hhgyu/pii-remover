@@ -12,8 +12,21 @@ import {
   CLAUDE_HOOK_TYPE,
 } from "../constants.js";
 import type { PIICategory } from "@pii-remover/core";
-import { ALL_CATEGORIES, CATEGORY_LABELS, DEFAULT_CONFIG } from "@pii-remover/core";
+import {
+  ALL_CATEGORIES,
+  CATEGORY_LABELS,
+  DEFAULT_CONFIG,
+  resolveTokenKey,
+  defaultKeyPath,
+} from "@pii-remover/core";
 export { ALL_CATEGORIES, CATEGORY_LABELS };
+
+export function ensureTokenKey(
+  env: NodeJS.ProcessEnv = process.env,
+): { key_path: string; source: string } {
+  const resolution = resolveTokenKey({ env });
+  return { key_path: defaultKeyPath(), source: resolution.source };
+}
 
 export type InstallTarget = "claude-code" | "opencode" | "codex";
 export type InstallScope = "global" | "project";
@@ -259,6 +272,16 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
   }
 
   const nextSteps: string[] = [];
+  if (!opts.dryRun) {
+    const { key_path, source } = ensureTokenKey();
+    if (source === "generated") {
+      nextSteps.push(
+        `Deterministic token key written to ${key_path} (ADR-0020).`,
+        `Set PII_REMOVER_TOKEN_KEY to override, or copy this file to share tokens across machines.`,
+        ``
+      );
+    }
+  }
   const legacyHomePath = join(home, ".pii-remover.json");
   if (fs.exists(legacyHomePath)) {
     nextSteps.push(
@@ -340,6 +363,18 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
     configWritten = true;
   }
 
+  let tokenKeyNote: string[] = [];
+  if (!opts.dryRun) {
+    const { key_path, source } = ensureTokenKey();
+    if (source === "generated") {
+      tokenKeyNote = [
+        `Deterministic token key written to ${key_path} (ADR-0020).`,
+        `Set PII_REMOVER_TOKEN_KEY to override, or copy this file to share tokens across machines.`,
+        ``,
+      ];
+    }
+  }
+
   const legacyHomePath = join(home, ".pii-remover.json");
   const nextSteps =
     fs.exists(legacyHomePath) && scope === "global"
@@ -348,9 +383,10 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
           `This path is NOT in the loader candidate list and is silently ignored.`,
           `Migrate any custom values to ${configPath ?? "~/.config/pii-remover/config.json"}.`,
           ``,
+          ...tokenKeyNote,
           ...buildNextSteps(opts.commandPath),
         ]
-      : buildNextSteps(opts.commandPath);
+      : [...tokenKeyNote, ...buildNextSteps(opts.commandPath)];
 
   return {
     settings_path: settingsPath,

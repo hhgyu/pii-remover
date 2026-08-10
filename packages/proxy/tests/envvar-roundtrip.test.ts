@@ -7,8 +7,20 @@ import {
   type ProxyServer,
 } from "../src/server.js";
 
-function makeSseFetch(chunks: string[]): FetchLike {
-  return async () => {
+const TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+
+function tokenFromInit(init?: RequestInit): string {
+  const raw = typeof init?.body === "string" ? init.body : "";
+  return raw.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
+}
+
+function replaceFixtureTokens<T>(body: T, token: string): T {
+  return JSON.parse(JSON.stringify(body).replace(/__OPF_EMAIL__0123456789abcdef__/g, token)) as T;
+}
+
+function makeSseFetch(chunksForToken: (token: string) => string[]): FetchLike {
+  return async (_url, init) => {
+    const chunks = chunksForToken(tokenFromInit(init));
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -24,8 +36,8 @@ function makeSseFetch(chunks: string[]): FetchLike {
 }
 
 function makeJsonFetch(body: unknown): FetchLike {
-  return async () =>
-    new Response(JSON.stringify(body), {
+  return async (_url, init) =>
+    new Response(JSON.stringify(replaceFixtureTokens(body, tokenFromInit(init))), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -85,7 +97,7 @@ describe("Phase 3 — ANTHROPIC_BASE_URL roundtrip via env var", () => {
         type: "message",
         role: "assistant",
         content: [
-          { type: "text", text: "Will reach __OPF_EMAIL_1__ soon." },
+          { type: "text", text: "Will reach __OPF_EMAIL__0123456789abcdef__ soon." },
         ],
         model: "claude-test",
         stop_reason: "end_turn",
@@ -121,8 +133,9 @@ describe("Phase 3 — ANTHROPIC_BASE_URL roundtrip via env var", () => {
   });
 
   test("ANTHROPIC_BASE_URL streaming SSE roundtrip", async () => {
-    const upstreamText = "OK, paging __OPF_EMAIL_1__ now.";
-    const chunks = [
+    const chunksForToken = (token: string) => {
+      const upstreamText = `OK, paging ${token} now.`;
+      const chunks = [
       `event: message_start\ndata: ${JSON.stringify({ type: "message_start" })}\n\n`,
       `event: content_block_start\ndata: ${JSON.stringify({
         type: "content_block_start",
@@ -130,7 +143,7 @@ describe("Phase 3 — ANTHROPIC_BASE_URL roundtrip via env var", () => {
         content_block: { type: "text", text: "" },
       })}\n\n`,
     ];
-    for (let i = 0; i < upstreamText.length; i += 2) {
+      for (let i = 0; i < upstreamText.length; i += 2) {
       chunks.push(
         `event: content_block_delta\ndata: ${JSON.stringify({
           type: "content_block_delta",
@@ -138,10 +151,12 @@ describe("Phase 3 — ANTHROPIC_BASE_URL roundtrip via env var", () => {
           delta: { type: "text_delta", text: upstreamText.slice(i, i + 2) },
         })}\n\n`
       );
-    }
-    chunks.push(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+      }
+      chunks.push(`event: message_stop\ndata: ${JSON.stringify({ type: "message_stop" })}\n\n`);
+      return chunks;
+    };
 
-    const proxy = await withProxy(makeSseFetch(chunks));
+    const proxy = await withProxy(makeSseFetch(chunksForToken));
     setEnv("ANTHROPIC_BASE_URL", `${proxy.url}/anthropic/v1`);
 
     const base = process.env.ANTHROPIC_BASE_URL!;
@@ -173,7 +188,7 @@ describe("Phase 3 — OPENAI_API_BASE roundtrip via env var", () => {
         choices: [
           {
             index: 0,
-            message: { role: "assistant", content: "Reaching __OPF_EMAIL_1__ now." },
+            message: { role: "assistant", content: "Reaching __OPF_EMAIL__0123456789abcdef__ now." },
             finish_reason: "stop",
           },
         ],
@@ -206,8 +221,9 @@ describe("Phase 3 — OPENAI_API_BASE roundtrip via env var", () => {
   test("OPENAI_API_BASE + ANTHROPIC_BASE_URL share vault on single proxy (multi-provider)", async () => {
     let anthropicCount = 0;
     let openaiCount = 0;
-    const fetch_impl: FetchLike = async (input) => {
+    const fetch_impl: FetchLike = async (input, init) => {
       const url = typeof input === "string" ? input : input.toString();
+      const token = tokenFromInit(init);
       if (url.includes("anthropic.com")) {
         anthropicCount += 1;
         return new Response(
@@ -215,7 +231,7 @@ describe("Phase 3 — OPENAI_API_BASE roundtrip via env var", () => {
             id: "m1",
             type: "message",
             role: "assistant",
-            content: [{ type: "text", text: "Hi __OPF_EMAIL_1__" }],
+            content: [{ type: "text", text: `Hi ${token}` }],
             model: "claude-test",
             stop_reason: "end_turn",
             usage: { input_tokens: 1, output_tokens: 1 },
@@ -233,7 +249,7 @@ describe("Phase 3 — OPENAI_API_BASE roundtrip via env var", () => {
           choices: [
             {
               index: 0,
-              message: { role: "assistant", content: "Hello __OPF_EMAIL_1__" },
+              message: { role: "assistant", content: `Hello ${token}` },
               finish_reason: "stop",
             },
           ],

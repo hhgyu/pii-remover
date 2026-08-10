@@ -582,11 +582,12 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
 
     const sentence = "사업자 104-81-52702 와 연락처 010-1234-5678 처리.";
     const masked = (await remover.mask(sentence)).text;
-    expect(masked).toContain("__OPF_BIZNUM_");
-    expect(masked).toContain("__OPF_PHONE_");
+    expect(masked).toMatch(/__OPF_BIZNUM__[a-z0-9]{16}__/);
+    expect(masked).toMatch(/__OPF_PHONE__[a-z0-9]{16}__/);
+    const bizToken = masked.match(/__OPF_BIZNUM__[a-z0-9]{16}__/)![0];
 
     const toolOutput = {
-      title: "Search hit __OPF_BIZNUM_1__",
+      title: `Search hit ${bizToken}`,
       output: `Result line: ${masked}`,
       metadata: {},
     };

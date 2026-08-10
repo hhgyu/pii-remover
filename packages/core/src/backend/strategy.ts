@@ -157,8 +157,10 @@ export function mergeBackendDetections(
 }
 
 /**
- * Resolve overlap with longer-span priority, FIFO on ties.
- * Stable across calls: sort uses (start asc, length desc, original index asc).
+ * Resolve overlap with longer-span priority; on equal length the higher
+ * confidence wins, and ties fall back to original order (FIFO).
+ * Stable across calls: sort uses
+ * (start asc, length desc, confidence desc, original index asc).
  */
 export function mergeDetections(detections: readonly Detection[]): Detection[] {
   if (detections.length <= 1) return [...detections];
@@ -168,6 +170,7 @@ export function mergeDetections(detections: readonly Detection[]): Detection[] {
     const lenA = a.d.end - a.d.start;
     const lenB = b.d.end - b.d.start;
     if (lenA !== lenB) return lenB - lenA;
+    if (a.d.confidence !== b.d.confidence) return b.d.confidence - a.d.confidence;
     return a.i - b.i;
   });
   const result: Detection[] = [];
@@ -180,6 +183,8 @@ export function mergeDetections(detections: readonly Detection[]): Detection[] {
     const lastLen = last.end - last.start;
     const curLen = d.end - d.start;
     if (curLen > lastLen) {
+      result[result.length - 1] = d;
+    } else if (curLen === lastLen && d.confidence > last.confidence) {
       result[result.length - 1] = d;
     }
   }

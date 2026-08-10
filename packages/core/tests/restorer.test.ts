@@ -32,6 +32,30 @@ function makeVault(sessionId: string, seeds: Seed[]): VaultManager {
   return v;
 }
 
+function vaultToken(v: VaultManager, sessionId: string, seed: Seed): string {
+  return v.assign(sessionId, [det(0, seed.text.length, seed.category, seed.text)])[0]!.token;
+}
+
+const H1 = "0123456789abcdef";
+const H2 = "fedcba9876543210";
+const H3 = "aaaaaaaaaaaaaaaa";
+const PERSON1 = `__OPF_PERSON__${H1}__`;
+const PERSON1_LOWER = `__opf_person__${H1}__`;
+const PERSON1_MISSING_SUFFIX = `__OPF_PERSON__${H1}`;
+const PERSON1_LOWER_MISSING_SUFFIX = `__opf_person__${H1}`;
+const EMAIL1 = `__OPF_EMAIL__${H1}__`;
+const EMAIL1_LOWER = `__opf_email__${H1}__`;
+const EMAIL1_MISSING_SUFFIX = `__OPF_EMAIL__${H1}`;
+const EMAIL1_LOWER_MISSING_SUFFIX = `__opf_email__${H1}`;
+const EMAIL2 = `__OPF_EMAIL__${H2}__`;
+const PHONE = `__OPF_PHONE__${H3}__`;
+const BIZNUM = `__OPF_BIZ_NUM__${H1}__`;
+const FAKE = `__OPF_FAKE__ffffffffffffffff__`;
+const FAKE_LOWER = `__opf_fake__ffffffffffffffff__`;
+const FAKE_LOWER_MISSING_SUFFIX = `__opf_fake__ffffffffffffffff`;
+const PERSON_UNKNOWN = `__OPF_PERSON__ffffffffffffffff__`;
+const EMAIL_UNKNOWN = `__OPF_EMAIL__ffffffffffffffff__`;
+
 describe("scanTokens — strict + lenient detection (ADR-0002, ADR-0004)", () => {
   test("empty string returns no matches", () => {
     expect(scanTokens("")).toEqual([]);
@@ -42,41 +66,41 @@ describe("scanTokens — strict + lenient detection (ADR-0002, ADR-0004)", () =>
   });
 
   test("canonical token is a strict match", () => {
-    const out = scanTokens("see __OPF_PERSON_1__ here");
+    const out = scanTokens(`see ${PERSON1} here`);
     expect(out).toHaveLength(1);
     expect(out[0]!.matchType).toBe("strict");
-    expect(out[0]!.token).toBe("__OPF_PERSON_1__");
-    expect(out[0]!.normalizedToken).toBe("__OPF_PERSON_1__");
+    expect(out[0]!.token).toBe(PERSON1);
+    expect(out[0]!.normalizedToken).toBe(PERSON1);
     expect(out[0]!.category).toBe("PERSON");
-    expect(out[0]!.index).toBe(1);
+    expect(out[0]!.hash).toBe(H1);
   });
 
   test("lowercased token is a lenient match", () => {
-    const out = scanTokens("see __opf_person_1__ here");
+    const out = scanTokens(`see ${PERSON1_LOWER} here`);
     expect(out).toHaveLength(1);
     expect(out[0]!.matchType).toBe("lenient");
-    expect(out[0]!.token).toBe("__opf_person_1__");
-    expect(out[0]!.normalizedToken).toBe("__OPF_PERSON_1__");
+    expect(out[0]!.token).toBe(PERSON1_LOWER);
+    expect(out[0]!.normalizedToken).toBe(PERSON1);
     expect(out[0]!.category).toBe("PERSON");
   });
 
   test("suffix-missing token is a lenient match", () => {
-    const out = scanTokens("trailing __OPF_PERSON_1 cut off");
+    const out = scanTokens(`trailing ${PERSON1_MISSING_SUFFIX} cut off`);
     expect(out).toHaveLength(1);
     expect(out[0]!.matchType).toBe("lenient");
-    expect(out[0]!.token).toBe("__OPF_PERSON_1");
-    expect(out[0]!.normalizedToken).toBe("__OPF_PERSON_1__");
+    expect(out[0]!.token).toBe(PERSON1_MISSING_SUFFIX);
+    expect(out[0]!.normalizedToken).toBe(PERSON1);
   });
 
   test("suffix-missing + lowercased token is a lenient match", () => {
-    const out = scanTokens("trailing __opf_person_1 cut off");
+    const out = scanTokens(`trailing ${PERSON1_LOWER_MISSING_SUFFIX} cut off`);
     expect(out).toHaveLength(1);
     expect(out[0]!.matchType).toBe("lenient");
-    expect(out[0]!.normalizedToken).toBe("__OPF_PERSON_1__");
+    expect(out[0]!.normalizedToken).toBe(PERSON1);
   });
 
   test("strict and lenient share the same span without double-counting", () => {
-    const out = scanTokens("__OPF_EMAIL_1__");
+    const out = scanTokens(EMAIL1);
     expect(out).toHaveLength(1);
     expect(out[0]!.matchType).toBe("strict");
   });
@@ -86,22 +110,22 @@ describe("scanTokens — strict + lenient detection (ADR-0002, ADR-0004)", () =>
   });
 
   test("token adjacent to a word still matches strictly (no \\b in strict regex)", () => {
-    const out = scanTokens("__OPF_EMAIL_1__please respond");
+    const out = scanTokens(`${EMAIL1}please respond`);
     expect(out).toHaveLength(1);
     expect(out[0]!.matchType).toBe("strict");
-    expect(out[0]!.token).toBe("__OPF_EMAIL_1__");
+    expect(out[0]!.token).toBe(EMAIL1);
   });
 
   test("two consecutive tokens both match strictly", () => {
-    const out = scanTokens("__OPF_EMAIL_1__ and __OPF_EMAIL_2__");
+    const out = scanTokens(`${EMAIL1} and ${EMAIL2}`);
     expect(out).toHaveLength(2);
     expect(out.every((m) => m.matchType === "strict")).toBe(true);
-    expect(out[0]!.index).toBe(1);
-    expect(out[1]!.index).toBe(2);
+    expect(out[0]!.hash).toBe(H1);
+    expect(out[1]!.hash).toBe(H2);
   });
 
   test("matches are sorted by start position", () => {
-    const out = scanTokens("see __OPF_PHONE_5__ then __opf_email_1");
+    const out = scanTokens(`see ${PHONE} then ${EMAIL1_LOWER_MISSING_SUFFIX}`);
     expect(out).toHaveLength(2);
     expect(out[0]!.start).toBeLessThan(out[1]!.start);
     expect(out[0]!.matchType).toBe("strict");
@@ -109,11 +133,11 @@ describe("scanTokens — strict + lenient detection (ADR-0002, ADR-0004)", () =>
   });
 
   test("multi-underscore categories like BIZ_NUM parse correctly", () => {
-    const out = scanTokens("__OPF_BIZ_NUM_3__");
+    const out = scanTokens(BIZNUM);
     expect(out).toHaveLength(1);
     expect(out[0]!.category).toBe("BIZ_NUM");
-    expect(out[0]!.index).toBe(3);
-    expect(out[0]!.normalizedToken).toBe("__OPF_BIZ_NUM_3__");
+    expect(out[0]!.hash).toBe(H1);
+    expect(out[0]!.normalizedToken).toBe(BIZNUM);
   });
 });
 
@@ -146,7 +170,8 @@ describe("Restorer.restore — happy path", () => {
       { category: "private_email", text: "alice@example.com" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("see __OPF_EMAIL_1__ today", "s1");
+    const token = vaultToken(v, "s1", { category: "private_email", text: "alice@example.com" });
+    const out = r.restore(`see ${token} today`, "s1");
     expect(out.text).toBe("see alice@example.com today");
     expect(out.restoredCount).toBe(1);
     expect(out.partialMatchCount).toBe(0);
@@ -158,7 +183,8 @@ describe("Restorer.restore — happy path", () => {
       { category: "private_person", text: "Alice" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("__OPF_PERSON_1__", "s1");
+    const token = vaultToken(v, "s1", { category: "private_person", text: "Alice" });
+    const out = r.restore(token, "s1");
     expect(out.text).toBe("Alice");
     expect(out.restoredCount).toBe(1);
   });
@@ -169,8 +195,10 @@ describe("Restorer.restore — happy path", () => {
       { category: "private_url", text: "https://example.com/path?q=1" },
     ]);
     const r = new Restorer(v);
+    const email = vaultToken(v, "s1", { category: "private_email", text: "alice@example.com" });
+    const url = vaultToken(v, "s1", { category: "private_url", text: "https://example.com/path?q=1" });
     const out = r.restore(
-      "contact __OPF_EMAIL_1__ or visit __OPF_URL_1__",
+      `contact ${email} or visit ${url}`,
       "s1"
     );
     expect(out.text).toBe(
@@ -185,8 +213,10 @@ describe("Restorer.restore — happy path", () => {
       { category: "private_email", text: "very-long-email-address@example.com" },
     ]);
     const r = new Restorer(v);
+    const person = vaultToken(v, "s1", { category: "private_person", text: "X" });
+    const email = vaultToken(v, "s1", { category: "private_email", text: "very-long-email-address@example.com" });
     const out = r.restore(
-      "__OPF_PERSON_1__ and __OPF_EMAIL_1__ done",
+      `${person} and ${email} done`,
       "s1"
     );
     expect(out.text).toBe(
@@ -201,7 +231,8 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
       { category: "private_email", text: "alice@example.com" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("see __opf_email_1__ tomorrow", "s1");
+    const token = vaultToken(v, "s1", { category: "private_email", text: "alice@example.com" }).toLowerCase();
+    const out = r.restore(`see ${token} tomorrow`, "s1");
     expect(out.text).toBe("see alice@example.com tomorrow");
     expect(out.restoredCount).toBe(1);
     expect(out.partialMatchCount).toBe(1);
@@ -213,7 +244,8 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
       { category: "private_person", text: "Alice" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("trailing __OPF_PERSON_1 cut off", "s1");
+    const token = vaultToken(v, "s1", { category: "private_person", text: "Alice" }).slice(0, -2);
+    const out = r.restore(`trailing ${token} cut off`, "s1");
     expect(out.text).toBe("trailing Alice cut off");
     expect(out.restoredCount).toBe(1);
     expect(out.partialMatchCount).toBe(1);
@@ -224,7 +256,8 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
       { category: "private_person", text: "Alice" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("trailing __opf_person_1 cut off", "s1");
+    const token = vaultToken(v, "s1", { category: "private_person", text: "Alice" }).toLowerCase().slice(0, -2);
+    const out = r.restore(`trailing ${token} cut off`, "s1");
     expect(out.text).toBe("trailing Alice cut off");
     expect(out.restoredCount).toBe(1);
     expect(out.partialMatchCount).toBe(1);
@@ -235,8 +268,8 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
       { category: "private_email", text: "alice@example.com" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("see __OPF_FAKE_99__ here", "s1");
-    expect(out.text).toBe("see __OPF_FAKE_99__ here");
+    const out = r.restore(`see ${FAKE} here`, "s1");
+    expect(out.text).toBe(`see ${FAKE} here`);
     expect(out.restoredCount).toBe(0);
     expect(out.partialMatchCount).toBe(0);
     expect(out.unknownTokenCount).toBe(1);
@@ -245,8 +278,8 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
   test("hallucinated lenient token preserves original + bumps both partial and unknown", () => {
     const v = makeVault("s1", []);
     const r = new Restorer(v);
-    const out = r.restore("__opf_fake_42__ trailing", "s1");
-    expect(out.text).toBe("__opf_fake_42__ trailing");
+    const out = r.restore(`${FAKE_LOWER} trailing`, "s1");
+    expect(out.text).toBe(`${FAKE_LOWER} trailing`);
     expect(out.restoredCount).toBe(0);
     expect(out.partialMatchCount).toBe(1);
     expect(out.unknownTokenCount).toBe(1);
@@ -256,7 +289,7 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
     const v = makeVault("s1", []);
     const warnings: string[] = [];
     const r = new Restorer(v, { warn: (m) => warnings.push(m) });
-    r.restore("__OPF_FAKE_99__", "s1");
+    r.restore(FAKE, "s1");
     expect(warnings.length).toBe(1);
     expect(warnings[0]).toMatch(/hallucinated/);
   });
@@ -267,7 +300,8 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
     ]);
     const warnings: string[] = [];
     const r = new Restorer(v, { warn: (m) => warnings.push(m) });
-    r.restore("see __opf_email_1__ tomorrow", "s1");
+    const token = vaultToken(v, "s1", { category: "private_email", text: "alice@example.com" }).toLowerCase();
+    r.restore(`see ${token} tomorrow`, "s1");
     expect(warnings.length).toBe(1);
     expect(warnings[0]).toMatch(/lenient/);
     expect(warnings[0]).toMatch(/LLM transformation/);
@@ -277,7 +311,7 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
     const v = makeVault("s1", []);
     const warnings: string[] = [];
     const r = new Restorer(v, { warn: (m) => warnings.push(m) });
-    r.restore("__OPF_FAKE_99__ __opf_fake_42__", "s1", {
+    r.restore(`${FAKE} ${FAKE_LOWER}`, "s1", {
       warnOnPartial: false,
       warnOnUnknownToken: false,
     });
@@ -287,24 +321,24 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
   test("custom unknownTokenHandler replaces strict misses with handler output", () => {
     const v = makeVault("s1", []);
     const r = new Restorer(v);
-    const out = r.restore("see __OPF_FAKE_99__ here", "s1", {
+    const out = r.restore(`see ${FAKE} here`, "s1", {
       unknownTokenHandler: (tok) => `[unknown:${tok}]`,
       warnOnUnknownToken: false,
     });
-    expect(out.text).toBe("see [unknown:__OPF_FAKE_99__] here");
+    expect(out.text).toBe(`see [unknown:${FAKE}] here`);
     expect(out.unknownTokenCount).toBe(1);
   });
 
   test("custom partialMatchHandler replaces lenient misses with handler output", () => {
     const v = makeVault("s1", []);
     const r = new Restorer(v);
-    const out = r.restore("see __opf_fake_42 here", "s1", {
+    const out = r.restore(`see ${FAKE_LOWER_MISSING_SUFFIX} here`, "s1", {
       partialMatchHandler: (tok, match) =>
         `[partial:${tok}->${match.normalizedToken}]`,
       warnOnPartial: false,
     });
     expect(out.text).toBe(
-      "see [partial:__opf_fake_42->__OPF_FAKE_42__] here"
+      `see [partial:${FAKE_LOWER_MISSING_SUFFIX}->${FAKE}] here`
     );
     expect(out.partialMatchCount).toBe(1);
     expect(out.unknownTokenCount).toBe(1);
@@ -315,10 +349,10 @@ describe("Restorer.restore — LLM variation scenarios (ADR-0004)", () => {
       { category: "private_email", text: "alice@example.com" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("see __opf_email_1__ here", "s1", {
+    const out = r.restore(`see ${EMAIL1_LOWER} here`, "s1", {
       lenient: false,
     });
-    expect(out.text).toBe("see __opf_email_1__ here");
+    expect(out.text).toBe(`see ${EMAIL1_LOWER} here`);
     expect(out.matches).toHaveLength(0);
     expect(out.restoredCount).toBe(0);
     expect(out.partialMatchCount).toBe(0);
@@ -332,10 +366,12 @@ describe("Restorer.restore — edge cases", () => {
       { category: "private_url", text: "https://x.y" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("__OPF_URL_1__ ... __OPF_EMAIL_1__", "s1");
+    const email = vaultToken(v, "s1", { category: "private_email", text: "a@b.c" });
+    const url = vaultToken(v, "s1", { category: "private_url", text: "https://x.y" });
+    const out = r.restore(`${url} ... ${email}`, "s1");
     expect(out.matches.map((m) => m.normalizedToken)).toEqual([
-      "__OPF_URL_1__",
-      "__OPF_EMAIL_1__",
+      url,
+      email,
     ]);
     expect(out.matches[0]!.start).toBeLessThan(out.matches[1]!.start);
   });
@@ -343,7 +379,7 @@ describe("Restorer.restore — edge cases", () => {
   test("empty sessionId throws TypeError", () => {
     const v = makeVault("s1", []);
     const r = new Restorer(v);
-    expect(() => r.restore("__OPF_PERSON_1__", "")).toThrow(TypeError);
+    expect(() => r.restore(PERSON1, "")).toThrow(TypeError);
   });
 
   test("unknown sessionId yields all-unknown counters without throwing", () => {
@@ -351,8 +387,9 @@ describe("Restorer.restore — edge cases", () => {
       { category: "private_person", text: "Alice" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("__OPF_PERSON_1__", "never-existed");
-    expect(out.text).toBe("__OPF_PERSON_1__");
+    const token = vaultToken(v, "s1", { category: "private_person", text: "Alice" });
+    const out = r.restore(token, "never-existed");
+    expect(out.text).toBe(token);
     expect(out.restoredCount).toBe(0);
     expect(out.unknownTokenCount).toBe(1);
   });
@@ -362,8 +399,8 @@ describe("Restorer.restore — edge cases", () => {
       { category: "private_person", text: "Alice" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("__OPF_EMAIL_5__", "s1");
-    expect(out.text).toBe("__OPF_EMAIL_5__");
+    const out = r.restore(EMAIL_UNKNOWN, "s1");
+    expect(out.text).toBe(EMAIL_UNKNOWN);
     expect(out.unknownTokenCount).toBe(1);
   });
 
@@ -372,7 +409,8 @@ describe("Restorer.restore — edge cases", () => {
       { category: "private_email", text: "alice@example.com" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("__OPF_EMAIL_1__please reply", "s1");
+    const token = vaultToken(v, "s1", { category: "private_email", text: "alice@example.com" });
+    const out = r.restore(`${token}please reply`, "s1");
     expect(out.text).toBe("alice@example.complease reply");
     expect(out.restoredCount).toBe(1);
     expect(out.matches[0]!.matchType).toBe("strict");
@@ -386,7 +424,7 @@ describe("Restorer.restore — edge cases", () => {
       warnOnUnknownToken: true,
     });
     const callSiteCaptured: string[] = [];
-    r.restore("__OPF_FAKE_1__", "s1", {
+    r.restore(FAKE, "s1", {
       warn: (m) => callSiteCaptured.push(`call:${m}`),
     });
     expect(captured).toEqual([]);
@@ -398,7 +436,7 @@ describe("Restorer.restore — edge cases", () => {
     const v = makeVault("s1", []);
     const r = new Restorer(v);
     const out = r.restore(
-      "__OPF_PERSON_1__ and __opf_email_2 and __OPF_FAKE_99__",
+      `${PERSON1} and ${EMAIL2.toLowerCase().slice(0, -2)} and ${FAKE}`,
       "s1",
       { warnOnPartial: false, warnOnUnknownToken: false }
     );
@@ -419,63 +457,63 @@ describe("isInsidePath — path-context detection", () => {
 
   test("Windows drive path with token embedded in directory name", () => {
     const { start, end } = findToken(
-      "NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_2__Plugin)",
-      "__OPF_PERSON_2__"
+      `NotFound: FileSystem.access (D:\\Git\\${PERSON1}Plugin)`,
+      PERSON1
     );
-    expect(isInsidePath("NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_2__Plugin)", start, end)).toBe(true);
+    expect(isInsidePath(`NotFound: FileSystem.access (D:\\Git\\${PERSON1}Plugin)`, start, end)).toBe(true);
   });
 
   test("POSIX absolute path with token", () => {
-    const path = "/tmp/__OPF_PERSON_2__Plugin";
-    const { start, end } = findToken(path, "__OPF_PERSON_2__");
+    const path = `/tmp/${PERSON1}Plugin`;
+    const { start, end } = findToken(path, PERSON1);
     expect(isInsidePath(path, start, end)).toBe(true);
   });
 
   test("UNC path", () => {
-    const path = "\\\\server\\share\\__OPF_EMAIL_1__dir";
-    const { start, end } = findToken(path, "__OPF_EMAIL_1__");
+    const path = `\\\\server\\share\\${EMAIL1}dir`;
+    const { start, end } = findToken(path, EMAIL1);
     expect(isInsidePath(path, start, end)).toBe(true);
   });
 
   test("relative path with ./ prefix", () => {
-    const path = "./src/__OPF_PERSON_1__file.ts";
-    const { start, end } = findToken(path, "__OPF_PERSON_1__");
+    const path = `./src/${PERSON1}file.ts`;
+    const { start, end } = findToken(path, PERSON1);
     expect(isInsidePath(path, start, end)).toBe(true);
   });
 
   test("file:// URL", () => {
-    const path = "file:///home/__OPF_EMAIL_1__dir";
-    const { start, end } = findToken(path, "__OPF_EMAIL_1__");
+    const path = `file:///home/${EMAIL1}dir`;
+    const { start, end } = findToken(path, EMAIL1);
     expect(isInsidePath(path, start, end)).toBe(true);
   });
 
   test("token followed by regular text (NOT a path)", () => {
-    const text = "__OPF_EMAIL_1__please respond";
-    const { start, end } = findToken(text, "__OPF_EMAIL_1__");
+    const text = `${EMAIL1}please respond`;
+    const { start, end } = findToken(text, EMAIL1);
     expect(isInsidePath(text, start, end)).toBe(false);
   });
 
   test("token in normal sentence (NOT a path)", () => {
-    const text = "see __OPF_PERSON_1__ here";
-    const { start, end } = findToken(text, "__OPF_PERSON_1__");
+    const text = `see ${PERSON1} here`;
+    const { start, end } = findToken(text, PERSON1);
     expect(isInsidePath(text, start, end)).toBe(false);
   });
 
   test("token at sentence start (NOT a path)", () => {
-    const text = "__OPF_EMAIL_1__ is the email";
-    const { start, end } = findToken(text, "__OPF_EMAIL_1__");
+    const text = `${EMAIL1} is the email`;
+    const { start, end } = findToken(text, EMAIL1);
     expect(isInsidePath(text, start, end)).toBe(false);
   });
 
   test("token followed by newline (NOT a path)", () => {
-    const text = "see __OPF_PERSON_2__\nnext line";
-    const { start, end } = findToken(text, "__OPF_PERSON_2__");
+    const text = `see ${PERSON1}\nnext line`;
+    const { start, end } = findToken(text, PERSON1);
     expect(isInsidePath(text, start, end)).toBe(false);
   });
 
   test("https:// URL with token in path segment", () => {
-    const text = "https://example.com/__OPF_PERSON_2__page";
-    const { start, end } = findToken(text, "__OPF_PERSON_2__");
+    const text = `https://example.com/${PERSON1}page`;
+    const { start, end } = findToken(text, PERSON1);
     expect(isInsidePath(text, start, end)).toBe(true);
   });
 });
@@ -501,24 +539,25 @@ describe("Restorer.restore — path-skip behavior", () => {
     ]);
     const r = new Restorer(v);
     const out = r.restore(
-      "error: D:\\Git\\__OPF_PERSON_99__Plugin not found",
+      `error: D:\\Git\\${PERSON_UNKNOWN}Plugin not found`,
       "s1"
     );
-    expect(out.text).toBe("error: D:\\Git\\__OPF_PERSON_99__Plugin not found");
+    expect(out.text).toBe(`error: D:\\Git\\${PERSON_UNKNOWN}Plugin not found`);
     expect(out.pathSkipCount).toBe(1);
     expect(out.unknownTokenCount).toBe(0);
   });
 
   test("vault token inside path is always restored", () => {
     const v = makeVault("s1", [
-      { category: "private_person", text: "__OPF_PERSON_6__" },
+      { category: "private_person", text: PERSON1 },
     ]);
     const r = new Restorer(v);
+    const token = vaultToken(v, "s1", { category: "private_person", text: PERSON1 });
     const out = r.restore(
-      "NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_1__Plugin)",
+      `NotFound: FileSystem.access (D:\\Git\\${token}Plugin)`,
       "s1"
     );
-    expect(out.text).toBe("NotFound: FileSystem.access (D:\\Git\\__OPF_PERSON_6__Plugin)");
+    expect(out.text).toBe(`NotFound: FileSystem.access (D:\\Git\\${PERSON1}Plugin)`);
     expect(out.restoredCount).toBe(1);
     expect(out.pathSkipCount).toBe(0);
   });
@@ -528,7 +567,8 @@ describe("Restorer.restore — path-skip behavior", () => {
       { category: "private_person", text: "Bob" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("error: /tmp/__OPF_PERSON_1__dir not found", "s1");
+    const token = vaultToken(v, "s1", { category: "private_person", text: "Bob" });
+    const out = r.restore(`error: /tmp/${token}dir not found`, "s1");
     expect(out.text).toBe("error: /tmp/Bobdir not found");
     expect(out.restoredCount).toBe(1);
     expect(out.pathSkipCount).toBe(0);
@@ -539,7 +579,8 @@ describe("Restorer.restore — path-skip behavior", () => {
       { category: "private_email", text: "alice@example.com" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("__OPF_EMAIL_1__please respond", "s1");
+    const token = vaultToken(v, "s1", { category: "private_email", text: "alice@example.com" });
+    const out = r.restore(`${token}please respond`, "s1");
     expect(out.text).toBe("alice@example.complease respond");
     expect(out.restoredCount).toBe(1);
     expect(out.pathSkipCount).toBe(0);
@@ -547,15 +588,17 @@ describe("Restorer.restore — path-skip behavior", () => {
 
   test("mixed: vault token in path restored, unknown standalone token counted", () => {
     const v = makeVault("s1", [
-      { category: "private_person", text: "__OPF_PERSON_6__" },
-      { category: "private_email", text: "__OPF_EMAIL_5__" },
+      { category: "private_person", text: PERSON1 },
+      { category: "private_email", text: EMAIL1 },
     ]);
     const r = new Restorer(v);
+    const person = vaultToken(v, "s1", { category: "private_person", text: PERSON1 });
+    const email = vaultToken(v, "s1", { category: "private_email", text: EMAIL1 });
     const out = r.restore(
-      "D:\\Git\\__OPF_PERSON_1__Plugin and __OPF_EMAIL_1__ and __OPF_PERSON_99__dir",
+      `D:\\Git\\${person}Plugin and ${email} and ${PERSON_UNKNOWN}dir`,
       "s1"
     );
-    expect(out.text).toBe("D:\\Git\\__OPF_PERSON_6__Plugin and __OPF_EMAIL_5__ and __OPF_PERSON_99__dir");
+    expect(out.text).toBe(`D:\\Git\\${PERSON1}Plugin and ${EMAIL1} and ${PERSON_UNKNOWN}dir`);
     expect(out.restoredCount).toBe(2);
     expect(out.unknownTokenCount).toBe(1);
     expect(out.pathSkipCount).toBe(0);
@@ -566,8 +609,9 @@ describe("Restorer.restore — path-skip behavior", () => {
       { category: "private_person", text: "Dave" },
     ]);
     const r = new Restorer(v);
+    const token = vaultToken(v, "s1", { category: "private_person", text: "Dave" });
     const out = r.restore(
-      "D:\\Git\\__OPF_PERSON_1__Plugin",
+      `D:\\Git\\${token}Plugin`,
       "s1",
       { skipPathMatches: false }
     );
@@ -581,7 +625,8 @@ describe("Restorer.restore — path-skip behavior", () => {
       { category: "private_email", text: "x@y.z" },
     ]);
     const r = new Restorer(v);
-    const out = r.restore("see __OPF_EMAIL_1__ here", "s1");
+    const token = vaultToken(v, "s1", { category: "private_email", text: "x@y.z" });
+    const out = r.restore(`see ${token} here`, "s1");
     expect(out.pathSkipCount).toBe(0);
     expect(out.restoredCount).toBe(1);
   });

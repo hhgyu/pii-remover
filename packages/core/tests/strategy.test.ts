@@ -84,6 +84,35 @@ describe("mergeDetections — ADR-0010 overlap resolution", () => {
   test("empty input returns empty array", () => {
     expect(mergeDetections([])).toEqual([]);
   });
+
+  test("on equal-length overlap, higher confidence wins over FIFO", () => {
+    const lowFirst: Detection = {
+      start: 0,
+      end: 5,
+      category: "private_person",
+      confidence: 0.3,
+      text: "first",
+    };
+    const highSecond: Detection = {
+      start: 0,
+      end: 5,
+      category: "secret",
+      confidence: 0.95,
+      text: "first",
+    };
+    const merged = mergeDetections([lowFirst, highSecond]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.category).toBe("secret");
+  });
+
+  test("equal length and equal confidence still falls back to FIFO", () => {
+    const merged = mergeDetections([
+      det(0, 5, "private_person", "first"),
+      det(0, 5, "secret", "first"),
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.category).toBe("private_person");
+  });
 });
 
 describe("MergeStrategy — multi-backend union", () => {

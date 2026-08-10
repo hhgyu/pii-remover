@@ -175,8 +175,8 @@ describe("PersonalDataBackend - integration via PIIRemover", () => {
       warn: () => {},
     });
     const r = await pii.mask("Project-Phoenix delayed, contact user@example.com");
-    expect(r.text).toMatch(/__OPF_SECRET_\d+__/);
-    expect(r.text).toMatch(/__OPF_EMAIL_\d+__/);
+    expect(r.text).toMatch(/__OPF_SECRET__[a-z0-9]{16}__/);
+    expect(r.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(r.tokens.find((t) => t.category === "secret")?.text).toBe(
       "Project-Phoenix",
     );
@@ -224,7 +224,7 @@ describe("PersonalDataBackend - integration via PIIRemover", () => {
       warn: () => {},
     });
     const masked = await pii.mask("저자 위석호가 작성");
-    expect(masked.text).toMatch(/__OPF_PERSON_\d+__/);
+    expect(masked.text).toMatch(/__OPF_PERSON__[a-z0-9]{16}__/);
     const restored = pii.restore(masked.text);
     expect(restored.text).toBe("저자 위석호가 작성");
     pii.dispose();

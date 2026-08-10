@@ -19,7 +19,7 @@ describe("님 honorific regression (handoff Q from 2026-05-12)", () => {
     remover.dispose();
   });
 
-  test("LLM이 응답에서 '__OPF_PERSON_1__,'로 님을 콤마로 바꾼 응답을 복원하면 '김철수,'가 되며 이는 LLM 변형 결과로 인한 것 — 우리 도구의 버그가 아님", async () => {
+  test("LLM이 응답에서 OPF PERSON 토큰 뒤의 님을 콤마로 바꾼 응답을 복원하면 '김철수,'가 되며 이는 LLM 변형 결과로 인한 것 — 우리 도구의 버그가 아님", async () => {
     const remover = await PIIRemover.init({ env: {} });
     const masked = await remover.mask("안녕 김철수님 반갑습니다");
     const personToken = masked.tokens.find(

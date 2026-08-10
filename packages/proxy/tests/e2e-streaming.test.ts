@@ -52,8 +52,16 @@ function openaiSseChunks(text: string, chunkSize: number): string[] {
   return events;
 }
 
-function makeSseFetch(chunks: string[]): FetchLike {
-  return async () => {
+const TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+
+function extractEmailToken(init?: RequestInit): string {
+  const raw = typeof init?.body === "string" ? init.body : "";
+  return raw.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
+}
+
+function makeSseFetch(buildChunks: (token: string) => string[]): FetchLike {
+  return async (_url, init) => {
+    const chunks = buildChunks(extractEmailToken(init));
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -81,16 +89,29 @@ async function consumeSseBody(res: Response): Promise<string> {
   return out;
 }
 
+function aggregateSseText(sse: string): string {
+  let text = "";
+  for (const block of sse.split("\n\n")) {
+    const line = block.split("\n").find((l) => l.startsWith("data: "));
+    if (!line) continue;
+    try {
+      const data = JSON.parse(line.slice(6));
+      text += data.delta?.text ?? data.choices?.[0]?.delta?.content ?? "";
+    } catch {
+      // ignore sentinels
+    }
+  }
+  return text;
+}
+
 describe("e2e SSE — Anthropic streaming round-trip", () => {
   let proxy: ProxyServer;
 
   beforeAll(async () => {
-    const upstreamText = "Reply to __OPF_EMAIL_1__ tomorrow.";
-    const chunks = anthropicSseChunks(upstreamText, 1);
     proxy = await startProxy({
       port: 0,
       backends: [new LocalRegexBackend()],
-      fetch_impl: makeSseFetch(chunks),
+      fetch_impl: makeSseFetch((token) => anthropicSseChunks(`Reply to ${token} tomorrow.`, 16)),
     });
   });
 
@@ -117,7 +138,7 @@ describe("e2e SSE — Anthropic streaming round-trip", () => {
     expect(res.headers.get("content-type")).toContain("text/event-stream");
 
     const body = await consumeSseBody(res);
-    expect(body).toContain("alice@example.com");
+    expect(aggregateSseText(body)).toContain("alice@example.com");
     expect(body).not.toContain("__OPF_EMAIL_");
     expect(body).toContain("message_start");
     expect(body).toContain("message_stop");
@@ -128,12 +149,10 @@ describe("e2e SSE — OpenAI streaming round-trip", () => {
   let proxy: ProxyServer;
 
   beforeAll(async () => {
-    const upstreamText = "Got it, paging __OPF_EMAIL_1__.";
-    const chunks = openaiSseChunks(upstreamText, 2);
     proxy = await startProxy({
       port: 0,
       backends: [new LocalRegexBackend()],
-      fetch_impl: makeSseFetch(chunks),
+      fetch_impl: makeSseFetch((token) => openaiSseChunks(`Got it, paging ${token}.`, 2)),
     });
   });
 
@@ -159,7 +178,7 @@ describe("e2e SSE — OpenAI streaming round-trip", () => {
     expect(res.status).toBe(200);
 
     const body = await consumeSseBody(res);
-    expect(body).toContain("dev@example.com");
+    expect(aggregateSseText(body)).toContain("dev@example.com");
     expect(body).not.toContain("__OPF_EMAIL_");
     expect(body).toContain("[DONE]");
   });

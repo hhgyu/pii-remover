@@ -5,3 +5,4 @@ export {
   isValidBizNumChecksum,
 } from "./korean-biznum.js";
 export { findKoreanPhones } from "./korean-phone.js";
+export { findUsSsns, isValidSsn } from "./us-ssn.js";

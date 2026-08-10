@@ -75,7 +75,7 @@ describe("Streamable HTTP transport smoke", () => {
         vault_id: string;
         token_count: number;
       };
-      expect(m.text).toBe("email me at __OPF_EMAIL_1__");
+      expect(m.text).toMatch(/^email me at __OPF_EMAIL__[a-z0-9]{16}__$/);
       expect(m.token_count).toBe(1);
 
       const out = await client.callTool({

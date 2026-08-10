@@ -7,6 +7,7 @@ import {
 import { startProxy, type ProxyServer, type FetchLike } from "../src/server.js";
 
 const OPENAI_PATH = "/openai/v1/chat/completions";
+const TOKEN_RE = /__OPF_[A-Z_]+__[a-z0-9]{16}__/;
 
 async function makeRemover() {
   return PIIRemover.init({
@@ -30,7 +31,7 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
     );
     expect(out.rejection).toBeUndefined();
     const masked = (out.body.messages[0]!.content as string);
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
   });
 
   test("array content: text masked, image_url passthrough", async () => {
@@ -54,7 +55,7 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
       remover
     );
     const parts = out.body.messages[0]!.content as Array<{ type: string; text?: string }>;
-    expect(parts[0]!.text).toContain("__OPF_CARD_1__");
+    expect(parts[0]!.text).toMatch(/__OPF_CARD__[a-z0-9]{16}__/);
     expect(parts[1]!.type).toBe("image_url");
   });
 
@@ -71,21 +72,21 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
     expect(out.rejection).toBeUndefined();
     expect(out.body.stream).toBe(true);
     const masked = out.body.messages[0]!.content as string;
-    expect(masked).toContain("__OPF_EMAIL_1__");
+    expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
   });
 });
 
 describe("restoreOpenAIResponse — content + tool_calls restoration", () => {
   test("restores string content in choices", async () => {
     const remover = await makeRemover();
-    await remover.mask("alice@example.com");
+    const token = (await remover.mask("alice@example.com")).tokens[0]!.token;
     const restored = await restoreOpenAIResponse(
       {
         choices: [
           {
             message: {
               role: "assistant",
-              content: "Will message __OPF_EMAIL_1__.",
+              content: `Will message ${token}.`,
             },
           },
         ],
@@ -99,12 +100,12 @@ describe("restoreOpenAIResponse — content + tool_calls restoration", () => {
 
   test("restores tool_calls.function.arguments JSON", async () => {
     const remover = await makeRemover();
-    await remover.mask("alice@example.com");
+    const token = (await remover.mask("alice@example.com")).tokens[0]!.token;
 
     const argsRaw = JSON.stringify({
-      to: "__OPF_EMAIL_1__",
+      to: token,
       subject: "report",
-      body: "send to __OPF_EMAIL_1__ now",
+      body: `send to ${token} now`,
     });
     const restored = await restoreOpenAIResponse(
       {
@@ -135,7 +136,7 @@ describe("restoreOpenAIResponse — content + tool_calls restoration", () => {
 
   test("array content with text parts gets restored", async () => {
     const remover = await makeRemover();
-    await remover.mask("dev@example.com");
+    const token = (await remover.mask("dev@example.com")).tokens[0]!.token;
     const restored = await restoreOpenAIResponse(
       {
         choices: [
@@ -143,7 +144,7 @@ describe("restoreOpenAIResponse — content + tool_calls restoration", () => {
             message: {
               role: "assistant",
               content: [
-                { type: "text", text: "I'll page __OPF_EMAIL_1__." },
+                { type: "text", text: `I'll page ${token}.` },
               ],
             },
           },
@@ -173,6 +174,9 @@ describe("startProxy — OpenAI round-trip via mock upstream", () => {
       } catch {
         lastBody = null;
       }
+      const upstreamText = (lastBody as { messages?: Array<{ content?: string }> })
+        ?.messages?.[0]?.content ?? "";
+      const token = upstreamText.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
       return new Response(
         JSON.stringify({
           id: "chatcmpl_test",
@@ -182,7 +186,7 @@ describe("startProxy — OpenAI round-trip via mock upstream", () => {
               index: 0,
               message: {
                 role: "assistant",
-                content: "Got it, paging __OPF_EMAIL_1__.",
+                content: `Got it, paging ${token}.`,
               },
               finish_reason: "stop",
             },
@@ -223,7 +227,7 @@ describe("startProxy — OpenAI round-trip via mock upstream", () => {
     );
     const upstreamMessages = (lastBody as { messages: Array<{ content: string }> })
       .messages;
-    expect(upstreamMessages[0]!.content).toContain("__OPF_EMAIL_1__");
+    expect(upstreamMessages[0]!.content).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
   });
 
   test("embeddings passthrough does not double-handle JSON", async () => {

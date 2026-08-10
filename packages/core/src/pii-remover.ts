@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { DetectionResult, DetectOpts, TrustTier } from "./types.js";
+import type {
+  DetectionResult,
+  DetectOpts,
+  PIICategory,
+  TrustTier,
+} from "./types.js";
 import type {
   BackendAuthConfig,
   BackendConfig,
@@ -10,8 +15,12 @@ import type { BackendClient } from "./backend/client.js";
 import { LocalRegexBackend } from "./backend/local-regex.js";
 import { OpfHttpBackend } from "./backend/opf-http.js";
 import { PersonalDataBackend } from "./backend/personal-data.js";
+import { CustomPatternBackend } from "./backend/custom-pattern.js";
 import { synthesize } from "./synthetic/index.js";
 import { restoreSynthetic } from "./synthetic/restore.js";
+import { HmacTokenizer } from "./redaction/hmac.js";
+import { TypeRedactor } from "./redaction/redact.js";
+import { resolveTokenKey } from "./redaction/token-hash.js";
 import {
   RemoteHttpBackend,
   type RemoteHttpAuth,
@@ -71,6 +80,8 @@ export class PIIRemover {
   private readonly backendName: string;
   private readonly fallbackBackend: LocalRegexBackend;
   private readonly audit: AuditEmitter;
+  private readonly hmacTokenizer: HmacTokenizer | null;
+  private readonly typeRedactor: TypeRedactor | null;
   private disposed = false;
 
   private constructor(args: {
@@ -84,6 +95,8 @@ export class PIIRemover {
     backendName: string;
     fallbackBackend: LocalRegexBackend;
     audit: AuditEmitter;
+    hmacTokenizer: HmacTokenizer | null;
+    typeRedactor: TypeRedactor | null;
   }) {
     this.sessionId = args.sessionId;
     this.config = args.config;
@@ -95,6 +108,8 @@ export class PIIRemover {
     this.backendName = args.backendName;
     this.fallbackBackend = args.fallbackBackend;
     this.audit = args.audit;
+    this.hmacTokenizer = args.hmacTokenizer;
+    this.typeRedactor = args.typeRedactor;
   }
 
   static async init(
@@ -106,8 +121,19 @@ export class PIIRemover {
     const sessionId = opts.sessionId ?? `session_${randomUUID()}`;
     const warn = opts.warn ?? ((msg: string) => process.stderr.write(`${msg}\n`));
 
+    const tokenKeyOpts: Parameters<typeof resolveTokenKey>[0] = { env };
+    if (config.restoration.token_key?.secret_env) {
+      tokenKeyOpts.envName = config.restoration.token_key.secret_env;
+    }
+    if (config.restoration.token_key?.key_path) {
+      tokenKeyOpts.keyPath = config.restoration.token_key.key_path;
+    }
+    const tokenKeyResolution = resolveTokenKey(tokenKeyOpts);
+    if (tokenKeyResolution.warning) warn(tokenKeyResolution.warning);
+
     const vaultOpts: ConstructorParameters<typeof VaultManager>[0] = {
       onWarn: warn,
+      tokenKey: tokenKeyResolution.key,
     };
     if (config.restoration.mode === "synthetic") {
       vaultOpts.syntheticGenerator = synthesize;
@@ -121,9 +147,7 @@ export class PIIRemover {
       defaultCategories: config.detection.enabled_categories,
     });
     const restorer = new Restorer(vault, { warn });
-    const fallbackBackend = new LocalRegexBackend({
-      enabledCategories: config.detection.enabled_categories,
-    });
+    const fallbackBackend = buildLocalRegexBackend(config);
     const auditEnvValue = env[config.audit.audit_env];
     const auditEnvOverride =
       typeof auditEnvValue === "string" && auditEnvValue.length > 0
@@ -136,6 +160,9 @@ export class PIIRemover {
         logPath: config.audit.log_path,
       });
 
+    const hmacTokenizer = buildHmacTokenizer(config, env);
+    const typeRedactor = buildTypeRedactor(config);
+
     return new PIIRemover({
       sessionId,
       config,
@@ -147,6 +174,8 @@ export class PIIRemover {
       backendName: built.name,
       fallbackBackend,
       audit,
+      hmacTokenizer,
+      typeRedactor,
     });
   }
 
@@ -241,7 +270,9 @@ export class PIIRemover {
     }
 
     const tokens = this.vault.assign(this.sessionId, detection.detections);
-    const masked = applyTokens(text, tokens, this.config.restoration.mode);
+    const masked = applyTokens(text, tokens, {
+      resolveReplacement: (t) => this.resolveReplacement(t),
+    });
     const latencyMs = performance.now() - t0;
     this.audit.maskEvent({
       vault_id: vault.vault_id,
@@ -260,6 +291,24 @@ export class PIIRemover {
       bypassed: false,
       backend_name: detection.backend_name,
     };
+  }
+
+  private resolveReplacement(t: AssignedToken): string {
+    const category = t.category as PIICategory;
+    if (this.typeRedactor) {
+      const redacted = this.typeRedactor.redact(category, t.text);
+      if (redacted !== null) return redacted;
+    }
+    if (this.hmacTokenizer) {
+      return this.hmacTokenizer.tokenize(category, t.text);
+    }
+    if (
+      this.config.restoration.mode === "synthetic" &&
+      t.syntheticValue !== undefined
+    ) {
+      return t.syntheticValue;
+    }
+    return t.token;
   }
 
   restore(
@@ -317,19 +366,33 @@ export class PIIRemover {
   }
 }
 
+export interface ApplyTokensOptions {
+  mode?: "token" | "synthetic";
+  resolveReplacement?: (token: AssignedToken) => string;
+}
+
 export function applyTokens(
   text: string,
   tokens: readonly AssignedToken[],
-  mode: "token" | "synthetic" = "token",
+  modeOrOptions: "token" | "synthetic" | ApplyTokensOptions = "token",
 ): string {
   if (tokens.length === 0) return text;
+  const options: ApplyTokensOptions =
+    typeof modeOrOptions === "string"
+      ? { mode: modeOrOptions }
+      : modeOrOptions;
+  const mode = options.mode ?? "token";
   const sorted = [...tokens].sort((a, b) => b.start - a.start);
   let out = text;
   for (const t of sorted) {
-    const replacement =
-      mode === "synthetic" && t.syntheticValue !== undefined
-        ? t.syntheticValue
-        : t.token;
+    let replacement: string;
+    if (options.resolveReplacement) {
+      replacement = options.resolveReplacement(t);
+    } else if (mode === "synthetic" && t.syntheticValue !== undefined) {
+      replacement = t.syntheticValue;
+    } else {
+      replacement = t.token;
+    }
     out = out.slice(0, t.start) + replacement + out.slice(t.end);
   }
   return out;
@@ -348,13 +411,11 @@ function buildDefaultStrategy(
     return buildTieredStrategy(config, extraBackends);
   }
   const backends: BackendClient[] = [];
-  backends.push(
-    new LocalRegexBackend({
-      enabledCategories: config.detection.enabled_categories,
-    })
-  );
+  backends.push(buildLocalRegexBackend(config));
   const personalBackend = buildPersonalDataBackend(config);
   if (personalBackend) backends.push(personalBackend);
+  const customBackend = buildCustomPatternBackend(config);
+  if (customBackend) backends.push(customBackend);
   if (config.backend.endpoint) {
     backends.push(buildRemoteBackend(config.backend));
   }
@@ -369,6 +430,13 @@ function buildDefaultStrategy(
   return { strategy, name };
 }
 
+function buildLocalRegexBackend(config: PiiRemoverConfig): LocalRegexBackend {
+  return new LocalRegexBackend({
+    enabledCategories: config.detection.enabled_categories,
+    detect_us_ssn: config.detection.detect_us_ssn === true,
+  });
+}
+
 function buildPersonalDataBackend(
   config: PiiRemoverConfig,
 ): PersonalDataBackend | null {
@@ -376,6 +444,41 @@ function buildPersonalDataBackend(
   if (!pd || pd.enabled === false) return null;
   if (!pd.entries || pd.entries.length === 0) return null;
   return new PersonalDataBackend(pd.entries);
+}
+
+function buildCustomPatternBackend(
+  config: PiiRemoverConfig,
+): CustomPatternBackend | null {
+  const patterns = config.detection.custom_patterns;
+  if (!patterns || patterns.length === 0) return null;
+  const backend = new CustomPatternBackend(patterns);
+  return backend.size() > 0 ? backend : null;
+}
+
+function buildHmacTokenizer(
+  config: PiiRemoverConfig,
+  env: NodeJS.ProcessEnv,
+): HmacTokenizer | null {
+  if (config.restoration.mode !== "hmac") return null;
+  const hmac = config.restoration.hmac;
+  if (!hmac || !hmac.secret_env) {
+    throw new Error(
+      "PII Remover: restoration.mode='hmac' requires restoration.hmac.secret_env (fail-closed)",
+    );
+  }
+  const secret = env[hmac.secret_env];
+  if (typeof secret !== "string" || secret.length === 0) {
+    throw new Error(
+      `PII Remover: restoration.hmac.secret_env '${hmac.secret_env}' is not set (fail-closed)`,
+    );
+  }
+  return new HmacTokenizer(secret, hmac.token_length);
+}
+
+function buildTypeRedactor(config: PiiRemoverConfig): TypeRedactor | null {
+  const overrides = config.restoration.type_overrides;
+  if (!overrides || overrides.length === 0) return null;
+  return new TypeRedactor(overrides);
 }
 
 function buildTieredStrategy(
@@ -392,18 +495,17 @@ function buildTieredStrategy(
       "PII Remover: backend.type='tiered' requires a non-empty backend.endpoint (fail-closed per ADR-0006)"
     );
   }
-  const local = new LocalRegexBackend({
-    enabledCategories: config.detection.enabled_categories,
-  });
+  const local = buildLocalRegexBackend(config);
   const remote = buildRemoteBackend(config.backend);
   const personalBackend = buildPersonalDataBackend(config);
-  const localStrategy: BackendClient = personalBackend
-    ? new MergedBackend([local, personalBackend])
-    : local;
+  const customBackend = buildCustomPatternBackend(config);
+  const localOnly: BackendClient[] = [local];
+  if (personalBackend) localOnly.push(personalBackend);
+  if (customBackend) localOnly.push(customBackend);
+  const localStrategy: BackendClient =
+    localOnly.length > 1 ? new MergedBackend(localOnly) : local;
   const strategy = new TieredStrategy({ local: localStrategy, remote });
-  const localName = personalBackend
-    ? `${local.name}+${personalBackend.name}`
-    : local.name;
+  const localName = localOnly.map((b) => b.name).join("+");
   return {
     strategy,
     name: `tiered(local=${localName}+remote=${remote.name})`,

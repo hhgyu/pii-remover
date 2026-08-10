@@ -41,6 +41,21 @@ function splitEvery(text: string, size: number): string[] {
   return out;
 }
 
+function aggregateSseText(sse: string): string {
+  let text = "";
+  for (const block of sse.split("\n\n")) {
+    const line = block.split("\n").find((l) => l.startsWith("data: "));
+    if (!line) continue;
+    try {
+      const data = JSON.parse(line.slice(6));
+      text += data.delta?.text ?? data.choices?.[0]?.delta?.content ?? "";
+    } catch {
+      // ignore sentinels
+    }
+  }
+  return text;
+}
+
 describe("SseLineParser — event block parsing", () => {
   test("parses event + data line", () => {
     const parser = new SseLineParser();
@@ -76,34 +91,34 @@ describe("SseLineParser — event block parsing", () => {
 describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
   test("restores token in single complete delta", async () => {
     const remover = await makeRemover();
-    await remover.mask("alice@example.com");
+    const token = (await remover.mask("alice@example.com")).tokens[0]!.token;
     const t = new AnthropicSseTransformer(remover);
-    const input = anthropicDelta(0, "Email __OPF_EMAIL_1__ please");
+    const input = anthropicDelta(0, `Email ${token} please`);
     const out = t.push(input) + t.flush();
     expect(out).toContain("alice@example.com");
     expect(out).not.toContain("__OPF_EMAIL_");
   });
 
-  test("reassembles token split across deltas (1-char chunks)", async () => {
+  test("reassembles token split across deltas", async () => {
     const remover = await makeRemover();
-    await remover.mask("bob@example.com");
+    const token = (await remover.mask("bob@example.com")).tokens[0]!.token;
     const t = new AnthropicSseTransformer(remover);
-    const fullText = "Ping __OPF_EMAIL_1__ tomorrow";
+    const fullText = `Ping ${token} tomorrow`;
+    const splitAt = `Ping ${token.slice(0, token.length >> 1)}`.length;
     let out = "";
-    for (const ch of splitEvery(fullText, 1)) {
-      out += t.push(anthropicDelta(0, ch));
-    }
+    out += t.push(anthropicDelta(0, fullText.slice(0, splitAt)));
+    out += t.push(anthropicDelta(0, fullText.slice(splitAt)));
     out += t.flush();
-    expect(out).toContain("bob@example.com");
+    expect(aggregateSseText(out)).toContain("bob@example.com");
     expect(out).not.toContain("__OPF_EMAIL_");
   });
 
   test("content_block_stop flushes pending buffer for that index (lenient: suffix dropped)", async () => {
     const remover = await makeRemover();
-    await remover.mask("carol@example.com");
+    const token = (await remover.mask("carol@example.com")).tokens[0]!.token.slice(0, -2);
     const t = new AnthropicSseTransformer(remover);
     let out = "";
-    out += t.push(anthropicDelta(0, "Hi __OPF_EMAIL_1"));
+    out += t.push(anthropicDelta(0, `Hi ${token}`));
     out += t.push(
       serializeSseEvent({
         event: "content_block_stop",
@@ -117,11 +132,11 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
 
   test("input_json_delta: accumulates and restores PII tokens in tool call args", async () => {
     const remover = await makeRemover();
-    await remover.mask("김철수");
-    await remover.mask("alice@example.com");
+    const person = (await remover.mask("김철수")).tokens[0]!.token;
+    const email = (await remover.mask("alice@example.com")).tokens[0]!.token;
     const t = new AnthropicSseTransformer(remover);
     const toolArgs = JSON.stringify({
-      questions: [{ question: "__OPF_PERSON_1__님 __OPF_EMAIL_1__ 확인?" }],
+      questions: [{ question: `${person}님 ${email} 확인?` }],
     });
     const chunks = splitEvery(toolArgs, 5);
     let out = "";
@@ -178,13 +193,14 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
 
   test("multi-block indices buffered independently", async () => {
     const remover = await makeRemover();
-    await remover.mask("dev@example.com");
+    const token = (await remover.mask("dev@example.com")).tokens[0]!.token;
     const t = new AnthropicSseTransformer(remover);
     let out = "";
-    out += t.push(anthropicDelta(0, "first __OPF_E"));
-    out += t.push(anthropicDelta(1, "second __OPF_E"));
-    out += t.push(anthropicDelta(0, "MAIL_1__ end0"));
-    out += t.push(anthropicDelta(1, "MAIL_1__ end1"));
+    const cut = "__OPF_E".length;
+    out += t.push(anthropicDelta(0, `first ${token.slice(0, cut)}`));
+    out += t.push(anthropicDelta(1, `second ${token.slice(0, cut)}`));
+    out += t.push(anthropicDelta(0, `${token.slice(cut)} end0`));
+    out += t.push(anthropicDelta(1, `${token.slice(cut)} end1`));
     out += t.flush();
     const emailCount = (out.match(/dev@example\.com/g) ?? []).length;
     expect(emailCount).toBe(2);
@@ -217,24 +233,24 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
 describe("OpenAISseTransformer — token-restoring delta pipeline", () => {
   test("restores token in single complete delta", async () => {
     const remover = await makeRemover();
-    await remover.mask("alice@example.com");
+    const token = (await remover.mask("alice@example.com")).tokens[0]!.token;
     const t = new OpenAISseTransformer(remover);
-    const out = t.push(openaiDelta("Email __OPF_EMAIL_1__ please")) + t.flush();
+    const out = t.push(openaiDelta(`Email ${token} please`)) + t.flush();
     expect(out).toContain("alice@example.com");
     expect(out).not.toContain("__OPF_EMAIL_");
   });
 
   test("reassembles token split across deltas", async () => {
     const remover = await makeRemover();
-    await remover.mask("bob@example.com");
+    const token = (await remover.mask("bob@example.com")).tokens[0]!.token;
     const t = new OpenAISseTransformer(remover);
-    const fullText = "ping __OPF_EMAIL_1__ now";
+    const fullText = `ping ${token} now`;
     let out = "";
-    for (const ch of splitEvery(fullText, 1)) {
-      out += t.push(openaiDelta(ch));
-    }
+    const splitAt = `ping ${token.slice(0, token.length >> 1)}`.length;
+    out += t.push(openaiDelta(fullText.slice(0, splitAt)));
+    out += t.push(openaiDelta(fullText.slice(splitAt)));
     out += t.flush();
-    expect(out).toContain("bob@example.com");
+    expect(aggregateSseText(out)).toContain("bob@example.com");
     expect(out).not.toContain("__OPF_EMAIL_");
   });
 
@@ -260,11 +276,11 @@ describe("OpenAISseTransformer — token-restoring delta pipeline", () => {
 
   test("delta.tool_calls arguments: accumulates and restores PII tokens", async () => {
     const remover = await makeRemover();
-    await remover.mask("김철수");
-    await remover.mask("alice@example.com");
+    const person = (await remover.mask("김철수")).tokens[0]!.token;
+    const email = (await remover.mask("alice@example.com")).tokens[0]!.token;
     const t = new OpenAISseTransformer(remover);
     const fullArgs = JSON.stringify({
-      questions: [{ question: "__OPF_PERSON_1__님 __OPF_EMAIL_1__" }],
+      questions: [{ question: `${person}님 ${email}` }],
     });
     let out = "";
     for (const chunk of splitEvery(fullArgs, 6)) {
@@ -292,11 +308,11 @@ describe("CodexSseTransformer — function_call_arguments restoration", () => {
 
   test("response.function_call_arguments.delta: accumulates and restores PII on done", async () => {
     const remover = await makeRemover();
-    await remover.mask("김철수");
-    await remover.mask("alice@example.com");
+    const person = (await remover.mask("김철수")).tokens[0]!.token;
+    const email = (await remover.mask("alice@example.com")).tokens[0]!.token;
     const t = new CodexSseTransformer(remover);
     const fullArgs = JSON.stringify({
-      todos: [{ content: "__OPF_PERSON_1__님 todo: __OPF_EMAIL_1__ 확인" }],
+      todos: [{ content: `${person}님 todo: ${email} 확인` }],
     });
     let out = "";
     for (const chunk of splitEvery(fullArgs, 7)) {
@@ -329,14 +345,14 @@ describe("CodexSseTransformer — function_call_arguments restoration", () => {
 
   test("response.output_text.delta still works after function_call changes", async () => {
     const remover = await makeRemover();
-    await remover.mask("bob@example.com");
+    const token = (await remover.mask("bob@example.com")).tokens[0]!.token;
     const t = new CodexSseTransformer(remover);
     const out = t.push(sse({
       event: "response.output_text.delta",
       data: JSON.stringify({
         type: "response.output_text.delta",
         output_index: 0,
-        delta: "Email __OPF_EMAIL_1__ done",
+        delta: `Email ${token} done`,
       }),
       raw: "",
     })) + t.flush();

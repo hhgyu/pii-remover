@@ -17,8 +17,21 @@ export {
   TOKEN_LENIENT_REGEX,
   TOKEN_PREFIX,
   TOKEN_SUFFIX,
+  TOKEN_DELIMITER,
 } from "./token/format.js";
 export type { ParsedToken } from "./token/format.js";
+
+export {
+  tokenHash,
+  deriveTokenKey,
+  resolveTokenKey,
+  defaultKeyPath,
+  TOKEN_HASH_LENGTH,
+} from "./redaction/token-hash.js";
+export type {
+  TokenKeyResolution,
+  ResolveTokenKeyOptions,
+} from "./redaction/token-hash.js";
 
 export {
   CATEGORY_MAP,
@@ -45,6 +58,7 @@ export type { BackendStrategy } from "./backend/strategy.js";
 export { LocalRegexBackend } from "./backend/local-regex.js";
 export type { LocalRegexBackendOptions } from "./backend/local-regex.js";
 export { PersonalDataBackend } from "./backend/personal-data.js";
+export { CustomPatternBackend } from "./backend/custom-pattern.js";
 export { OpfHttpBackend } from "./backend/opf-http.js";
 export type {
   OpfHttpBackendOptions,
@@ -87,6 +101,10 @@ export { Detector } from "./detector/index.js";
 export type { DetectorOptions } from "./detector/index.js";
 export { findSecrets, SECRET_PATTERNS } from "./detector/secret-scanner.js";
 export type { FindSecretsOptions } from "./detector/secret-scanner.js";
+export { findUsSsns, isValidSsn } from "./detector/regex/us-ssn.js";
+
+export { HmacTokenizer, deriveHmacKey } from "./redaction/hmac.js";
+export { TypeRedactor } from "./redaction/redact.js";
 
 export { AuditEmitter, aggregateAuditCategories } from "./audit/index.js";
 export type {
@@ -121,6 +139,11 @@ export type {
   KoreanHeuristicsConfig,
   RestorationConfig,
   RestorationMode,
+  RedactionMode,
+  TypeRedactionOverride,
+  HmacConfig,
+  TokenKeyConfig,
+  CustomPatternConfig,
   VaultConfig,
   ProxyConfig,
   ProxyStreamingConfig,
@@ -154,4 +177,8 @@ export {
 export type { BypassDetectOptions } from "./policy/bypass.js";
 
 export { PIIRemover, applyTokens } from "./pii-remover.js";
-export type { PIIRemoverInitOptions, MaskResult } from "./pii-remover.js";
+export type {
+  PIIRemoverInitOptions,
+  MaskResult,
+  ApplyTokensOptions,
+} from "./pii-remover.js";

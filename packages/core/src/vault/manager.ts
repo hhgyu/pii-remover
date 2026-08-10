@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { Detection, PIICategory, TokenizedSpan } from "../types.js";
 import { formatToken } from "../token/format.js";
 import { categoryToTokenLabel } from "../token/category-map.js";
+import { tokenHash } from "../redaction/token-hash.js";
 import { SCHEMA_VERSION, type Vault, type VaultEntry } from "./schema.js";
 
 const MAX_ENTRIES_HARD = 100_000;
@@ -19,6 +20,10 @@ export interface VaultManagerOptions {
   maxEntries?: number;
   onWarn?: (message: string) => void;
   syntheticGenerator?: SyntheticGenerator;
+  /** HMAC key for deterministic token hashing (ADR-0020). When omitted, a
+   *  process-local random key is used (tokens stay consistent within the
+   *  process but not across restarts). */
+  tokenKey?: Buffer;
 }
 
 export class VaultManager {
@@ -26,11 +31,13 @@ export class VaultManager {
   private readonly maxEntries: number;
   private readonly onWarn: (message: string) => void;
   private readonly syntheticGenerator: SyntheticGenerator | null;
+  private readonly tokenKey: Buffer;
 
   constructor(opts: VaultManagerOptions = {}) {
     this.maxEntries = opts.maxEntries ?? MAX_ENTRIES_HARD;
     this.onWarn = opts.onWarn ?? (() => {});
     this.syntheticGenerator = opts.syntheticGenerator ?? null;
+    this.tokenKey = opts.tokenKey ?? randomBytes(32);
   }
 
   entries(sessionId: string): VaultEntry[] {
@@ -81,11 +88,8 @@ export class VaultManager {
     assertNoOverlap(detections);
     const vault = this.getOrCreate(sessionId);
 
-    const labelMaxIndex = new Map<string, number>();
     const dedupLookup = new Map<string, string>();
     for (const [token, entry] of Object.entries(vault.entries)) {
-      const prev = labelMaxIndex.get(entry.label) ?? 0;
-      if (entry.index > prev) labelMaxIndex.set(entry.label, entry.index);
       dedupLookup.set(dedupKey(entry.label, entry.canonical_text), token);
     }
 
@@ -95,20 +99,26 @@ export class VaultManager {
       const key = dedupKey(label, canonical);
       let token = dedupLookup.get(key);
       if (!token) {
-        const idx = (labelMaxIndex.get(label) ?? 0) + 1;
-        labelMaxIndex.set(label, idx);
         const tokenLabel = categoryToTokenLabel(label as PIICategory);
-        token = formatToken(tokenLabel, idx);
+        const hash = tokenHash(this.tokenKey, tokenLabel, canonical);
+        token = formatToken(tokenLabel, hash);
+        const collision = vault.entries[token];
+        if (collision && collision.canonical_text !== canonical) {
+          throw new Error(
+            `Vault ${vault.vault_id}: token hash collision for ${token} ` +
+              `(existing label=${collision.label}; new label=${label}) — fail-closed`,
+          );
+        }
         const entry: VaultEntry = {
           label,
           text: d.text,
           canonical_text: canonical,
-          index: idx,
+          id: hash,
         };
         if (this.syntheticGenerator) {
           entry.synthetic_value = this.syntheticGenerator(
             label as PIICategory,
-            idx,
+            hashToSeed(hash),
             d.text,
           );
         }
@@ -140,6 +150,18 @@ export class VaultManager {
 
 function canonicalize(text: string): string {
   return text.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * Map a base36 token hash to a stable positive integer seed for synthetic
+ * value generation (ADR-0018). Deterministic: same hash → same seed.
+ */
+function hashToSeed(hash: string): number {
+  let acc = 0;
+  for (let i = 0; i < hash.length; i += 1) {
+    acc = (acc * 31 + hash.charCodeAt(i)) % 1_000_000_007;
+  }
+  return acc + 1;
 }
 
 function dedupKey(label: string, canonical: string): string {

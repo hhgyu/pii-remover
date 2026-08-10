@@ -6,7 +6,7 @@
  * VaultManager.canonicalize for the normalization function.
  */
 
-export const SCHEMA_VERSION = "opf.reversible.v1" as const;
+export const SCHEMA_VERSION = "opf.reversible.v2" as const;
 
 export type VaultSchemaVersion = typeof SCHEMA_VERSION;
 
@@ -14,7 +14,8 @@ export interface VaultEntry {
   label: string;
   text: string;
   canonical_text: string;
-  index: number;
+  /** Deterministic base36 hash identifier (ADR-0020). */
+  id: string;
   /** Populated only when `RestorationConfig.mode === "synthetic"` (ADR-0018). */
   synthetic_value?: string;
 }

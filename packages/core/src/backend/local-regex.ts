@@ -11,6 +11,7 @@ import {
   findKoreanBizNums,
   findKoreanPhones,
   findKoreanRrns,
+  findUsSsns,
 } from "../detector/regex/index.js";
 import { findKoreanNames } from "../detector/korean-heuristic/index.js";
 import { findSecrets } from "../detector/secret-scanner.js";
@@ -33,6 +34,7 @@ const DEFAULT_ENABLED: ReadonlyArray<PIICategory> = [
   "card",
   "rrn",
   "biz_num",
+  "account_number",
 ];
 
 const SUPPORTED: ReadonlySet<PIICategory> = new Set([
@@ -44,6 +46,7 @@ const SUPPORTED: ReadonlySet<PIICategory> = new Set([
   "card",
   "rrn",
   "biz_num",
+  "account_number",
 ]);
 
 export interface LocalRegexBackendOptions {
@@ -51,6 +54,7 @@ export interface LocalRegexBackendOptions {
   name?: string;
   enable_korean_pii?: boolean;
   strict_rrn_checksum?: boolean;
+  detect_us_ssn?: boolean;
 }
 
 export class LocalRegexBackend implements BackendClient {
@@ -59,6 +63,7 @@ export class LocalRegexBackend implements BackendClient {
   private readonly enabled: ReadonlySet<PIICategory>;
   private readonly enableKorean: boolean;
   private readonly strictRrnChecksum: boolean;
+  private readonly detectUsSsn: boolean;
 
   constructor(opts: LocalRegexBackendOptions = {}) {
     const requested = opts.enabledCategories ?? DEFAULT_ENABLED;
@@ -66,6 +71,7 @@ export class LocalRegexBackend implements BackendClient {
     this.name = opts.name ?? "local-regex";
     this.enableKorean = opts.enable_korean_pii !== false;
     this.strictRrnChecksum = opts.strict_rrn_checksum !== false;
+    this.detectUsSsn = opts.detect_us_ssn === true;
   }
 
   async detect(text: string, opts: DetectOpts): Promise<DetectionResult> {
@@ -150,6 +156,10 @@ export class LocalRegexBackend implements BackendClient {
       if (wants("private_person")) {
         for (const d of findKoreanNames(text)) all.push(d);
       }
+    }
+
+    if (this.detectUsSsn && wants("account_number")) {
+      for (const d of findUsSsns(text)) all.push(d);
     }
 
     if (wants("secret")) {

@@ -44,19 +44,62 @@ export interface KoreanHeuristicsConfig {
   stopwords_path: string | null;
 }
 
+export interface CustomPatternConfig {
+  name: string;
+  pattern: string;
+  /** Extra regex flags (e.g. "i"); the global flag "g" is always forced on. */
+  flags?: string;
+  category: PIICategory;
+  /** Detection confidence in [0, 1]. Default 0.9. */
+  confidence?: number;
+  /** When false the pattern is skipped. Default true. */
+  enabled?: boolean;
+}
+
 export interface DetectionConfig {
   enabled_categories: PIICategory[];
   korean_heuristics: KoreanHeuristicsConfig;
   generic_secret_scan?: boolean;
+  detect_us_ssn?: boolean;
+  custom_patterns?: readonly CustomPatternConfig[];
 }
 
-export type RestorationMode = "token" | "synthetic";
+export type RestorationMode = "token" | "synthetic" | "hmac";
+
+export type RedactionMode = "token" | "mask" | "partial";
+
+export interface TypeRedactionOverride {
+  category: PIICategory;
+  mode: RedactionMode;
+  /** Placeholder for "mask" mode (e.g. "[EMAIL]"). Default "[<CATEGORY>]". */
+  placeholder?: string;
+  /** Trailing chars kept visible in "partial" mode. Default 4. */
+  visible_suffix?: number;
+}
+
+export interface HmacConfig {
+  /** Env var holding the HMAC secret. Required when mode is "hmac". */
+  secret_env: string;
+  /** Token length (chars of the base64 digest). Default 16. */
+  token_length?: number;
+}
+
+export interface TokenKeyConfig {
+  /** Env var holding the token-hash key (ADR-0020). Default PII_REMOVER_TOKEN_KEY. */
+  secret_env?: string;
+  /** Override the key file path. Default ~/.config/pii-remover/key. */
+  key_path?: string;
+}
 
 export interface RestorationConfig {
   token_format: string;
   lenient_match: boolean;
   warn_on_partial: boolean;
   mode: RestorationMode;
+  type_overrides?: readonly TypeRedactionOverride[];
+  hmac?: HmacConfig;
+  /** Deterministic token-hash key resolution (ADR-0020). */
+  token_key?: TokenKeyConfig;
 }
 
 export interface VaultConfig {
@@ -156,7 +199,7 @@ export const DEFAULT_CONFIG: PiiRemoverConfig = {
     generic_secret_scan: false,
   },
   restoration: {
-    token_format: "__OPF_{CATEGORY}_{INDEX}__",
+    token_format: "__OPF_{CATEGORY}__{HASH}__",
     lenient_match: true,
     warn_on_partial: true,
     mode: "token",

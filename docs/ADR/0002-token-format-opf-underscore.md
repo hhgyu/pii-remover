@@ -1,8 +1,14 @@
 # ADR-0002: 토큰 형식 `__OPF_<CATEGORY>_<INDEX>__`
 
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0020](./0020-deterministic-hash-token.md)
 - **Date**: 2026-05-12
 - **Related**: [ARCHITECTURE.md §5](../ARCHITECTURE.md#5-토큰-형식-명세), [ADR-0003](./0003-vault-session-in-memory.md), [ADR-0004](./0004-local-llm-proxy-streaming.md)
+
+> **Superseded (2026-06-12)**: 정수 인덱스(`john.doe@example.com`)는 세션·프로세스
+> 로컬이라 비결정론적이며, 프로세스 재시작 시 "dead token" 복원 불가 문제를
+> 일으켰다. [ADR-0020](./0020-deterministic-hash-token.md)이 인덱스를 결정론적
+> HMAC 해시(`__OPF_EMAIL__<16자>__`)로 대체한다. 카테고리 매핑(§카테고리 매핑)은
+> ADR-0020에서도 유효하다.
 
 ---
 

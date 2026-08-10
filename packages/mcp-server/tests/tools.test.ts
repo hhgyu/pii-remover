@@ -37,6 +37,9 @@ function isError(result: unknown): boolean {
   return (result as { isError?: boolean }).isError === true;
 }
 
+const EMAIL_TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+const UNKNOWN_EMAIL = "__OPF_EMAIL__ffffffffffffffff__";
+
 describe("sanitize tool", () => {
   test("masks email and returns vault_id + categories", async () => {
     const pool = mkPool();
@@ -44,7 +47,7 @@ describe("sanitize tool", () => {
     const result = await handler({ text: "contact user@example.com please" });
     expect(isError(result)).toBe(false);
     const out = structured<SanitizeOutput>(result);
-    expect(out.text).toBe("contact __OPF_EMAIL_1__ please");
+    expect(out.text).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__ please$/);
     expect(out.vault_id.length).toBeGreaterThan(0);
     expect(out.token_count).toBe(1);
     expect(out.categories).toEqual({ private_email: 1 });
@@ -61,7 +64,8 @@ describe("sanitize tool", () => {
       await handler({ text: "again user@example.com", vault_id: r1.vault_id }),
     );
     expect(r1.vault_id).toBe(r2.vault_id);
-    expect(r2.text).toContain("__OPF_EMAIL_1__");
+    const t1 = r1.text.match(EMAIL_TOKEN_RE)![0];
+    expect(r2.text).toContain(t1);
   });
 
   test("returns vault_not_found when vault_id is unknown", async () => {
@@ -82,7 +86,7 @@ describe("sanitize tool", () => {
     const result = await handler({ text: "주민번호 921011-1234568 임" });
     const out = structured<SanitizeOutput>(result);
     expect(out.token_count).toBeGreaterThanOrEqual(1);
-    expect(out.text).toMatch(/__OPF_RRN_\d+__/);
+    expect(out.text).toMatch(/__OPF_RRN__[a-z0-9]{16}__/);
     expect(out.categories.rrn).toBeGreaterThanOrEqual(1);
     await pool.shutdown();
   });
@@ -92,7 +96,7 @@ describe("sanitize tool", () => {
     const handler = createSanitizeHandler({ vaultPool: pool });
     const result = await handler({ text: "전화 010-1234-5678 임" });
     const out = structured<SanitizeOutput>(result);
-    expect(out.text).toMatch(/__OPF_PHONE_\d+__/);
+    expect(out.text).toMatch(/__OPF_PHONE__[a-z0-9]{16}__/);
     expect(out.categories.private_phone).toBeGreaterThanOrEqual(1);
     await pool.shutdown();
   });
@@ -120,9 +124,10 @@ describe("sanitize_batch tool", () => {
     expect(isError(result)).toBe(false);
     const out = structured<SanitizeBatchOutput>(result);
     expect(out.results).toHaveLength(3);
-    expect(out.results[0]!.text).toContain("__OPF_EMAIL_1__");
-    expect(out.results[1]!.text).toContain("__OPF_EMAIL_1__");
-    expect(out.results[2]!.text).toContain("__OPF_EMAIL_2__");
+    const firstToken = out.results[0]!.text.match(EMAIL_TOKEN_RE)![0];
+    const thirdToken = out.results[2]!.text.match(EMAIL_TOKEN_RE)![0];
+    expect(out.results[1]!.text).toContain(firstToken);
+    expect(thirdToken).not.toBe(firstToken);
     expect(out.results[0]!.vault_id).toBe(out.vault_id);
     await pool.shutdown();
   });
@@ -138,7 +143,8 @@ describe("sanitize_batch tool", () => {
       await batch({ texts: ["x user@example.com"], vault_id: seed.vault_id }),
     );
     expect(out.vault_id).toBe(seed.vault_id);
-    expect(out.results[0]!.text).toBe("x __OPF_EMAIL_1__");
+    const seedToken = seed.text.match(EMAIL_TOKEN_RE)![0];
+    expect(out.results[0]!.text).toBe(`x ${seedToken}`);
     await pool.shutdown();
   });
 
@@ -172,7 +178,7 @@ describe("desanitize tool", () => {
     const pool = mkPool();
     const desanitize = createDesanitizeHandler({ vaultPool: pool });
     const result = await desanitize({
-      text: "__OPF_EMAIL_1__",
+      text: UNKNOWN_EMAIL,
       vault_id: "unknown",
     });
     expect(isError(result)).toBe(true);
@@ -189,7 +195,7 @@ describe("desanitize tool", () => {
       await sanitize({ text: "user@example.com" }),
     );
     const out = structured<DesanitizeOutput>(
-      await desanitize({ text: "__OPF_EMAIL_99__", vault_id: seed.vault_id }),
+      await desanitize({ text: UNKNOWN_EMAIL, vault_id: seed.vault_id }),
     );
     expect(out.restored_count).toBe(0);
     expect(out.unknown_token_count).toBe(1);
@@ -225,7 +231,7 @@ describe("desanitize_batch tool", () => {
     const pool = mkPool();
     const handler = createDesanitizeBatchHandler({ vaultPool: pool });
     const result = await handler({
-      texts: ["__OPF_EMAIL_1__"],
+      texts: [UNKNOWN_EMAIL],
       vault_id: "no_such",
     });
     expect(isError(result)).toBe(true);

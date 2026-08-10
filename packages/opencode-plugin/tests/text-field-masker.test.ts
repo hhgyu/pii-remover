@@ -174,58 +174,58 @@ describe("DEFAULT_SKIP_FIELDS shape", () => {
 
 describe("restoreTextFields — restore walker", () => {
   function unwrap(text: string): string {
-    return text.replace(/__OPF_(?:[A-Z_]+)_(\d+)__/g, "[restored-$1]");
+    return text.replace(/__OPF_(?:[A-Z_]+)__([a-z0-9]{16})__/g, "[restored-$1]");
   }
 
   test("restores tokens in nested args, mutating in place", async () => {
     const args = {
       questions: [
         {
-          question: "User __OPF_PERSON_1__ asked about __OPF_EMAIL_1__",
+          question: "User __OPF_PERSON__0123456789abcdef__ asked about __OPF_EMAIL__fedcba9876543210__",
           options: [
-            { label: "Yes", description: "Confirm __OPF_PERSON_1__" },
+            { label: "Yes", description: "Confirm __OPF_PERSON__0123456789abcdef__" },
           ],
         },
       ],
     };
     const out = (await restoreTextFields(args, unwrap)) as typeof args;
     expect(out.questions[0]!.question).toBe(
-      "User [restored-1] asked about [restored-1]"
+      "User [restored-0123456789abcdef] asked about [restored-fedcba9876543210]"
     );
     expect(out.questions[0]!.options[0]!.description).toBe(
-      "Confirm [restored-1]"
+      "Confirm [restored-0123456789abcdef]"
     );
     expect(out).toBe(args);
   });
 
   test("does not apply length threshold (short token strings restored)", async () => {
-    const args = { short: "__OPF_X_1__" };
+    const args = { short: "__OPF_X__0123456789abcdef__" };
     const out = (await restoreTextFields(args, unwrap)) as typeof args;
-    expect(out.short).toBe("[restored-1]");
+    expect(out.short).toBe("[restored-0123456789abcdef]");
   });
 
   test("restores tokens in path-shaped fields (LLM echoes masked paths)", async () => {
     const args = {
-      file_path: "/tmp/file__OPF_PERSON_1__.txt",
-      workdir: "D:\\Git\\__OPF_PERSON_1__-tools",
-      content: "Body __OPF_PERSON_1__ here",
+      file_path: "/tmp/file__OPF_PERSON__0123456789abcdef__.txt",
+      workdir: "D:\\Git\\__OPF_PERSON__0123456789abcdef__-tools",
+      content: "Body __OPF_PERSON__0123456789abcdef__ here",
     };
     const out = (await restoreTextFields(args, unwrap)) as typeof args;
-    expect(out.file_path).toBe("/tmp/file[restored-1].txt");
-    expect(out.workdir).toBe("D:\\Git\\[restored-1]-tools");
-    expect(out.content).toBe("Body [restored-1] here");
+    expect(out.file_path).toBe("/tmp/file[restored-0123456789abcdef].txt");
+    expect(out.workdir).toBe("D:\\Git\\[restored-0123456789abcdef]-tools");
+    expect(out.content).toBe("Body [restored-0123456789abcdef] here");
   });
 
   test("explicit skipFields option is still honored", async () => {
     const args = {
-      file_path: "/tmp/file__OPF_PERSON_1__.txt",
-      content: "Body __OPF_PERSON_1__ here",
+      file_path: "/tmp/file__OPF_PERSON__0123456789abcdef__.txt",
+      content: "Body __OPF_PERSON__0123456789abcdef__ here",
     };
     const out = (await restoreTextFields(args, unwrap, {
       skipFields: new Set(["file_path"]),
     })) as typeof args;
-    expect(out.file_path).toBe("/tmp/file__OPF_PERSON_1__.txt");
-    expect(out.content).toBe("Body [restored-1] here");
+    expect(out.file_path).toBe("/tmp/file__OPF_PERSON__0123456789abcdef__.txt");
+    expect(out.content).toBe("Body [restored-0123456789abcdef] here");
   });
 
   test("returns args unchanged for null/undefined", async () => {
@@ -238,10 +238,10 @@ describe("restoreTextFields — restore walker", () => {
       text: string;
       self?: Node;
     }
-    const node: Node = { text: "Hello __OPF_PERSON_1__" };
+    const node: Node = { text: "Hello __OPF_PERSON__0123456789abcdef__" };
     node.self = node;
     const out = (await restoreTextFields(node, unwrap)) as Node;
-    expect(out.text).toBe("Hello [restored-1]");
+    expect(out.text).toBe("Hello [restored-0123456789abcdef]");
     expect(out.self).toBe(out);
   });
 });
