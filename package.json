@@ -15,6 +15,7 @@
     "build": "bun run build:core && bun run build:plugins",
     "typecheck": "bun run build:core && bun run --filter '@pii-remover/core' typecheck && bun run --filter '@pii-remover/opencode-plugin' typecheck && bun run --filter '@pii-remover/proxy' typecheck && bun run --filter '@pii-remover/cli' typecheck && bun run --filter '@pii-remover/vision' typecheck && bun run --filter '@pii-remover/mcp-server' typecheck",
     "test": "bun test",
+    "audit-report": "bun scripts/audit-report.ts",
     "sync-versions": "node scripts/sync-versions.mjs",
     "version": "node scripts/sync-versions.mjs && git add -A"
   },
