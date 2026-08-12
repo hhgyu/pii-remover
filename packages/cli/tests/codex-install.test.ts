@@ -110,6 +110,18 @@ describe("patchCodexConfigToml", () => {
     expect(r.patched).not.toContain("http://localhost:8765/codex/v1");
   });
 
+  test("re-running with the identical proxy URL reports it as applied", () => {
+    const url = "http://localhost:8765/codex/v1";
+    const r = patchCodexConfigToml(`openai_base_url = "${url}"\n`, {
+      commandPath: "node bin hook",
+      timeoutSeconds: 30,
+      proxyUrl: url,
+    });
+    expect(r.baseUrlWritten).toBe(true);
+    expect(r.baseUrlAlreadySet).toBe(false);
+    expect(r.patched.match(/openai_base_url/g)).toHaveLength(1);
+  });
+
   test("escapes backslashes in Windows-style paths", () => {
     const r = patchCodexConfigToml("", {
       commandPath: 'node "D:\\Git\\bin\\pii-remover.js" hook',

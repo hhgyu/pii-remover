@@ -95,6 +95,9 @@ export function patchCodexConfigToml(
     if (existing === null) {
       out = appendScalarKey(out, "openai_base_url", opts.proxyUrl);
       baseUrlWritten = true;
+    } else if (parseTomlBasicString(existing) === opts.proxyUrl) {
+      // Desired value already present: end state is correct, so report it as applied.
+      baseUrlWritten = true;
     } else {
       baseUrlAlreadySet = true;
     }
@@ -167,6 +170,12 @@ function stripInlineComment(s: string): string {
     if (c === "#" && !inStr) return s.slice(0, i);
   }
   return s;
+}
+
+function parseTomlBasicString(raw: string): string | null {
+  const m = /^"((?:[^"\\]|\\.)*)"$/.exec(raw.trim());
+  if (m === null) return null;
+  return (m[1] ?? "").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
 
 function readScalarKey(content: string, key: string): string | null {
