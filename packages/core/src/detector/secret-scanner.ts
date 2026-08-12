@@ -1,4 +1,5 @@
 import type { Detection } from "../types.js";
+import { TOKEN_STRICT_PATTERN } from "../token/format.js";
 
 const AWS_ACCESS_KEY_REGEX = /(?:^|[^A-Za-z0-9])AKIA[0-9A-Z]{16}(?=[^A-Za-z0-9]|$)/g;
 
@@ -171,6 +172,11 @@ function shannonEntropy(s: string): number {
 
 const HEX_ONLY_REGEX = /^[A-Fa-f0-9]+$/;
 
+// Our own masking tokens are high-entropy by construction; scanning them as
+// secrets would re-tokenise an already-masked value. Non-global so `.test()`
+// stays stateless across calls.
+const OPF_TOKEN_REGEX = new RegExp(TOKEN_STRICT_PATTERN, "i");
+
 const PLACEHOLDER_VALUES: ReadonlySet<string> = new Set([
   "your-key-here",
   "your_api_key",
@@ -187,7 +193,7 @@ const PLACEHOLDER_VALUES: ReadonlySet<string> = new Set([
 ]);
 
 function isHighEntropySecret(value: string): boolean {
-  if (/__OPF_[A-Z][A-Z0-9_]*?__[a-z0-9]{16}__/i.test(value)) return false;
+  if (OPF_TOKEN_REGEX.test(value)) return false;
   if (PLACEHOLDER_VALUES.has(value.toLowerCase())) return false;
   if (/[<>${}]/.test(value)) return false;
   if (HEX_ONLY_REGEX.test(value)) {
