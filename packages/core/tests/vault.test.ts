@@ -105,7 +105,7 @@ describe("VaultManager — schema and ids", () => {
   test("new vault carries schema_version and a UUID-like vault_id", () => {
     const v = new VaultManager();
     const vault = v.getOrCreate("s1");
-    expect(vault.schema_version).toBe("opf.reversible.v2");
+    expect(vault.schema_version).toBe("opf.reversible.v3");
     expect(typeof vault.vault_id).toBe("string");
     expect(vault.vault_id.length).toBeGreaterThan(8);
   });

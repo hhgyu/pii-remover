@@ -6,7 +6,7 @@
  * VaultManager.canonicalize for the normalization function.
  */
 
-export const SCHEMA_VERSION = "opf.reversible.v2" as const;
+export const SCHEMA_VERSION = "opf.reversible.v3" as const;
 
 export type VaultSchemaVersion = typeof SCHEMA_VERSION;
 
