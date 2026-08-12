@@ -33,6 +33,7 @@
 | 0018 | [Synthetic Substitution 모드 — 토큰 대신 그럴듯한 가짜 값](./0018-synthetic-substitution.md) | Accepted | 2026-05-19 |
 | 0019 | [Backend auto-start (opt-in) + idle model unload (default-on)](./0019-backend-auto-start-and-idle-unload.md) | Accepted | 2026-05-20 |
 | 0020 | [결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__`](./0020-deterministic-hash-token.md) | Accepted | 2026-06-12 |
+| 0021 | [토큰 epoch 접두 + vault 경계 복구](./0021-token-epoch-and-bounded-repair.md) | Accepted | 2026-08-10 |
 
 ## ADR 카테고리별 그룹
 
@@ -48,6 +49,7 @@
 ### 데이터 모델
 - **ADR-0002**: 토큰 형식 `__OPF_<CATEGORY>_<INDEX>__` (Superseded by 0020)
 - **ADR-0020**: 결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__` (정수 인덱스 → HMAC 해시)
+- **ADR-0021**: 해시 안에 키 epoch 3자를 심어 환각/dead token 판별 + vault 키셋으로 경계 지은 편집거리-1 복구 (wire format 무변경)
 - **ADR-0003**: Vault 스키마 + 세션 스코프 인메모리
 - **ADR-0010**: PII 카테고리 (OPF 8 + 한국 3)
 - **ADR-0018**: Synthetic Substitution 모드 — 토큰 vs 가짜 자연어 값 선택 가능
@@ -70,7 +72,7 @@
 | TBD | Custom recognizer 인터페이스 (Presidio 스타일) | 카테고리 확장 요청 |
 | TBD | Transformers.js 백엔드 없는 임베드 모드 | Docker 의존 회피 요청 |
 | TBD | 응답 무결성 HMAC (vault 변조 탐지) | 원격 백엔드 위협 분석 후 |
-| TBD | 토큰 체크섬 (`__OPF_PERSON_1_a3f9__`) | LLM 환각 토큰 빈도 측정 후 |
+| ~~TBD~~ | ~~토큰 체크섬 (`__OPF_PERSON_1_a3f9__`)~~ | **기각 — ADR-0021**: vault 키셋이 체크섬보다 엄격한 경계 |
 | TBD | 멀티 사용자/팀 vault | 엔터프라이즈 시나리오 |
 | TBD | PDF 첨부 텍스트 추출 + 마스킹 | v1.x 빠른 win |
 | TBD | 한국 주소 정규식 + 행정구역 사전 | v1.x 확장 |
