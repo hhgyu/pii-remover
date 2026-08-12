@@ -1,0 +1,70 @@
+name: eval
+
+# Tier 1 of the evaluation harness (docs/QUALITY-MEASUREMENT-PLAN.md §5):
+# deterministic mutation simulation, no network, no Docker, no model calls.
+# Tier 2 (recorded replay, schedule) and Tier 3 (live LLM, workflow_dispatch)
+# are not implemented yet and are intentionally absent.
+
+on:
+  pull_request:
+    paths:
+      - "packages/eval/**"
+      - "packages/core/**"
+      - "packages/proxy/**"
+      - ".github/workflows/eval.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tier1:
+    name: tier 1 — mutation harness
+    uses: ./.github/workflows/reusable-bun-checks.yml
+    with:
+      test-paths: "packages/eval/tests/"
+
+  baseline:
+    name: tier 1 — baseline is current
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # `bun run --filter <pkg>` does not resolve workspace packages in this
+      # setup (verified: it fails for the pre-existing proxy package too), so
+      # every step below addresses the package by directory instead.
+      - name: Build core declarations
+        run: bun run build:core
+
+      - name: Build proxy declarations
+        run: bun run build
+        working-directory: packages/proxy
+
+      - name: Typecheck eval package
+        run: bun run typecheck
+        working-directory: packages/eval
+
+      # No `|| true` here. If the generator crashes, the baseline file is left
+      # untouched, the drift check below passes, and the job reports a false
+      # green — the one outcome this gate exists to prevent.
+      - name: Regenerate the Tier-1 baseline
+        run: bun run tier1
+        working-directory: packages/eval
+
+      - name: Fail if the committed baseline drifted
+        run: |
+          if ! git diff --quiet packages/eval/baseline.md; then
+            echo "::error::packages/eval/baseline.md is stale. Run 'bun run tier1' in packages/eval and commit the result."
+            git diff packages/eval/baseline.md
+            exit 1
+          fi
