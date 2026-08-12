@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         description: "When the ref is a v* tag, fail if the tag does not match root package.json version."
+      verify-vectors:
+        type: boolean
+        required: false
+        default: false
+        description: "Regenerate the golden vectors from the TypeScript reference and fail if they drift."
 
 jobs:
   checks:
@@ -52,6 +57,18 @@ jobs:
           PKG_VERSION="$(node -p "require('./package.json').version")"
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "::error::Tag '$GITHUB_REF_NAME' does not match package.json version '$PKG_VERSION'"
+            exit 1
+          fi
+
+      # The fixtures are committed, so the Python parity tests pass even when the
+      # TypeScript reference has moved. This step is the only thing that notices.
+      - name: Verify golden vectors match the TypeScript reference
+        if: inputs.verify-vectors
+        run: |
+          bun run gen-vectors
+          if ! git diff --quiet -- packages/backend/tests/fixtures; then
+            echo "::error::Golden vectors drifted from packages/proxy. Run 'bun run gen-vectors' locally, re-run the Python parity tests, and commit."
+            git diff -- packages/backend/tests/fixtures
             exit 1
           fi
 

@@ -24,6 +24,7 @@ jobs:
     with:
       verify-versions: true
       verify-tag-version: true
+      verify-vectors: true
 
   publish:
     name: publish to npm
