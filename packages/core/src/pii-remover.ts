@@ -20,7 +20,8 @@ import { synthesize } from "./synthetic/index.js";
 import { restoreSynthetic } from "./synthetic/restore.js";
 import { HmacTokenizer } from "./redaction/hmac.js";
 import { TypeRedactor } from "./redaction/redact.js";
-import { resolveTokenKey } from "./redaction/token-hash.js";
+import { resolveTokenKey, TOKEN_EPOCH_LENGTH } from "./redaction/token-hash.js";
+import { parseToken } from "./token/format.js";
 import {
   RemoteHttpBackend,
   type RemoteHttpAuth,
@@ -38,6 +39,7 @@ import { mergeDetections } from "./backend/strategy.js";
 import {
   Restorer,
   type RestoreOptions,
+  type RestoreOrigin,
   type RestoreResult,
 } from "./restorer/index.js";
 import { type AssignedToken, VaultManager } from "./vault/manager.js";
@@ -59,6 +61,8 @@ export interface PIIRemoverInitOptions {
   warn?: (message: string) => void;
   audit?: AuditEmitter;
 }
+
+export type TokenStatus = "live" | "expired" | "foreign";
 
 export interface MaskResult {
   text: string;
@@ -281,6 +285,9 @@ export class PIIRemover {
       categories: aggregateAuditCategories(tokens),
       backend_name: detection.backend_name,
       latency_ms: latencyMs,
+      minted_count: new Set(tokens.map((t) => t.token)).size,
+      text_length: text.length,
+      masked_char_count: tokens.reduce((n, t) => n + (t.end - t.start), 0),
       provider: opts.provider,
     });
     return {
@@ -328,20 +335,53 @@ export class PIIRemover {
     }
     const result = this.restorer.restore(workingText, this.sessionId, restorerOpts);
     result.restoredCount += syntheticRestored;
-    this.audit.restoreEvent({
-      vault_id: vault.vault_id,
-      session_id: this.sessionId,
-      request_id: requestId,
-      restored_count: result.restoredCount,
-      unknown_token_count: result.unknownTokenCount,
-      partial_match_count: result.partialMatchCount,
-      provider,
-    });
+
+    // Streaming transports call restore() once per SSE delta, most of which
+    // carry no token at all. Emitting for those inflates the event count and
+    // makes the proxy's denominator incomparable with the plugin's, which
+    // short-circuits token-free text before it ever reaches restore().
+    const observed =
+      result.restoredCount + result.unknownTokenCount + result.pathSkipCount;
+    if (observed > 0) {
+      this.audit.restoreEvent({
+        vault_id: vault.vault_id,
+        session_id: this.sessionId,
+        request_id: requestId,
+        restored_count: result.restoredCount,
+        unknown_token_count: result.unknownTokenCount,
+        partial_match_count: result.partialMatchCount,
+        lenient_restored_count: result.lenientRestoredCount,
+        path_skip_count: result.pathSkipCount,
+        residual_token_count: result.residualTokenCount,
+        repaired_count: result.repairedCount,
+        ...attributeForeign(result.foreignCount, restorerOpts.origin ?? "model"),
+        dead_token_count: result.deadTokenCount,
+        ambiguous_count: result.ambiguousCount,
+        provider,
+      });
+    }
     return result;
   }
 
   hasToken(token: string): boolean {
     return this.vault.lookup(this.sessionId, token) !== null;
+  }
+
+  /**
+   * Why a token cannot be used, without consulting the repair index (O(1)).
+   *
+   * `expired` means this key minted it but the in-memory vault no longer holds
+   * it — a resumed session. `foreign` means this key never minted it, so the
+   * model most likely invented it. Hosts surface the difference to the user;
+   * the two need different fixes.
+   */
+  tokenStatus(token: string): TokenStatus {
+    if (this.vault.lookup(this.sessionId, token)) return "live";
+    const parsed = parseToken(token);
+    if (!parsed) return "foreign";
+    return parsed.hash.slice(0, TOKEN_EPOCH_LENGTH) === this.vault.epoch()
+      ? "expired"
+      : "foreign";
   }
 
   vaultId(): string {
@@ -364,6 +404,15 @@ export class PIIRemover {
       );
     }
   }
+}
+
+function attributeForeign(
+  count: number,
+  origin: RestoreOrigin
+): { hallucinated_count: number } | { unminted_token_count: number } {
+  return origin === "model"
+    ? { hallucinated_count: count }
+    : { unminted_token_count: count };
 }
 
 export interface ApplyTokensOptions {
