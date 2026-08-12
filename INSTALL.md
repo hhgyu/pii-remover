@@ -100,16 +100,46 @@ The hook detects PII but cannot rewrite prompts — the proxy does the actual ma
 pii-remover-proxy start
 ```
 
-Per-host setup:
+### Proxy mode: let the installer wire the base URL
+
+Add `--proxy` to any `install` command and the installer writes the proxy base
+URL into the host's own config, so nothing has to be exported by hand:
+
+```bash
+npx @pii-remover/cli install --target claude-code --proxy
+npx @pii-remover/cli install --target opencode    --proxy
+npx @pii-remover/cli install --target codex       --proxy
+```
+
+| Host | Key the installer writes | Value |
+| --- | --- | --- |
+| Claude Code | `env.ANTHROPIC_BASE_URL` in `settings.json` | `http://localhost:8765/anthropic/v1` |
+| OpenCode | `provider.anthropic.options.baseURL` in `opencode.json` | `http://localhost:8765/anthropic/v1` |
+| Codex | `openai_base_url` in `config.toml` | `http://localhost:8765/codex/v1` |
+
+The route prefix differs per upstream API and is derived from `--target`, so it
+cannot be mismatched. Use `--proxy-url <url>` instead of `--proxy` to point at a
+remote or non-default proxy; it overrides `--proxy`.
+
+**The installer never overwrites a base URL that is already set to something
+else.** It leaves the existing value alone and prints a warning that requests
+will bypass the PII proxy — re-running is safe, and a corporate gateway or
+another tool's config is never silently replaced.
+
+Manual setup, if you prefer not to let the installer touch host config:
 
 | Host | Configuration |
 | --- | --- |
 | Claude Code | `export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1` |
 | OpenCode | plugin handles masking directly (proxy optional) |
-| Codex | `openai_base_url = "http://localhost:8765/codex/v1"` in `~/.codex/config.toml` (set automatically by `install --target codex --proxy-url`) |
+| Codex | `openai_base_url = "http://localhost:8765/codex/v1"` in `~/.codex/config.toml` |
 
 Without the proxy, the hook **blocks** any prompt containing PII (fail-closed).
 With the proxy, PII is masked before the request leaves your machine.
+
+> A **remote** `--proxy-url` (non-localhost) is not recognised by the hook's
+> proxy check, which only trusts a localhost `/anthropic/` URL. Set
+> `PII_REMOVER_PROXY_TRUST=1` in that case, or the hook will keep blocking.
 
 ## Verify
 

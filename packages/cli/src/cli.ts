@@ -9,6 +9,7 @@ import {
   runInstall,
   runOpenCodeInstall,
   loadExistingConfig,
+  defaultProxyUrl,
   ALL_CATEGORIES,
   CATEGORY_LABELS,
   OPENCODE_PLUGIN_PACKAGE,
@@ -44,6 +45,7 @@ export interface ParsedFlags {
   endpoint?: string;
   categories?: string[];
   proxyUrl?: string;
+  proxy?: boolean;
   autoStart?: boolean;
   composeFile?: "cpu" | "gpu" | string;
   startTimeoutMs?: number;
@@ -62,6 +64,8 @@ export function parseFlags(argv: readonly string[]): ParsedFlags {
     } else if (arg === "--proxy-url") {
       const v = argv[++i];
       if (typeof v === "string") out.proxyUrl = v;
+    } else if (arg === "--proxy") {
+      out.proxy = true;
     } else if (arg === "--scope" || arg === "-s") {
       const v = argv[++i];
       if (v === "global" || v === "project") out.scope = v;
@@ -137,8 +141,14 @@ export function helpText(): string {
     "  --scope, -s <s>            install only: 'global' (default) or 'project'.",
     "  --endpoint, -e <url>       install only: OPF backend endpoint (skips prompt).",
     "  --categories, -c <list>    install only: comma-separated PII categories (skips prompt).",
-    "  --proxy-url <url>          install only (--target codex): set openai_base_url to this proxy URL.",
-    "                             Typical: http://localhost:8765/codex/v1",
+    "  --proxy                    install only: proxy mode — write the local proxy base URL into the",
+    "                             host config so no manual export is needed. Per target:",
+    "                               claude-code  env.ANTHROPIC_BASE_URL in settings.json",
+    "                               opencode     provider.anthropic.options.baseURL in opencode.json",
+    "                               codex        openai_base_url in config.toml",
+    "                             An existing different base URL is never overwritten (warns instead).",
+    "  --proxy-url <url>          install only: same as --proxy but with an explicit URL",
+    "                             (remote/self-hosted proxy). Overrides --proxy.",
     "  --auto-start               install only: write backend.auto_start=true (opt-in Docker spawn).",
     "                             Default: backend must be started manually. See ADR-0019.",
     "  --no-auto-start            install only: write backend.auto_start=false (explicit opt-out).",
@@ -252,6 +262,9 @@ export async function runCli(
     if (flags.composeFile !== undefined) piiConfig.compose_file = flags.composeFile;
     if (flags.startTimeoutMs !== undefined) piiConfig.start_timeout_ms = flags.startTimeoutMs;
 
+    const effectiveProxyUrl =
+      flags.proxyUrl ?? (flags.proxy === true ? defaultProxyUrl(target) : undefined);
+
     try {
       let r;
       if (target === "opencode") {
@@ -262,6 +275,7 @@ export async function runCli(
           dryRun: flags.dryRun,
           piiConfig,
         };
+        if (effectiveProxyUrl !== undefined) opts.proxyUrl = effectiveProxyUrl;
         if (installFs) opts.fs = installFs;
         r = await runOpenCodeInstall(opts);
       } else if (target === "codex") {
@@ -274,7 +288,7 @@ export async function runCli(
           dryRun: flags.dryRun,
           piiConfig,
         };
-        if (flags.proxyUrl !== undefined) opts.proxyUrl = flags.proxyUrl;
+        if (effectiveProxyUrl !== undefined) opts.proxyUrl = effectiveProxyUrl;
         if (installFs) opts.fs = installFs;
         r = await runCodexInstall(opts);
       } else {
@@ -287,6 +301,7 @@ export async function runCli(
           dryRun: flags.dryRun,
           piiConfig,
         };
+        if (effectiveProxyUrl !== undefined) opts.proxyUrl = effectiveProxyUrl;
         if (installFs) opts.fs = installFs;
         r = await runInstall(opts);
       }
@@ -299,6 +314,13 @@ export async function runCli(
       ];
       if (r.config_written && r.config_path) {
         lines.push(`Config written: ${r.config_path}`);
+      }
+      if (effectiveProxyUrl !== undefined) {
+        lines.push(
+          r.base_url_written === true
+            ? `Proxy mode: ENABLED -> ${effectiveProxyUrl}`
+            : `Proxy mode: NOT APPLIED (existing base URL left untouched) — requests will bypass the proxy`
+        );
       }
       if (piiConfig.auto_start === true) {
         lines.push(

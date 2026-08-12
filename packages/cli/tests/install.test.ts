@@ -5,6 +5,9 @@ import {
   runOpenCodeInstall,
   loadExistingConfig,
   buildPiiRemoverJson,
+  defaultProxyUrl,
+  patchClaudeSettingsEnv,
+  patchOpenCodeProviderBaseUrl,
   ALL_CATEGORIES,
   OPENCODE_PLUGIN_PACKAGE,
   type InstallFs,
@@ -564,5 +567,208 @@ describe("runOpenCodeInstall split-mode", () => {
     expect(fs.files.size).toBe(0);
     expect(r.patched_json).toContain("mask.js");
     expect(r.patched_json).toContain("restore.js");
+  });
+
+  test("proxyUrl writes provider.anthropic.options.baseURL alongside the plugins", async () => {
+    const fs = memFs();
+    const url = "http://localhost:8765/anthropic/v1";
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: url,
+    });
+    expect(r.base_url_written).toBe(true);
+    expect(r.base_url_already_set).toBe(false);
+    const parsed = JSON.parse(fs.files.get(r.settings_path)!);
+    expect(parsed.provider.anthropic.options.baseURL).toBe(url);
+    expect((parsed.plugin as string[])[0]).toMatch(/mask\.js$/);
+  });
+
+  test("proxyUrl does not clobber a different existing baseURL and warns", async () => {
+    const configPath = path.join("/home/u", ".config", "opencode", "opencode.json");
+    const fs = memFs({
+      [configPath]: JSON.stringify({
+        provider: { anthropic: { options: { baseURL: "https://gateway.corp/v1" } } },
+      }),
+    });
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8765/anthropic/v1",
+    });
+    expect(r.base_url_written).toBe(false);
+    expect(r.base_url_already_set).toBe(true);
+    const parsed = JSON.parse(fs.files.get(r.settings_path)!);
+    expect(parsed.provider.anthropic.options.baseURL).toBe("https://gateway.corp/v1");
+    expect(r.next_steps.join("\n")).toContain("BYPASS");
+  });
+});
+
+describe("defaultProxyUrl", () => {
+  test("routes anthropic hosts to /anthropic/v1 and codex to /codex/v1", () => {
+    expect(defaultProxyUrl("claude-code")).toBe("http://localhost:8765/anthropic/v1");
+    expect(defaultProxyUrl("opencode")).toBe("http://localhost:8765/anthropic/v1");
+    expect(defaultProxyUrl("codex")).toBe("http://localhost:8765/codex/v1");
+  });
+
+  test("honours a custom port", () => {
+    expect(defaultProxyUrl("claude-code", 9999)).toBe("http://localhost:9999/anthropic/v1");
+  });
+});
+
+describe("patchClaudeSettingsEnv", () => {
+  const url = "http://localhost:8765/anthropic/v1";
+
+  test("creates the env block when absent", () => {
+    const { patched, outcome } = patchClaudeSettingsEnv({ hooks: {} }, url);
+    expect(outcome.written).toBe(true);
+    expect(outcome.already_set).toBe(false);
+    expect((patched.env as Record<string, string>).ANTHROPIC_BASE_URL).toBe(url);
+    expect(patched.hooks).toEqual({});
+  });
+
+  test("preserves unrelated env keys", () => {
+    const { patched } = patchClaudeSettingsEnv({ env: { FOO: "bar" } }, url);
+    const env = patched.env as Record<string, string>;
+    expect(env.FOO).toBe("bar");
+    expect(env.ANTHROPIC_BASE_URL).toBe(url);
+  });
+
+  test("identical existing value is reported as applied without mutation", () => {
+    const input = { env: { ANTHROPIC_BASE_URL: url } };
+    const { patched, outcome } = patchClaudeSettingsEnv(input, url);
+    expect(outcome.written).toBe(true);
+    expect(outcome.already_set).toBe(false);
+    expect(patched).toBe(input);
+  });
+
+  test("refuses to clobber a different existing value", () => {
+    const input = { env: { ANTHROPIC_BASE_URL: "https://gateway.corp/v1" } };
+    const { patched, outcome } = patchClaudeSettingsEnv(input, url);
+    expect(outcome.written).toBe(false);
+    expect(outcome.already_set).toBe(true);
+    expect(outcome.existing).toBe("https://gateway.corp/v1");
+    expect(patched).toBe(input);
+  });
+
+  test("leaves a malformed env value untouched", () => {
+    const input = { env: ["not", "an", "object"] };
+    const { patched, outcome } = patchClaudeSettingsEnv(input, url);
+    expect(outcome.written).toBe(false);
+    expect(outcome.already_set).toBe(true);
+    expect(patched).toBe(input);
+  });
+});
+
+describe("patchOpenCodeProviderBaseUrl", () => {
+  const url = "http://localhost:8765/anthropic/v1";
+
+  test("creates the full nested path from an empty config", () => {
+    const { patched, outcome } = patchOpenCodeProviderBaseUrl({}, url);
+    expect(outcome.written).toBe(true);
+    const provider = patched.provider as Record<string, Record<string, Record<string, string>>>;
+    expect(provider.anthropic!.options!.baseURL).toBe(url);
+  });
+
+  test("preserves sibling keys and other providers", () => {
+    const { patched } = patchOpenCodeProviderBaseUrl(
+      {
+        plugin: ["a"],
+        provider: {
+          openai: { options: { baseURL: "https://api.openai.com/v1" } },
+          anthropic: { options: { apiKey: "k" } },
+        },
+      },
+      url
+    );
+    expect(patched.plugin).toEqual(["a"]);
+    const provider = patched.provider as Record<string, Record<string, Record<string, string>>>;
+    expect(provider.openai!.options!.baseURL).toBe("https://api.openai.com/v1");
+    expect(provider.anthropic!.options!.apiKey).toBe("k");
+    expect(provider.anthropic!.options!.baseURL).toBe(url);
+  });
+
+  test("identical existing value is reported as applied without mutation", () => {
+    const input = { provider: { anthropic: { options: { baseURL: url } } } };
+    const { patched, outcome } = patchOpenCodeProviderBaseUrl(input, url);
+    expect(outcome.written).toBe(true);
+    expect(patched).toBe(input);
+  });
+
+  test("refuses to clobber a different existing value", () => {
+    const input = { provider: { anthropic: { options: { baseURL: "https://gw/v1" } } } };
+    const { outcome } = patchOpenCodeProviderBaseUrl(input, url);
+    expect(outcome.written).toBe(false);
+    expect(outcome.already_set).toBe(true);
+    expect(outcome.existing).toBe("https://gw/v1");
+  });
+
+  test("leaves a malformed intermediate node untouched", () => {
+    const input = { provider: ["nope"] };
+    const { patched, outcome } = patchOpenCodeProviderBaseUrl(input, url);
+    expect(outcome.written).toBe(false);
+    expect(outcome.already_set).toBe(true);
+    expect(patched).toBe(input);
+  });
+});
+
+describe("runInstall proxy mode", () => {
+  const url = "http://localhost:8765/anthropic/v1";
+
+  test("writes env.ANTHROPIC_BASE_URL and keeps the hook", async () => {
+    const fs = memFs();
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/abs/pii-remover",
+      homeDir: "/home/u",
+      fs,
+      proxyUrl: url,
+    });
+    expect(r.base_url_written).toBe(true);
+    const parsed = JSON.parse(fs.files.get(r.settings_path)!);
+    expect(parsed.env.ANTHROPIC_BASE_URL).toBe(url);
+    expect(parsed.hooks.UserPromptSubmit).toHaveLength(1);
+    const joined = r.next_steps.join("\n");
+    expect(joined).toContain("Proxy mode:");
+    expect(joined).not.toContain("export ANTHROPIC_BASE_URL=");
+  });
+
+  test("warns and leaves a conflicting base URL untouched", async () => {
+    const path = require("node:path");
+    const settingsPath = path.join("/home/u", ".claude", "settings.json");
+    const fs = memFs({
+      [settingsPath]: JSON.stringify({ env: { ANTHROPIC_BASE_URL: "https://gw/v1" } }),
+    });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/abs/pii-remover",
+      homeDir: "/home/u",
+      fs,
+      proxyUrl: url,
+    });
+    expect(r.base_url_written).toBe(false);
+    expect(r.base_url_already_set).toBe(true);
+    const parsed = JSON.parse(fs.files.get(r.settings_path)!);
+    expect(parsed.env.ANTHROPIC_BASE_URL).toBe("https://gw/v1");
+    expect(r.next_steps.join("\n")).toContain("BYPASS");
+  });
+
+  test("without proxyUrl the manual export instruction is still emitted", async () => {
+    const fs = memFs();
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/abs/pii-remover",
+      homeDir: "/home/u",
+      fs,
+    });
+    expect(r.base_url_written).toBe(false);
+    expect(r.next_steps.join("\n")).toContain("export ANTHROPIC_BASE_URL=");
+    expect(JSON.parse(fs.files.get(r.settings_path)!).env).toBeUndefined();
   });
 });
