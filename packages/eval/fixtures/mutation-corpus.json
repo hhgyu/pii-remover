@@ -1,0 +1,592 @@
+{
+  "$comment": "Tier-1 mutation corpus (docs/QUALITY-MEASUREMENT-PLAN.md §5). Strata: lang {en, ko} x surface {prose, code, path, json, markdown, adversarial} x the 11 PIICategory values (ADR-0010). Every entry declares its PII spans explicitly, so the harness masks deterministically through VaultManager.assign() without a detection backend — no network, no Docker.",
+  "$invariant_i4": "SYNTHETIC ONLY. Every value below is reused from the already-synthetic fixtures listed in derived_from, or built from the same generators (surname + syllable combinations, checksum-valid dummies, example.com / example.kr reserved domains). Recording a real user session transcript into this file violates invariant I4 (plan §8) and is blocked by tests/corpus-synthetic-guard.test.ts.",
+  "derived_from": [
+    "packages/core/tests/fixtures/pii-corpus.json",
+    "tests/integration/fixtures/developer-corpus-sample.json",
+    "tests/integration/fixtures/korean-pii-corpus.json"
+  ],
+  "$comment_synthetic_values": "Every value that any entry declares as a PII span. tests/corpus-synthetic-guard.test.ts enforces both directions: (a) every span text appears here, and (b) every high-confidence detection the local detector finds anywhere in this file is covered by one of these declarations.",
+  "synthetic_values": [
+    "+1-212-555-0199",
+    "+1-310-555-0173",
+    "+1-415-555-0142",
+    "+1-800-555-0199",
+    "010-1234-5678",
+    "02-555-0101",
+    "02-987-6543",
+    "031-777-8888",
+    "070-1234-9876",
+    "101-86-12345",
+    "110123456789",
+    "1234567890123456",
+    "1600 Pennsylvania Avenue, Washington DC",
+    "1981-01-18",
+    "1985-07-22",
+    "2024-03-15",
+    "2024-08-20",
+    "2024-10-30",
+    "2025-12-31",
+    "220-81-62517",
+    "3333021234567",
+    "4000-1234-5678-9010",
+    "4111-1111-1111-1111",
+    "4567-8910-1112-1314",
+    "5555-4444-3333-2222",
+    "5555-5555-5555-4444",
+    "742 Evergreen Terrace, Springfield IL 62704",
+    "760607-2345678",
+    "800329-2123456",
+    "850315-1234567",
+    "900101-1234567",
+    "9876543210987654",
+    "AKIAIOSFODNN7EXAMPLE",
+    "Alice Wong",
+    "Grace Hopper",
+    "John Smith",
+    "Robert Davies",
+    "RobertDavies",
+    "alice@example.com",
+    "billing@megacorp.com",
+    "caroline.reyes@pd.gov",
+    "gain.han@example.kr",
+    "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh123456",
+    "https://care.example.kr/gong",
+    "https://dash.example.com/u/grace",
+    "https://internal.acme.corp/secrets",
+    "https://profile.example.kr/son",
+    "https://secure.example.com/olivia",
+    "iu_secret_2025",
+    "james.p@clevelandclinic.org",
+    "jiwon.kim@drama.kr",
+    "john.smith@example.com",
+    "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn",
+    "sk_live_abc123xyz789",
+    "victor.lee@example.net",
+    "younghee.park@example.kr",
+    "강동원",
+    "김연아",
+    "김철수",
+    "박영희",
+    "박지성",
+    "부산시 해운대구 센텀중앙로 90",
+    "서울시 강남구 테헤란로 152",
+    "손흥민",
+    "유재석",
+    "최민수",
+    "홍길동"
+  ],
+  "entries": [
+    {
+      "id": "en-prose-01",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Email John Smith at john.smith@example.com about the migration.",
+      "spans": [
+        { "text": "John Smith", "category": "private_person" },
+        { "text": "john.smith@example.com", "category": "private_email" }
+      ]
+    },
+    {
+      "id": "en-prose-02",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Call Alice Wong at +1-415-555-0142 before the standup.",
+      "spans": [
+        { "text": "Alice Wong", "category": "private_person" },
+        { "text": "+1-415-555-0142", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "en-prose-03",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Robert Davies lives at 1600 Pennsylvania Avenue, Washington DC.",
+      "spans": [
+        { "text": "Robert Davies", "category": "private_person" },
+        { "text": "1600 Pennsylvania Avenue, Washington DC", "category": "private_address" }
+      ]
+    },
+    {
+      "id": "en-prose-04",
+      "lang": "en",
+      "surface": "prose",
+      "text": "API key sk_live_abc123xyz789 was rotated on 2024-03-15.",
+      "spans": [
+        { "text": "sk_live_abc123xyz789", "category": "secret" },
+        { "text": "2024-03-15", "category": "private_date" }
+      ]
+    },
+    {
+      "id": "en-prose-05",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Wire the refund to account 1234567890123456 by Friday.",
+      "spans": [{ "text": "1234567890123456", "category": "account_number" }]
+    },
+    {
+      "id": "en-prose-06",
+      "lang": "en",
+      "surface": "prose",
+      "text": "The card on file is 4111-1111-1111-1111 and it expires soon.",
+      "spans": [{ "text": "4111-1111-1111-1111", "category": "card" }]
+    },
+    {
+      "id": "en-prose-07",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Escalate to caroline.reyes@pd.gov if the pager stays silent.",
+      "spans": [{ "text": "caroline.reyes@pd.gov", "category": "private_email" }]
+    },
+    {
+      "id": "en-prose-08",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Grace Hopper opened https://dash.example.com/u/grace last night.",
+      "spans": [
+        { "text": "Grace Hopper", "category": "private_person" },
+        { "text": "https://dash.example.com/u/grace", "category": "private_url" }
+      ]
+    },
+    {
+      "id": "en-prose-09",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Ship to 742 Evergreen Terrace, Springfield IL 62704 before 2025-12-31.",
+      "spans": [
+        { "text": "742 Evergreen Terrace, Springfield IL 62704", "category": "private_address" },
+        { "text": "2025-12-31", "category": "private_date" }
+      ]
+    },
+    {
+      "id": "en-code-01",
+      "lang": "en",
+      "surface": "code",
+      "text": "const OWNER = \"victor.lee@example.net\"; // notify on deploy failure",
+      "spans": [{ "text": "victor.lee@example.net", "category": "private_email" }]
+    },
+    {
+      "id": "en-code-02",
+      "lang": "en",
+      "surface": "code",
+      "text": "logger.info(\"charging card\", { pan: \"5555-4444-3333-2222\" });",
+      "spans": [{ "text": "5555-4444-3333-2222", "category": "card" }]
+    },
+    {
+      "id": "en-code-03",
+      "lang": "en",
+      "surface": "code",
+      "text": "export const SUPPORT_PHONE = \"+1-212-555-0199\";",
+      "spans": [{ "text": "+1-212-555-0199", "category": "private_phone" }]
+    },
+    {
+      "id": "en-code-04",
+      "lang": "en",
+      "surface": "code",
+      "text": "process.env.AWS_KEY = \"AKIAIOSFODNN7EXAMPLE\"; // rotate quarterly",
+      "spans": [{ "text": "AKIAIOSFODNN7EXAMPLE", "category": "secret" }]
+    },
+    {
+      "id": "en-code-05",
+      "lang": "en",
+      "surface": "code",
+      "text": "# owner: james.p@clevelandclinic.org (on-call rotation A)",
+      "spans": [{ "text": "james.p@clevelandclinic.org", "category": "private_email" }]
+    },
+    {
+      "id": "en-code-06",
+      "lang": "en",
+      "surface": "code",
+      "text": "if (user.email === \"alice@example.com\") { grantAdmin(user); }",
+      "spans": [{ "text": "alice@example.com", "category": "private_email" }]
+    },
+    {
+      "id": "en-code-07",
+      "lang": "en",
+      "surface": "code",
+      "text": "const token = \"sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn\"; // do not commit",
+      "spans": [
+        { "text": "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn", "category": "secret" }
+      ]
+    },
+    {
+      "id": "en-path-01",
+      "lang": "en",
+      "surface": "path",
+      "text": "Open D:\\Git\\reports\\john.smith@example.com\\summary.md and diff it.",
+      "spans": [{ "text": "john.smith@example.com", "category": "private_email" }]
+    },
+    {
+      "id": "en-path-02",
+      "lang": "en",
+      "surface": "path",
+      "text": "The dump lives at /var/log/acme/victor.lee@example.net/session.log",
+      "spans": [{ "text": "victor.lee@example.net", "category": "private_email" }]
+    },
+    {
+      "id": "en-path-03",
+      "lang": "en",
+      "surface": "path",
+      "text": "Copy C:\\Users\\RobertDavies\\AppData\\config.json to the share.",
+      "spans": [{ "text": "RobertDavies", "category": "private_person" }]
+    },
+    {
+      "id": "en-json-01",
+      "lang": "en",
+      "surface": "json",
+      "text": "{\"customer\":{\"email\":\"billing@megacorp.com\",\"phone\":\"+1-310-555-0173\"}}",
+      "spans": [
+        { "text": "billing@megacorp.com", "category": "private_email" },
+        { "text": "+1-310-555-0173", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "en-json-02",
+      "lang": "en",
+      "surface": "json",
+      "text": "{\"card\":\"4000-1234-5678-9010\",\"issued\":\"2024-08-20\"}",
+      "spans": [
+        { "text": "4000-1234-5678-9010", "category": "card" },
+        { "text": "2024-08-20", "category": "private_date" }
+      ]
+    },
+    {
+      "id": "en-json-03",
+      "lang": "en",
+      "surface": "json",
+      "text": "{\"owner\":\"Alice Wong\",\"token\":\"ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh123456\"}",
+      "spans": [
+        { "text": "Alice Wong", "category": "private_person" },
+        { "text": "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh123456", "category": "secret" }
+      ]
+    },
+    {
+      "id": "en-json-04",
+      "lang": "en",
+      "surface": "json",
+      "text": "{\"dob\":\"1985-07-22\",\"ledger\":\"9876543210987654\"}",
+      "spans": [
+        { "text": "1985-07-22", "category": "private_date" },
+        { "text": "9876543210987654", "category": "account_number" }
+      ]
+    },
+    {
+      "id": "en-md-01",
+      "lang": "en",
+      "surface": "markdown",
+      "text": "## Incident 42\n\n- reporter: **John Smith**\n- contact: john.smith@example.com",
+      "spans": [
+        { "text": "John Smith", "category": "private_person" },
+        { "text": "john.smith@example.com", "category": "private_email" }
+      ]
+    },
+    {
+      "id": "en-md-02",
+      "lang": "en",
+      "surface": "markdown",
+      "text": "See [the dashboard](https://secure.example.com/olivia) for the weekly numbers.",
+      "spans": [{ "text": "https://secure.example.com/olivia", "category": "private_url" }]
+    },
+    {
+      "id": "en-md-03",
+      "lang": "en",
+      "surface": "markdown",
+      "text": "> Escalation owner: Grace Hopper (+1-800-555-0199)",
+      "spans": [
+        { "text": "Grace Hopper", "category": "private_person" },
+        { "text": "+1-800-555-0199", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "en-adv-01",
+      "lang": "en",
+      "surface": "adversarial",
+      "text": "Legacy placeholder __OPF_PERSON__short__ still appears next to alice@example.com",
+      "spans": [{ "text": "alice@example.com", "category": "private_email" }]
+    },
+    {
+      "id": "en-adv-02",
+      "lang": "en",
+      "surface": "adversarial",
+      "text": "The macro __OPF_EMAIL_1__ is a v1 token; the real address is billing@megacorp.com",
+      "spans": [{ "text": "billing@megacorp.com", "category": "private_email" }]
+    },
+    {
+      "id": "en-adv-03",
+      "lang": "en",
+      "surface": "adversarial",
+      "text": "Docs at https://internal.acme.corp/secrets mention __opf_person__ but carry no hash.",
+      "spans": [{ "text": "https://internal.acme.corp/secrets", "category": "private_url" }]
+    },
+    {
+      "id": "en-multi-01",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Ping John Smith at john.smith@example.com or Alice Wong at +1-415-555-0142.",
+      "spans": [
+        { "text": "John Smith", "category": "private_person" },
+        { "text": "john.smith@example.com", "category": "private_email" },
+        { "text": "Alice Wong", "category": "private_person" },
+        { "text": "+1-415-555-0142", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "en-multi-02",
+      "lang": "en",
+      "surface": "json",
+      "text": "{\"a\":\"alice@example.com\",\"b\":\"billing@megacorp.com\",\"c\":\"caroline.reyes@pd.gov\"}",
+      "spans": [
+        { "text": "alice@example.com", "category": "private_email" },
+        { "text": "billing@megacorp.com", "category": "private_email" },
+        { "text": "caroline.reyes@pd.gov", "category": "private_email" }
+      ]
+    },
+    {
+      "id": "en-multi-03",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Cards 4111-1111-1111-1111 and 5555-5555-5555-4444 were both declined.",
+      "spans": [
+        { "text": "4111-1111-1111-1111", "category": "card" },
+        { "text": "5555-5555-5555-4444", "category": "card" }
+      ]
+    },
+    {
+      "id": "en-repeat-01",
+      "lang": "en",
+      "surface": "prose",
+      "text": "Email john.smith@example.com now; if it bounces, retry john.smith@example.com later.",
+      "spans": [
+        { "text": "john.smith@example.com", "category": "private_email" },
+        { "text": "john.smith@example.com", "category": "private_email" }
+      ]
+    },
+    {
+      "id": "ko-prose-01",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "김철수 고객의 연락처는 010-1234-5678 입니다",
+      "spans": [
+        { "text": "김철수", "category": "private_person" },
+        { "text": "010-1234-5678", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "ko-prose-02",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "박영희 님 이메일은 younghee.park@example.kr 입니다",
+      "spans": [
+        { "text": "박영희", "category": "private_person" },
+        { "text": "younghee.park@example.kr", "category": "private_email" }
+      ]
+    },
+    {
+      "id": "ko-prose-03",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "최민수 대리는 서울시 강남구 테헤란로 152 에 거주합니다",
+      "spans": [
+        { "text": "최민수", "category": "private_person" },
+        { "text": "서울시 강남구 테헤란로 152", "category": "private_address" }
+      ]
+    },
+    {
+      "id": "ko-prose-04",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "강동원 의 생년월일은 1981-01-18 로 기록되었습니다",
+      "spans": [
+        { "text": "강동원", "category": "private_person" },
+        { "text": "1981-01-18", "category": "private_date" }
+      ]
+    },
+    {
+      "id": "ko-prose-05",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "등록번호 850315-1234567 확인 후 처리 바랍니다",
+      "spans": [{ "text": "850315-1234567", "category": "rrn" }]
+    },
+    {
+      "id": "ko-prose-06",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "사업자 220-81-62517 로 세금계산서를 발행했습니다",
+      "spans": [{ "text": "220-81-62517", "category": "biz_num" }]
+    },
+    {
+      "id": "ko-prose-07",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "결제 카드 4567-8910-1112-1314 는 만료 예정입니다",
+      "spans": [{ "text": "4567-8910-1112-1314", "category": "card" }]
+    },
+    {
+      "id": "ko-prose-08",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "계좌 110123456789 으로 환불이 처리되었습니다",
+      "spans": [{ "text": "110123456789", "category": "account_number" }]
+    },
+    {
+      "id": "ko-prose-09",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "배송지는 부산시 해운대구 센텀중앙로 90 이며 도착 예정일은 2024-10-30 입니다",
+      "spans": [
+        { "text": "부산시 해운대구 센텀중앙로 90", "category": "private_address" },
+        { "text": "2024-10-30", "category": "private_date" }
+      ]
+    },
+    {
+      "id": "ko-code-01",
+      "lang": "ko",
+      "surface": "code",
+      "text": "const OWNER_EMAIL = \"jiwon.kim@drama.kr\"; // 야간 배포 담당",
+      "spans": [{ "text": "jiwon.kim@drama.kr", "category": "private_email" }]
+    },
+    {
+      "id": "ko-code-02",
+      "lang": "ko",
+      "surface": "code",
+      "text": "logger.warn(\"노출 경고\", { rrn: \"760607-2345678\" });",
+      "spans": [{ "text": "760607-2345678", "category": "rrn" }]
+    },
+    {
+      "id": "ko-code-03",
+      "lang": "ko",
+      "surface": "code",
+      "text": "const LEDGER = \"3333021234567\"; // 내부 계좌 매핑",
+      "spans": [{ "text": "3333021234567", "category": "account_number" }]
+    },
+    {
+      "id": "ko-code-04",
+      "lang": "ko",
+      "surface": "code",
+      "text": "curl -H \"X-Auth: iu_secret_2025\" https://care.example.kr/gong",
+      "spans": [
+        { "text": "iu_secret_2025", "category": "secret" },
+        { "text": "https://care.example.kr/gong", "category": "private_url" }
+      ]
+    },
+    {
+      "id": "ko-path-01",
+      "lang": "ko",
+      "surface": "path",
+      "text": "D:\\작업\\계약\\김철수\\계약서.pdf 를 확인해 주세요",
+      "spans": [{ "text": "김철수", "category": "private_person" }]
+    },
+    {
+      "id": "ko-path-02",
+      "lang": "ko",
+      "surface": "path",
+      "text": "/srv/data/younghee.park@example.kr/upload.csv 경로를 확인하세요",
+      "spans": [{ "text": "younghee.park@example.kr", "category": "private_email" }]
+    },
+    {
+      "id": "ko-path-03",
+      "lang": "ko",
+      "surface": "path",
+      "text": "서버 로그 경로 /opt/acme/220-81-62517/audit.jsonl 를 확인하세요",
+      "spans": [{ "text": "220-81-62517", "category": "biz_num" }]
+    },
+    {
+      "id": "ko-json-01",
+      "lang": "ko",
+      "surface": "json",
+      "text": "{\"name\":\"최민수\",\"tel\":\"02-555-0101\"}",
+      "spans": [
+        { "text": "최민수", "category": "private_person" },
+        { "text": "02-555-0101", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "ko-json-02",
+      "lang": "ko",
+      "surface": "json",
+      "text": "{\"rrn\":\"800329-2123456\",\"biz\":\"101-86-12345\"}",
+      "spans": [
+        { "text": "800329-2123456", "category": "rrn" },
+        { "text": "101-86-12345", "category": "biz_num" }
+      ]
+    },
+    {
+      "id": "ko-md-01",
+      "lang": "ko",
+      "surface": "markdown",
+      "text": "## 고객 정보\n\n- 성명: **홍길동**\n- 연락처: 031-777-8888",
+      "spans": [
+        { "text": "홍길동", "category": "private_person" },
+        { "text": "031-777-8888", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "ko-md-02",
+      "lang": "ko",
+      "surface": "markdown",
+      "text": "[프로필](https://profile.example.kr/son) 에서 손흥민 선수 정보를 확인하세요",
+      "spans": [
+        { "text": "https://profile.example.kr/son", "category": "private_url" },
+        { "text": "손흥민", "category": "private_person" }
+      ]
+    },
+    {
+      "id": "ko-adv-01",
+      "lang": "ko",
+      "surface": "adversarial",
+      "text": "레거시 토큰 __OPF_PERSON__zzz__ 와 실제 고객 김연아 를 구분해야 합니다",
+      "spans": [{ "text": "김연아", "category": "private_person" }]
+    },
+    {
+      "id": "ko-adv-02",
+      "lang": "ko",
+      "surface": "adversarial",
+      "text": "문서에 __OPF_RRN_1__ 표기가 남아 있고 실제 값은 900101-1234567 입니다",
+      "spans": [{ "text": "900101-1234567", "category": "rrn" }]
+    },
+    {
+      "id": "ko-multi-01",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "김철수 는 010-1234-5678, 박영희 는 02-987-6543 으로 연락 가능합니다",
+      "spans": [
+        { "text": "김철수", "category": "private_person" },
+        { "text": "010-1234-5678", "category": "private_phone" },
+        { "text": "박영희", "category": "private_person" },
+        { "text": "02-987-6543", "category": "private_phone" }
+      ]
+    },
+    {
+      "id": "ko-multi-02",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "계약자 홍길동, 담당자 유재석, 승인자 박지성 이 서명했습니다",
+      "spans": [
+        { "text": "홍길동", "category": "private_person" },
+        { "text": "유재석", "category": "private_person" },
+        { "text": "박지성", "category": "private_person" }
+      ]
+    },
+    {
+      "id": "ko-repeat-01",
+      "lang": "ko",
+      "surface": "prose",
+      "text": "김철수 님께 연락하고 김철수 님의 서명을 받으세요",
+      "spans": [
+        { "text": "김철수", "category": "private_person" },
+        { "text": "김철수", "category": "private_person" }
+      ]
+    },
+    {
+      "id": "ko-md-03",
+      "lang": "ko",
+      "surface": "markdown",
+      "text": "문의는 gain.han@example.kr 또는 070-1234-9876 으로 주세요",
+      "spans": [
+        { "text": "gain.han@example.kr", "category": "private_email" },
+        { "text": "070-1234-9876", "category": "private_phone" }
+      ]
+    }
+  ]
+}

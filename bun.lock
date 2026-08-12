@@ -12,7 +12,7 @@
     },
     "packages/cli": {
       "name": "@pii-remover/cli",
-      "version": "0.1.0",
+      "version": "0.0.1",
       "bin": {
         "pii-remover": "./bin/pii-remover.js",
       },
@@ -31,7 +31,20 @@
     },
     "packages/core": {
       "name": "@pii-remover/core",
-      "version": "0.1.0",
+      "version": "0.0.1",
+      "devDependencies": {
+        "@types/bun": "^1.1.14",
+        "@types/node": "^22.10.0",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/eval": {
+      "name": "@pii-remover/eval",
+      "version": "0.0.0",
+      "dependencies": {
+        "@pii-remover/core": "workspace:*",
+        "@pii-remover/proxy": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "^1.1.14",
         "@types/node": "^22.10.0",
@@ -40,7 +53,7 @@
     },
     "packages/mcp-server": {
       "name": "@pii-remover/mcp-server",
-      "version": "0.1.0",
+      "version": "0.0.1",
       "bin": {
         "pii-remover-mcp": "./bin/pii-remover-mcp.js",
       },
@@ -57,7 +70,7 @@
     },
     "packages/opencode-plugin": {
       "name": "@pii-remover/opencode-plugin",
-      "version": "0.1.0",
+      "version": "0.0.1",
       "dependencies": {
         "@pii-remover/core": "workspace:*",
       },
@@ -76,7 +89,10 @@
     },
     "packages/proxy": {
       "name": "@pii-remover/proxy",
-      "version": "0.1.0",
+      "version": "0.0.1",
+      "bin": {
+        "pii-remover-proxy": "./bin/pii-remover-proxy.ts",
+      },
       "dependencies": {
         "@pii-remover/core": "workspace:*",
       },
@@ -88,11 +104,11 @@
     },
     "packages/shared-types": {
       "name": "@pii-remover/shared-types",
-      "version": "0.1.0",
+      "version": "0.0.1",
     },
     "packages/vision": {
       "name": "@pii-remover/vision",
-      "version": "0.1.0",
+      "version": "0.0.1",
       "dependencies": {
         "@pii-remover/core": "workspace:*",
       },
@@ -150,6 +166,8 @@
     "@pii-remover/cli": ["@pii-remover/cli@workspace:packages/cli"],
 
     "@pii-remover/core": ["@pii-remover/core@workspace:packages/core"],
+
+    "@pii-remover/eval": ["@pii-remover/eval@workspace:packages/eval"],
 
     "@pii-remover/integration-tests": ["@pii-remover/integration-tests@workspace:tests/integration"],
 

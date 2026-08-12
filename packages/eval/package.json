@@ -1,0 +1,31 @@
+{
+  "name": "@pii-remover/eval",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Private offline evaluation harness — Tier-1 deterministic mutation simulator for the PII restorer (docs/QUALITY-MEASUREMENT-PLAN.md §5). Never published.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "tier1": "bun run src/runners/tier1-mutation.ts"
+  },
+  "dependencies": {
+    "@pii-remover/core": "workspace:*",
+    "@pii-remover/proxy": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=18.0.0"
+  }
+}
