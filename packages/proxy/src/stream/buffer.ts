@@ -17,9 +17,15 @@ const PREFIX_REGEX_SOURCE = Array.from(TOKEN_PREFIX)
   .map((c) => c.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&"))
   .join("");
 
+// The bound is inclusive: a buffer ending at exactly the COMPLETE prefix
+// ("__OPF_") must also be held back. The other alternative in
+// UNSAFE_TOKEN_TAIL_REGEX needs at least one category character after the
+// prefix, so stopping at length-1 left a gap where only the trailing "_" was
+// held and "__OPF" was released — splitting the token across two restore calls
+// and delivering it to the user raw.
 function buildUnsafePrefixGroup(): string {
   const parts: string[] = [];
-  for (let i = 1; i < TOKEN_PREFIX.length; i++) {
+  for (let i = 1; i <= TOKEN_PREFIX.length; i++) {
     const slice = TOKEN_PREFIX.slice(0, i)
       .split("")
       .map((c) => c.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&"))
