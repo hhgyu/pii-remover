@@ -2,6 +2,10 @@ import type { PIIRemover } from "@pii-remover/core";
 
 import { createStreamBuffer, type StreamBuffer } from "./buffer.js";
 import {
+  createStreamRestoreScope,
+  type StreamRestoreScope,
+} from "./restore-scope.js";
+import {
   SseLineParser,
   serializeSseEvent,
   type SseEvent,
@@ -10,6 +14,8 @@ import {
 export interface CodexSseTransformerOptions {
   bufferWindow?: number;
   flushOnClose?: boolean;
+  requestId?: string;
+  provider?: string;
 }
 
 const TEXT_DELTA_EVENT = "response.output_text.delta";
@@ -29,14 +35,16 @@ export class CodexSseTransformer {
   private readonly funcArgAccumulators = new Map<number, string>();
   private readonly bufferWindow: number;
   private readonly flushOnClose: boolean;
+  private readonly scope: StreamRestoreScope;
   private closed = false;
 
-  constructor(
-    private readonly remover: PIIRemover,
-    opts: CodexSseTransformerOptions = {}
-  ) {
+  constructor(remover: PIIRemover, opts: CodexSseTransformerOptions = {}) {
     this.bufferWindow = opts.bufferWindow ?? 64;
     this.flushOnClose = opts.flushOnClose ?? true;
+    this.scope = createStreamRestoreScope(remover, {
+      ...(opts.requestId !== undefined ? { requestId: opts.requestId } : {}),
+      ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
+    });
   }
 
   push(chunk: string): string {
@@ -57,7 +65,7 @@ export class CodexSseTransformer {
       for (const [outputIdx, buf] of this.textBuffers.entries()) {
         const remaining = buf.flush();
         if (remaining.length > 0) {
-          const restored = this.remover.restore(remaining).text;
+          const restored = this.scope.text(remaining);
           out += serializeSseEvent({
             event: TEXT_DELTA_EVENT,
             data: JSON.stringify({
@@ -71,7 +79,7 @@ export class CodexSseTransformer {
       }
       for (const [outputIdx, accum] of this.funcArgAccumulators.entries()) {
         if (accum.length > 0) {
-          const restored = restoreJsonArguments(accum, this.remover);
+          const restored = this.scope.json(accum);
           out += serializeSseEvent({
             event: FUNC_ARGS_DELTA_EVENT,
             data: JSON.stringify({
@@ -112,7 +120,7 @@ export class CodexSseTransformer {
     if (safe.length === 0) {
       return "";
     }
-    const restored = this.remover.restore(safe).text;
+    const restored = this.scope.text(safe);
     const nextPayload: DeltaPayload = { ...payload, delta: restored };
     return serializeSseEvent({
       event: ev.event,
@@ -134,7 +142,7 @@ export class CodexSseTransformer {
     if (ev.event === FUNC_ARGS_DONE_EVENT) {
       const accum = this.funcArgAccumulators.get(outputIdx) ?? "";
       this.funcArgAccumulators.delete(outputIdx);
-      const restored = restoreJsonArguments(accum, this.remover);
+      const restored = this.scope.json(accum);
       const donePayload: DeltaPayload = { ...payload, delta: restored };
       return serializeSseEvent({ event: ev.event, data: JSON.stringify(donePayload), raw: "" });
     }
@@ -152,30 +160,6 @@ export class CodexSseTransformer {
     }
     return buf;
   }
-}
-
-function restoreJsonArguments(raw: string, remover: PIIRemover): string {
-  if (raw.length === 0) return raw;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return remover.restore(raw).text;
-  }
-  return JSON.stringify(walkRestore(parsed, remover));
-}
-
-function walkRestore(value: unknown, remover: PIIRemover): unknown {
-  if (typeof value === "string") return remover.restore(value).text;
-  if (Array.isArray(value)) return value.map((v) => walkRestore(v, remover));
-  if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = walkRestore(v, remover);
-    }
-    return out;
-  }
-  return value;
 }
 
 export { TEXT_DELTA_EVENT as CODEX_TEXT_DELTA_EVENT };

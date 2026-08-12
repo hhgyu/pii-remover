@@ -2,6 +2,10 @@ import type { PIIRemover } from "@pii-remover/core";
 
 import { createStreamBuffer, type StreamBuffer } from "./buffer.js";
 import {
+  createStreamRestoreScope,
+  type StreamRestoreScope,
+} from "./restore-scope.js";
+import {
   SseLineParser,
   serializeSseEvent,
   type SseEvent,
@@ -10,6 +14,8 @@ import {
 export interface AnthropicSseTransformerOptions {
   bufferWindow?: number;
   flushOnClose?: boolean;
+  requestId?: string;
+  provider?: string;
 }
 
 export class AnthropicSseTransformer {
@@ -18,14 +24,16 @@ export class AnthropicSseTransformer {
   private readonly toolInputAccumulators = new Map<number, string>();
   private readonly bufferWindow: number;
   private readonly flushOnClose: boolean;
+  private readonly scope: StreamRestoreScope;
   private closed = false;
 
-  constructor(
-    private readonly remover: PIIRemover,
-    opts: AnthropicSseTransformerOptions = {}
-  ) {
+  constructor(remover: PIIRemover, opts: AnthropicSseTransformerOptions = {}) {
     this.bufferWindow = opts.bufferWindow ?? 64;
     this.flushOnClose = opts.flushOnClose ?? true;
+    this.scope = createStreamRestoreScope(remover, {
+      ...(opts.requestId !== undefined ? { requestId: opts.requestId } : {}),
+      ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
+    });
   }
 
   push(chunk: string): string {
@@ -45,7 +53,7 @@ export class AnthropicSseTransformer {
     if (this.flushOnClose) {
       for (const [idx, accum] of this.toolInputAccumulators.entries()) {
         if (accum.length > 0) {
-          const restored = restoreJsonArguments(accum, this.remover);
+          const restored = this.scope.json(accum);
           out += serializeSseEvent({
             event: "content_block_delta",
             data: JSON.stringify({
@@ -67,7 +75,7 @@ export class AnthropicSseTransformer {
               index: idx,
               delta: {
                 type: "text_delta",
-                text: this.restore(remaining, "lenient"),
+                text: this.scope.text(remaining),
               },
             }),
             raw: "",
@@ -123,7 +131,7 @@ export class AnthropicSseTransformer {
     if (safe.length === 0) {
       return "";
     }
-    const restored = this.restore(safe, "strict");
+    const restored = this.scope.text(safe);
     const out: unknown = {
       ...obj,
       delta: { ...obj.delta, text: restored },
@@ -148,7 +156,7 @@ export class AnthropicSseTransformer {
     const accum = this.toolInputAccumulators.get(blockIndex);
     if (accum !== undefined) {
       this.toolInputAccumulators.delete(blockIndex);
-      const restored = restoreJsonArguments(accum, this.remover);
+      const restored = this.scope.json(accum);
       if (restored !== accum) {
         out += serializeSseEvent({
           event: "content_block_delta",
@@ -176,7 +184,7 @@ export class AnthropicSseTransformer {
     if (buf) {
       const remaining = buf.flush();
       if (remaining.length > 0) {
-        const restored = this.restore(remaining, "lenient");
+        const restored = this.scope.text(remaining);
         out += serializeSseEvent({
           event: "content_block_delta",
           data: JSON.stringify({
@@ -201,33 +209,4 @@ export class AnthropicSseTransformer {
     }
     return buf;
   }
-
-  private restore(text: string, _mode: "strict" | "lenient"): string {
-    if (text.length === 0) return text;
-    return this.remover.restore(text).text;
-  }
-}
-
-function restoreJsonArguments(raw: string, remover: PIIRemover): string {
-  if (raw.length === 0) return raw;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return remover.restore(raw).text;
-  }
-  return JSON.stringify(walkRestore(parsed, remover));
-}
-
-function walkRestore(value: unknown, remover: PIIRemover): unknown {
-  if (typeof value === "string") return remover.restore(value).text;
-  if (Array.isArray(value)) return value.map((v) => walkRestore(v, remover));
-  if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = walkRestore(v, remover);
-    }
-    return out;
-  }
-  return value;
 }

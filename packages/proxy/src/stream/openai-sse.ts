@@ -2,6 +2,10 @@ import type { PIIRemover } from "@pii-remover/core";
 
 import { createStreamBuffer, type StreamBuffer } from "./buffer.js";
 import {
+  createStreamRestoreScope,
+  type StreamRestoreScope,
+} from "./restore-scope.js";
+import {
   SseLineParser,
   serializeSseEvent,
   type SseEvent,
@@ -10,6 +14,8 @@ import {
 export interface OpenAISseTransformerOptions {
   bufferWindow?: number;
   flushOnClose?: boolean;
+  requestId?: string;
+  provider?: string;
 }
 
 export class OpenAISseTransformer {
@@ -18,14 +24,16 @@ export class OpenAISseTransformer {
   private readonly toolArgAccumulators = new Map<string, string>();
   private readonly bufferWindow: number;
   private readonly flushOnClose: boolean;
+  private readonly scope: StreamRestoreScope;
   private closed = false;
 
-  constructor(
-    private readonly remover: PIIRemover,
-    opts: OpenAISseTransformerOptions = {}
-  ) {
+  constructor(remover: PIIRemover, opts: OpenAISseTransformerOptions = {}) {
     this.bufferWindow = opts.bufferWindow ?? 64;
     this.flushOnClose = opts.flushOnClose ?? true;
+    this.scope = createStreamRestoreScope(remover, {
+      ...(opts.requestId !== undefined ? { requestId: opts.requestId } : {}),
+      ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
+    });
   }
 
   push(chunk: string): string {
@@ -51,7 +59,7 @@ export class OpenAISseTransformer {
               choices: [
                 {
                   index: choiceIdx,
-                  delta: { content: this.remover.restore(remaining).text },
+                  delta: { content: this.scope.text(remaining) },
                 },
               ],
             }),
@@ -70,7 +78,7 @@ export class OpenAISseTransformer {
       for (const [choiceIdx, tcs] of pendingByChoice.entries()) {
         const toolCalls = tcs.map(({ index, args }) => ({
           index,
-          function: { arguments: restoreJsonArguments(args, this.remover) },
+          function: { arguments: this.scope.json(args) },
         }));
         out += serializeSseEvent({
           data: JSON.stringify({
@@ -144,7 +152,7 @@ export class OpenAISseTransformer {
       }
       allHeld = false;
       mutated = true;
-      const restored = this.remover.restore(safe).text;
+      const restored = this.scope.text(safe);
       return { ...c, delta: { ...c.delta, content: restored } };
     });
 
@@ -167,26 +175,3 @@ export class OpenAISseTransformer {
   }
 }
 
-function restoreJsonArguments(raw: string, remover: PIIRemover): string {
-  if (raw.length === 0) return raw;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return remover.restore(raw).text;
-  }
-  return JSON.stringify(walkRestore(parsed, remover));
-}
-
-function walkRestore(value: unknown, remover: PIIRemover): unknown {
-  if (typeof value === "string") return remover.restore(value).text;
-  if (Array.isArray(value)) return value.map((v) => walkRestore(v, remover));
-  if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = walkRestore(v, remover);
-    }
-    return out;
-  }
-  return value;
-}
