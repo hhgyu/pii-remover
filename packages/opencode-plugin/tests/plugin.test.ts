@@ -1015,11 +1015,34 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
       state: { input: { filePath: string } };
     };
     expect(toolPart.state.input.filePath).toBe(
-      "D:\\Git\\[UNRESTORABLE]-tools\\x.ts"
+      "D:\\Git\\[UNRESTORABLE:PERSON/foreign]-tools\\x.ts"
     );
     const textPart = output.messages[0]!.parts[1] as { text: string };
-    expect(textPart.text).toContain("[UNRESTORABLE]");
+    expect(textPart.text).toContain("[UNRESTORABLE:EMAIL/foreign]");
     expect(textPart.text).not.toContain("__OPF_EMAIL__ffffffffffffffff__");
+    remover.dispose();
+  });
+
+  test("a token the USER typed survives the boundary untouched", async () => {
+    // Given a user asking about a token they pasted from a log, and prose
+    // describing the token grammar
+    const remover = await buildRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+    const typed =
+      "what is __OPF_PERSON__0123456789abcdef__? " +
+      "docs say the shape is __OPF_<CATEGORY>__<HASH>__";
+    const output = {
+      messages: [
+        { info: { role: "user" }, parts: [{ type: "text", text: typed }] },
+      ],
+    };
+
+    // When the LLM-boundary transform runs
+    await hooks["experimental.chat.messages.transform"]!({}, output as never);
+
+    // Then the question reaches the model exactly as written — neutralization
+    // is for model-authored text, not for the user's own words
+    expect((output.messages[0]!.parts[0] as { text: string }).text).toBe(typed);
     remover.dispose();
   });
 

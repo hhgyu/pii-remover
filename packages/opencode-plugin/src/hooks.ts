@@ -1,12 +1,16 @@
 import {
   AuditEmitter,
   FailClosedError,
+  OPF_PLACEHOLDER_SYSTEM_NOTE,
   PIIRemover,
+  TOKEN_PREFIX,
+  TOKEN_STRICT_PATTERN,
   maybeAutoStartBackend,
   type BackendClient,
   type MaskResult,
   type PiiRemoverConfig,
   type PIIRemoverInitOptions,
+  type RestoreOrigin,
 } from "@pii-remover/core";
 
 import { loadPluginConfig } from "./config-loader.js";
@@ -150,10 +154,18 @@ export interface CreatedHooks {
   ): Promise<void>;
 }
 
-const OPF_PLACEHOLDER_SYSTEM_NOTE =
-  "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. " +
-  "Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. " +
-  "When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written.";
+// Both are derived from the core token grammar so the hash length can never
+// desync from TOKEN_HASH_LENGTH. Sweep regex is global but only ever used with
+// String.replace, which resets lastIndex on entry and exit; the probe regex is
+// non-global so .test() stays stateless.
+const OPF_TOKEN_SWEEP_REGEX = new RegExp(TOKEN_STRICT_PATTERN, "gi");
+const OPF_PREFIX_PROBE_REGEX = new RegExp(TOKEN_PREFIX, "i");
+
+const NEUTRALIZE_REASON = {
+  expired:
+    "this key minted it but the vault no longer holds it (session resumed)",
+  foreign: "this key never minted it (model-invented, or the key was replaced)",
+} as const;
 
 export type PluginMode = "mask" | "restore" | "full";
 
@@ -353,13 +365,17 @@ export function createPluginHooks(
     }
   }
 
-  function restoreText(text: string, where: string): string {
+  function restoreText(
+    text: string,
+    where: string,
+    origin: RestoreOrigin
+  ): string {
     if (typeof text !== "string" || text.length === 0) return text;
-    if (!text.includes("__OPF_") && !/__opf_/i.test(text)) return text;
+    if (!text.includes(TOKEN_PREFIX) && !OPF_PREFIX_PROBE_REGEX.test(text)) {
+      return text;
+    }
     try {
-      const r = remover.restore(text, {
-        warn: (msg) => warn(msg),
-      });
+      const r = remover.restore(text, { warn: (msg) => warn(msg), origin });
       return r.text;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -368,12 +384,19 @@ export function createPluginHooks(
     }
   }
 
-  function restoreFieldText(text: string): string {
-    return restoreText(text, "tool.execute.before display-tool restore");
+  // Tool ARGS were written by the model; tool RESULTS were written by whatever
+  // the tool read. Blaming the model for a token-shaped string that came out of
+  // a file would report a hallucination it never committed.
+  function restoreArgText(text: string): string {
+    return restoreText(text, "tool.execute.before display-tool restore", "model");
+  }
+
+  function restoreResultText(text: string): string {
+    return restoreText(text, "tool.execute.after", "tool");
   }
 
   function stripTokens(text: string): string {
-    return text.replace(/__OPF_[A-Z][A-Z0-9_]*?__[a-z0-9]{16}__/gi, "[REDACTED]");
+    return text.replace(OPF_TOKEN_SWEEP_REGEX, "[REDACTED]");
   }
 
   // Tokens whose vault mapping no longer exists (minted by a previous
@@ -383,31 +406,41 @@ export function createPluginHooks(
   // the LLM onto a normal failure path (re-discover or ask the user).
   // Live tokens are preserved so the LLM can keep reusing them.
   function neutralizeDeadTokens(text: string): string {
-    if (!/__opf_/i.test(text)) return text;
+    if (!OPF_PREFIX_PROBE_REGEX.test(text)) return text;
     return text.replace(
-      /__OPF_([A-Z][A-Z0-9_]*?)__([a-z0-9]{16})__/gi,
+      OPF_TOKEN_SWEEP_REGEX,
       (raw, label: string, hash: string) => {
-        const normalized = `__OPF_${label.toUpperCase()}__${hash.toLowerCase()}__`;
-        if (remover.hasToken(normalized)) return raw;
+        const category = label.toUpperCase();
+        const normalized = `__OPF_${category}__${hash.toLowerCase()}__`;
+        const status = remover.tokenStatus(normalized);
+        if (status === "live") return raw;
         if (!warnedDeadTokens.has(normalized)) {
           warnedDeadTokens.add(normalized);
           warn(
-            `[pii-remover] neutralized dead token ${normalized} ` +
-            "(no vault mapping — likely minted by a previous process)"
+            `[pii-remover] neutralized ${status} token ${normalized}: ${NEUTRALIZE_REASON[status]}`
           );
         }
-        return "[UNRESTORABLE]";
+        return `[UNRESTORABLE:${category}/${status}]`;
       }
     );
   }
 
-  async function maskPartInPlace(part: ChatMessageTransformPart): Promise<void> {
+  async function maskPartInPlace(
+    part: ChatMessageTransformPart,
+    authoredByUser: boolean
+  ): Promise<void> {
     if (!part || typeof part !== "object") return;
     const type = part.type;
 
     // Compaction parts strip EVERY token to [REDACTED] below, so the
     // dead-token sweep would only change the placeholder text.
-    if (type !== "compaction") {
+    //
+    // User-authored parts are never swept. Neutralization exists to stop the
+    // MODEL copying an unusable token into a new tool call; the user typing
+    // one is authoritative input. Sweeping it silently rewrote documentation,
+    // tests and the "what is this __OPF_ token?" question itself before the
+    // model ever saw it.
+    if (type !== "compaction" && !authoredByUser) {
       await maskTextFieldsStrict(part, neutralizeDeadTokens);
     }
 
@@ -518,7 +551,7 @@ export function createPluginHooks(
       // Restore vault tokens the LLM echoed into args (e.g.
       // "D:\Git\__OPF_PERSON_1__Plugin" composed from masked context) so
       // the permission dialog and the tool both see the real filesystem.
-      const restored = await restoreTextFields(output.args, restoreFieldText);
+      const restored = await restoreTextFields(output.args, restoreArgText);
       output.args = restored;
 
       // Args originate FROM the LLM, so masking them here adds no LLM-side
@@ -553,17 +586,17 @@ export function createPluginHooks(
       output: ToolAfterOutput
     ): Promise<void> => {
       if (typeof output.output === "string") {
-        output.output = restoreText(output.output, "tool.execute.after");
+        output.output = restoreResultText(output.output);
       } else if (output.output !== undefined && output.output !== null) {
-        output.output = await restoreTextFields(output.output, restoreFieldText);
+        output.output = await restoreTextFields(output.output, restoreResultText);
       }
       if (typeof output.title === "string") {
-        output.title = restoreText(output.title, "tool.execute.after");
+        output.title = restoreResultText(output.title);
       }
       if (output.metadata !== undefined && output.metadata !== null) {
         output.metadata = await restoreTextFields(
           output.metadata,
-          restoreFieldText
+          restoreResultText
         );
       }
     };
@@ -587,8 +620,9 @@ export function createPluginHooks(
         if (!Array.isArray(output.messages)) return;
         for (const message of output.messages) {
           if (!message || !Array.isArray(message.parts)) continue;
+          const authoredByUser = message.info?.role === "user";
           for (const part of message.parts) {
-            await maskPartInPlace(part);
+            await maskPartInPlace(part, authoredByUser);
           }
         }
       };
@@ -599,7 +633,11 @@ export function createPluginHooks(
         output: TextCompleteOutput
       ): Promise<void> => {
         if (typeof output.text !== "string") return;
-        output.text = restoreText(output.text, "experimental.text.complete");
+        output.text = restoreText(
+          output.text,
+          "experimental.text.complete",
+          "model"
+        );
       };
     }
   }
