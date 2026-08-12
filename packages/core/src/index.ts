@@ -23,6 +23,8 @@ export {
   TOKEN_PREFIX,
   TOKEN_SUFFIX,
   TOKEN_DELIMITER,
+  MAX_CATEGORY_LABEL_LENGTH,
+  MAX_TOKEN_LENGTH,
 } from "./token/format.js";
 export type { ParsedToken } from "./token/format.js";
 

@@ -15,6 +15,7 @@
  */
 
 import { TOKEN_HASH_LENGTH } from "../redaction/token-hash.js";
+import { CATEGORY_MAP } from "./category-map.js";
 
 export const TOKEN_PREFIX = "__OPF_";
 export const TOKEN_SUFFIX = "__";
@@ -28,6 +29,22 @@ export const TOKEN_CATEGORY_PATTERN = "[A-Z][A-Z0-9_]*?";
 
 /** Hash sub-pattern, derived from TOKEN_HASH_LENGTH. */
 export const TOKEN_HASH_PATTERN = `[a-z0-9]{${TOKEN_HASH_LENGTH}}`;
+
+export const MAX_CATEGORY_LABEL_LENGTH = Math.max(
+  ...Object.values(CATEGORY_MAP).map((label) => label.length),
+);
+
+/**
+ * Longest token `formatToken` can emit. A streaming consumer that looks back
+ * fewer characters than this cannot see an in-progress token's `__OPF_` start
+ * and releases the tail raw.
+ */
+export const MAX_TOKEN_LENGTH =
+  TOKEN_PREFIX.length +
+  MAX_CATEGORY_LABEL_LENGTH +
+  TOKEN_DELIMITER.length +
+  TOKEN_HASH_LENGTH +
+  TOKEN_SUFFIX.length;
 
 /**
  * Canonical token pattern source with two capture groups: category, hash.

@@ -1,4 +1,8 @@
-import { TOKEN_PREFIX, TOKEN_HASH_LENGTH } from "@pii-remover/core";
+import {
+  MAX_TOKEN_LENGTH,
+  TOKEN_PREFIX,
+  TOKEN_HASH_LENGTH,
+} from "@pii-remover/core";
 
 export interface StreamBufferOptions {
   bufferWindow?: number;
@@ -11,7 +15,9 @@ export interface StreamBuffer {
   size(): number;
 }
 
-const DEFAULT_BUFFER_WINDOW = 64;
+// Must stay >= MAX_TOKEN_LENGTH, else the lookback misses an in-progress
+// token's `__OPF_` start and the tail is released raw. Doubled for headroom.
+export const DEFAULT_BUFFER_WINDOW = MAX_TOKEN_LENGTH * 2;
 
 const PREFIX_REGEX_SOURCE = Array.from(TOKEN_PREFIX)
   .map((c) => c.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&"))

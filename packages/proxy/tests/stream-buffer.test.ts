@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import {
+  CATEGORY_MAP,
+  MAX_TOKEN_LENGTH,
+  TOKEN_DELIMITER,
+  TOKEN_HASH_LENGTH,
+  TOKEN_PREFIX,
+  TOKEN_SUFFIX,
+} from "@pii-remover/core";
+import {
   createStreamBuffer,
+  DEFAULT_BUFFER_WINDOW,
   findUnsafeBoundary,
 } from "../src/stream/buffer.js";
 
@@ -64,6 +73,40 @@ describe("findUnsafeBoundary — token-prefix boundary detection", () => {
     const s = longSafe + "__OPF_E";
     const boundary = findUnsafeBoundary(s);
     expect(s.slice(boundary)).toBe("__OPF_E");
+  });
+});
+
+describe("DEFAULT_BUFFER_WINDOW — must contain a whole token", () => {
+  test("window is at least MAX_TOKEN_LENGTH", () => {
+    expect(DEFAULT_BUFFER_WINDOW).toBeGreaterThanOrEqual(MAX_TOKEN_LENGTH);
+  });
+
+  test("MAX_TOKEN_LENGTH covers the longest label in CATEGORY_MAP", () => {
+    for (const label of Object.values(CATEGORY_MAP)) {
+      const token = `${TOKEN_PREFIX}${label}${TOKEN_DELIMITER}${"0".repeat(TOKEN_HASH_LENGTH)}${TOKEN_SUFFIX}`;
+      expect(token.length).toBeLessThanOrEqual(MAX_TOKEN_LENGTH);
+    }
+  });
+
+  test("every category's token is held back when split one char at a time", () => {
+    for (const label of Object.values(CATEGORY_MAP)) {
+      const token = `${TOKEN_PREFIX}${label}${TOKEN_DELIMITER}${"0".repeat(TOKEN_HASH_LENGTH)}${TOKEN_SUFFIX}`;
+      const buf = createStreamBuffer();
+      let emitted = "";
+      for (const ch of token.slice(0, -1)) emitted += buf.push(ch);
+      expect(emitted).toBe("");
+      expect(emitted + buf.push("_") + buf.flush()).toBe(token);
+    }
+  });
+
+  test("a window below MAX_TOKEN_LENGTH releases a partial token raw", () => {
+    const token = `${TOKEN_PREFIX}ADDRESS${TOKEN_DELIMITER}${"0".repeat(TOKEN_HASH_LENGTH)}${TOKEN_SUFFIX}`;
+    const partial = token.slice(0, -1);
+    const tooSmall = createStreamBuffer({ bufferWindow: MAX_TOKEN_LENGTH - 8 });
+    expect(tooSmall.push(partial)).not.toBe("");
+
+    const derived = createStreamBuffer();
+    expect(derived.push(partial)).toBe("");
   });
 });
 
