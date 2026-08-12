@@ -158,19 +158,22 @@ async function handleRequest(
     });
   }
 
-  if (request.method !== "POST") {
-    return jsonResponse(405, {
-      error: "method_not_allowed",
-      message: "Only POST is supported on provider routes.",
-    });
-  }
-
   const { provider, upstreamPath } = route.match;
+  const upstreamPathWithQuery = `${upstreamPath}${url.search}`;
+
+  if (provider === "passthrough_anthropic") {
+    return passthrough(
+      request,
+      `${normalizeUpstreamBase(resolved.upstream.anthropic)}${upstreamPathWithQuery}`,
+      fetchImpl,
+      warn
+    );
+  }
 
   if (provider === "passthrough_openai") {
     return passthrough(
       request,
-      `${normalizeUpstreamBase(resolved.upstream.openai)}${upstreamPath}`,
+      `${normalizeUpstreamBase(resolved.upstream.openai)}${upstreamPathWithQuery}`,
       fetchImpl,
       warn
     );
@@ -179,10 +182,17 @@ async function handleRequest(
   if (provider === "passthrough_codex") {
     return passthrough(
       request,
-      `${normalizeUpstreamBase(resolved.upstream.codex)}${upstreamPath}`,
+      `${normalizeUpstreamBase(resolved.upstream.codex)}${upstreamPathWithQuery}`,
       fetchImpl,
       warn
     );
+  }
+
+  if (request.method !== "POST") {
+    return jsonResponse(405, {
+      error: "method_not_allowed",
+      message: "Only POST is supported on provider chat routes.",
+    });
   }
 
   const { remover } = await sessions.get(request.headers);
@@ -213,7 +223,7 @@ async function handleRequest(
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
 
-    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.anthropic)}${upstreamPath}`;
+    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.anthropic)}${upstreamPathWithQuery}`;
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -254,7 +264,7 @@ async function handleRequest(
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
 
-    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.openai)}${upstreamPath}`;
+    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.openai)}${upstreamPathWithQuery}`;
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -295,7 +305,7 @@ async function handleRequest(
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
 
-    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.codex)}${upstreamPath}`;
+    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.codex)}${upstreamPathWithQuery}`;
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -482,13 +492,13 @@ async function passthrough(
   warn: (msg: string) => void
 ): Promise<Response> {
   const headers = forwardableRequestHeaders(request.headers);
-  const body = await request.arrayBuffer();
+  const init: RequestInit = { method: request.method, headers };
+  // fetch rejects GET/HEAD carrying a body, even a zero-length one.
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = await request.arrayBuffer();
+  }
   try {
-    const upstream = await fetchImpl(upstreamUrl, {
-      method: request.method,
-      headers,
-      body,
-    });
+    const upstream = await fetchImpl(upstreamUrl, init);
     return relayResponse(upstream);
   } catch (err) {
     warn(`[pii-remover/proxy] passthrough failed: ${(err as Error).message}`);

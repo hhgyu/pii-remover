@@ -1,7 +1,11 @@
 import type { ProviderName } from "./providers/types.js";
 
 export interface RouteMatch {
-  provider: ProviderName | "passthrough_openai" | "passthrough_codex";
+  provider:
+    | ProviderName
+    | "passthrough_anthropic"
+    | "passthrough_openai"
+    | "passthrough_codex";
   upstreamPath: string;
 }
 
@@ -20,6 +24,10 @@ const PROVIDER_PREFIXES: ReadonlyArray<{
 ];
 
 const ANTHROPIC_CHAT_PATH = "/v1/messages";
+// Scoped to the account namespace on purpose: do NOT widen to all of
+// `/anthropic`. `/v1/messages/count_tokens` posts the full conversation and
+// must stay on the masking branch.
+const ANTHROPIC_PASSTHROUGH_PREFIX = "/api/";
 const OPENAI_CHAT_PATH = "/v1/chat/completions";
 const CODEX_RESPONSES_PATH = "/v1/responses";
 
@@ -33,6 +41,15 @@ export function resolveRoute(pathname: string): RouteResolution {
         return {
           kind: "provider",
           match: { provider: "anthropic", upstreamPath },
+        };
+      }
+      if (
+        provider === "anthropic" &&
+        upstreamPath.startsWith(ANTHROPIC_PASSTHROUGH_PREFIX)
+      ) {
+        return {
+          kind: "provider",
+          match: { provider: "passthrough_anthropic", upstreamPath },
         };
       }
       if (provider === "openai" && upstreamPath === OPENAI_CHAT_PATH) {

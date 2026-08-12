@@ -27,6 +27,18 @@ describe("resolveRoute — path prefix routing (ADR-0004)", () => {
     expect(r.match?.upstreamPath).toBe("/v1/embeddings");
   });
 
+  test("/anthropic/api/oauth/profile → passthrough_anthropic", () => {
+    const r = resolveRoute("/anthropic/api/oauth/profile");
+    expect(r.kind).toBe("provider");
+    expect(r.match?.provider).toBe("passthrough_anthropic");
+    expect(r.match?.upstreamPath).toBe("/api/oauth/profile");
+  });
+
+  test("/anthropic/v1/messages/count_tokens stays on the masking branch", () => {
+    const r = resolveRoute("/anthropic/v1/messages/count_tokens");
+    expect(r.match?.provider).toBe("anthropic");
+  });
+
   test("unknown path → not_found", () => {
     expect(resolveRoute("/random/path").kind).toBe("not_found");
     expect(resolveRoute("/anthropi/typo/v1/messages").kind).toBe("not_found");

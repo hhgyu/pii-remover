@@ -192,17 +192,26 @@ describe("startProxy — Anthropic round-trip via mock upstream", () => {
   let upstreamCalls = 0;
   let lastUpstreamHeaders: Headers | null = null;
   let lastUpstreamBody: unknown = null;
+  let lastUpstreamUrl: string | null = null;
 
   beforeAll(async () => {
     upstreamCalls = 0;
     lastUpstreamHeaders = null;
     lastUpstreamBody = null;
-    const fakeUpstream: FetchLike = async (_url, init) => {
+    lastUpstreamUrl = null;
+    const fakeUpstream: FetchLike = async (url, init) => {
       upstreamCalls++;
+      lastUpstreamUrl = String(url);
       lastUpstreamHeaders = new Headers(
         (init?.headers as Record<string, string>) ?? {}
       );
       lastUpstreamBody = init?.body ? JSON.parse(init.body as string) : null;
+      if (lastUpstreamUrl.includes("/api/oauth/profile")) {
+        return new Response(
+          JSON.stringify({ organization: { organization_type: "claude_max" } }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
       const upstreamText = ((lastUpstreamBody as { messages?: Array<{ content?: string }> })
         .messages?.[0]?.content ?? "");
       const token = upstreamText.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
@@ -258,6 +267,32 @@ describe("startProxy — Anthropic round-trip via mock upstream", () => {
       .messages;
     expect(upstreamMessages[0]!.content).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
     expect(lastUpstreamHeaders?.get("authorization")).toBe("Bearer test-key");
+  });
+
+  test("forwards the client query string to upstream", async () => {
+    const res = await fetch(`${proxy.url}${ANTHROPIC_PATH}?beta=true`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-test",
+        messages: [{ role: "user", content: "hi" }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(lastUpstreamUrl).toContain("/v1/messages?beta=true");
+  });
+
+  test("relays GET /anthropic/api/oauth/profile without masking", async () => {
+    const res = await fetch(`${proxy.url}/anthropic/api/oauth/profile`, {
+      headers: { authorization: "Bearer test-key" },
+    });
+    expect(res.status).toBe(200);
+    expect(lastUpstreamUrl).toContain("/api/oauth/profile");
+    expect(lastUpstreamHeaders?.get("authorization")).toBe("Bearer test-key");
+    const body = (await res.json()) as {
+      organization?: { organization_type?: string };
+    };
+    expect(body.organization?.organization_type).toBe("claude_max");
   });
 
   test("health endpoint works", async () => {
