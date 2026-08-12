@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type {
   PIIRemover,
   PIIRemoverInitOptions,
@@ -185,6 +187,11 @@ async function handleRequest(
 
   const { remover } = await sessions.get(request.headers);
 
+  // One id per HTTP request, shared by the request-side mask event and every
+  // response-side restore event (streaming emits one per SSE delta). Without a
+  // shared key the audit stream cannot reassemble a request's restore events.
+  const requestId = `req_${randomUUID()}`;
+
   let parsedBody: unknown;
   const rawBody = await request.text();
   try {
@@ -201,7 +208,7 @@ async function handleRequest(
     const result = await transformAnthropicRequest(
       parsedBody as AnthropicRequestBody,
       remover,
-      { provider: "anthropic" }
+      { provider: "anthropic", requestId }
     );
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
@@ -218,11 +225,18 @@ async function handleRequest(
       return relayResponse(upstreamRes);
     }
     if (isStreaming) {
-      return streamingResponse(upstreamRes, "anthropic", remover, resolved, request.signal);
+      return streamingResponse(upstreamRes, {
+        provider: "anthropic",
+        remover,
+        resolved,
+        requestId,
+        clientSignal: request.signal,
+      });
     }
     const responseBody = (await upstreamRes.json()) as AnthropicResponseBody;
     const restored = await restoreAnthropicResponse(responseBody, remover, {
       provider: "anthropic",
+      requestId,
     });
     return jsonResponse(
       upstreamRes.status,
@@ -235,7 +249,7 @@ async function handleRequest(
     const result = await transformOpenAIRequest(
       parsedBody as OpenAIRequestBody,
       remover,
-      { provider: "openai" }
+      { provider: "openai", requestId }
     );
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
@@ -252,11 +266,18 @@ async function handleRequest(
       return relayResponse(upstreamRes);
     }
     if (isStreaming) {
-      return streamingResponse(upstreamRes, "openai", remover, resolved, request.signal);
+      return streamingResponse(upstreamRes, {
+        provider: "openai",
+        remover,
+        resolved,
+        requestId,
+        clientSignal: request.signal,
+      });
     }
     const responseBody = (await upstreamRes.json()) as OpenAIResponseBody;
     const restored = await restoreOpenAIResponse(responseBody, remover, {
       provider: "openai",
+      requestId,
     });
     return jsonResponse(
       upstreamRes.status,
@@ -269,7 +290,7 @@ async function handleRequest(
     const result = await transformCodexResponsesRequest(
       parsedBody as CodexResponsesRequestBody,
       remover,
-      { provider: "codex" }
+      { provider: "codex", requestId }
     );
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
@@ -286,11 +307,18 @@ async function handleRequest(
       return relayResponse(upstreamRes);
     }
     if (isStreaming) {
-      return streamingResponse(upstreamRes, "codex", remover, resolved, request.signal);
+      return streamingResponse(upstreamRes, {
+        provider: "codex",
+        remover,
+        resolved,
+        requestId,
+        clientSignal: request.signal,
+      });
     }
     const responseBody = (await upstreamRes.json()) as CodexResponsesResponseBody;
     const restored = await restoreCodexResponsesResponse(responseBody, remover, {
       provider: "codex",
+      requestId,
     });
     return jsonResponse(
       upstreamRes.status,
@@ -310,14 +338,21 @@ interface StreamingTransformer {
   flush(): string;
 }
 
-function selectStreamTransformer(
-  provider: ProviderName,
-  remover: import("@pii-remover/core").PIIRemover,
-  resolved: ResolvedProxyConfig
-): StreamingTransformer {
+interface StreamingContext {
+  provider: ProviderName;
+  remover: PIIRemover;
+  resolved: ResolvedProxyConfig;
+  requestId: string;
+  clientSignal?: AbortSignal;
+}
+
+function selectStreamTransformer(ctx: StreamingContext): StreamingTransformer {
+  const { provider, remover, resolved, requestId } = ctx;
   const opts = {
     bufferWindow: resolved.buffer_window,
     flushOnClose: resolved.flush_on_close,
+    requestId,
+    provider,
   };
   if (provider === "anthropic") return new AnthropicSseTransformer(remover, opts);
   if (provider === "openai") return new OpenAISseTransformer(remover, opts);
@@ -326,11 +361,9 @@ function selectStreamTransformer(
 
 function streamingResponse(
   upstream: Response,
-  provider: ProviderName,
-  remover: import("@pii-remover/core").PIIRemover,
-  resolved: ResolvedProxyConfig,
-  clientSignal?: AbortSignal
+  ctx: StreamingContext
 ): Response {
+  const { clientSignal } = ctx;
   const sourceBody = upstream.body;
   if (!sourceBody) {
     return jsonResponse(502, {
@@ -338,7 +371,7 @@ function streamingResponse(
       message: "Upstream returned an empty streaming body.",
     });
   }
-  const transformer = selectStreamTransformer(provider, remover, resolved);
+  const transformer = selectStreamTransformer(ctx);
 
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();

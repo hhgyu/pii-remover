@@ -12,6 +12,14 @@ async function makeRemover(): Promise<PIIRemover> {
   return PIIRemover.init({ env: {} });
 }
 
+// The transform injects a system message carrying the placeholder note, so
+// positional indexing into `messages` no longer identifies the user turn.
+function userContent(messages: readonly { role: string; content: unknown }[]) {
+  const found = messages.find((m) => m.role === "user");
+  if (!found) throw new Error("no user message in transformed body");
+  return found.content;
+}
+
 describe("Anthropic image redactor hook", () => {
   test("calls imageRedactor on base64 image source", async () => {
     const remover = await makeRemover();
@@ -157,7 +165,7 @@ describe("OpenAI image_url redactor hook", () => {
       },
     });
     expect(seen).toEqual(["SEED_B64"]);
-    const part = (out.messages[0]!.content as Array<{ image_url?: { url?: string } }>)[1]!;
+    const part = (userContent(out.messages) as Array<{ image_url?: { url?: string } }>)[1]!;
     expect(part.image_url?.url).toBe("data:image/png;base64,MASKED_B64");
     remover.dispose();
   });
@@ -186,7 +194,7 @@ describe("OpenAI image_url redactor hook", () => {
       },
     });
     expect(called).toBe(0);
-    const part = (out.messages[0]!.content as Array<{ image_url?: { url?: string } }>)[0]!;
+    const part = (userContent(out.messages) as Array<{ image_url?: { url?: string } }>)[0]!;
     expect(part.image_url?.url).toBe("https://example.com/p.png");
     remover.dispose();
   });

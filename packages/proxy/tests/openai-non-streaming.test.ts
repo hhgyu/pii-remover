@@ -17,6 +17,14 @@ async function makeRemover() {
   });
 }
 
+// The transform injects a system message carrying the placeholder note, so
+// positional indexing into `messages` no longer identifies the user turn.
+function userMessage(messages: readonly { role: string; content: unknown }[]) {
+  const found = messages.find((m) => m.role === "user");
+  if (!found) throw new Error("no user message in transformed body");
+  return found;
+}
+
 describe("transformOpenAIRequest — non-streaming masking", () => {
   test("string content message is masked", async () => {
     const remover = await makeRemover();
@@ -30,7 +38,7 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
       remover
     );
     expect(out.rejection).toBeUndefined();
-    const masked = (out.body.messages[0]!.content as string);
+    const masked = userMessage(out.body.messages).content as string;
     expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
   });
 
@@ -54,7 +62,10 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
       },
       remover
     );
-    const parts = out.body.messages[0]!.content as Array<{ type: string; text?: string }>;
+    const parts = userMessage(out.body.messages).content as Array<{
+      type: string;
+      text?: string;
+    }>;
     expect(parts[0]!.text).toMatch(/__OPF_CARD__[a-z0-9]{16}__/);
     expect(parts[1]!.type).toBe("image_url");
   });
@@ -71,7 +82,7 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
     );
     expect(out.rejection).toBeUndefined();
     expect(out.body.stream).toBe(true);
-    const masked = out.body.messages[0]!.content as string;
+    const masked = userMessage(out.body.messages).content as string;
     expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
   });
 });
@@ -174,8 +185,12 @@ describe("startProxy — OpenAI round-trip via mock upstream", () => {
       } catch {
         lastBody = null;
       }
-      const upstreamText = (lastBody as { messages?: Array<{ content?: string }> })
-        ?.messages?.[0]?.content ?? "";
+      // Scan every message: the transform prepends a system message carrying
+      // the placeholder note, so the token is no longer in messages[0].
+      const upstreamText = ((lastBody as { messages?: Array<{ content?: string }> })
+        ?.messages ?? [])
+        .map((m) => m?.content ?? "")
+        .join("\n");
       const token = upstreamText.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
       return new Response(
         JSON.stringify({
@@ -225,9 +240,12 @@ describe("startProxy — OpenAI round-trip via mock upstream", () => {
     expect(body.choices[0]!.message.content).toBe(
       "Got it, paging dev@example.com."
     );
-    const upstreamMessages = (lastBody as { messages: Array<{ content: string }> })
-      .messages;
-    expect(upstreamMessages[0]!.content).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    const upstreamMessages = (
+      lastBody as { messages: Array<{ role: string; content: string }> }
+    ).messages;
+    expect(userMessage(upstreamMessages).content).toMatch(
+      /__OPF_EMAIL__[a-z0-9]{16}__/
+    );
   });
 
   test("embeddings passthrough does not double-handle JSON", async () => {

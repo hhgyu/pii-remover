@@ -1,4 +1,8 @@
 import type { PIIRemover } from "@pii-remover/core";
+import {
+  OPF_PLACEHOLDER_SYSTEM_NOTE,
+  appendPlaceholderNote,
+} from "@pii-remover/core";
 import type {
   AnthropicContentBlock,
   AnthropicMessage,
@@ -11,6 +15,9 @@ export type ImageRedactor = (base64: string) => Promise<string>;
 export interface AnthropicTransformOptions {
   imageRedactor?: ImageRedactor;
   provider?: string;
+  /** Shared across the mask event and every restore event of one HTTP request
+   *  so the audit stream can join them. */
+  requestId?: string;
 }
 
 export interface AnthropicTransformResult {
@@ -26,8 +33,20 @@ export async function transformAnthropicRequest(
   const messages = await maskMessages(raw.messages, remover, opts);
   const system = await maskSystem(raw.system, remover, opts);
   const out: AnthropicRequestBody = { ...raw, messages };
-  if (system !== undefined) out.system = system;
+  out.system = withPlaceholderNote(system);
   return { body: out };
+}
+
+function withPlaceholderNote(
+  system: AnthropicRequestBody["system"]
+): AnthropicRequestBody["system"] {
+  if (!Array.isArray(system)) return appendPlaceholderNote(system);
+  const alreadyPresent = system.some(
+    (block) => block.text === OPF_PLACEHOLDER_SYSTEM_NOTE
+  );
+  return alreadyPresent
+    ? system
+    : [...system, { type: "text", text: OPF_PLACEHOLDER_SYSTEM_NOTE }];
 }
 
 export async function restoreAnthropicResponse(
@@ -39,7 +58,7 @@ export async function restoreAnthropicResponse(
   const restoredContent = body.content.map((block) => {
     if (!block || typeof block !== "object") return block;
     if (block.type === "text" && typeof block.text === "string") {
-      return { ...block, text: restoreWithProvider(remover, block.text, opts.provider).text };
+      return { ...block, text: restoreWithProvider(remover, block.text, opts).text };
     }
     if (block.type === "tool_use") {
       const input = (block as { input?: unknown }).input;
@@ -58,7 +77,7 @@ function walkRestore(
   opts: AnthropicTransformOptions
 ): unknown {
   if (typeof value === "string") {
-    return restoreWithProvider(remover, value, opts.provider).text;
+    return restoreWithProvider(remover, value, opts).text;
   }
   if (Array.isArray(value)) return value.map((v) => walkRestore(v, remover, opts));
   if (value !== null && typeof value === "object") {
@@ -80,7 +99,7 @@ async function maskMessages(
   const out: AnthropicMessage[] = [];
   for (const m of msgs) {
     if (typeof m.content === "string") {
-      const masked = await maskWithProvider(remover, m.content, opts.provider);
+      const masked = await maskWithProvider(remover, m.content, opts);
       out.push({ ...m, content: masked.text });
       continue;
     }
@@ -109,7 +128,7 @@ async function maskContentBlocks(
       const masked = await maskWithProvider(
         remover,
         (b as { text: string }).text,
-        opts.provider
+        opts
       );
       out.push({ ...b, text: masked.text });
       continue;
@@ -150,14 +169,14 @@ async function maskSystem(
 ): Promise<AnthropicRequestBody["system"]> {
   if (system === undefined) return undefined;
   if (typeof system === "string") {
-    const masked = await maskWithProvider(remover, system, opts.provider);
+    const masked = await maskWithProvider(remover, system, opts);
     return masked.text;
   }
   if (Array.isArray(system)) {
     const out: Array<{ type: string; text?: string }> = [];
     for (const s of system) {
       if (s && typeof s === "object" && typeof s.text === "string") {
-        const masked = await maskWithProvider(remover, s.text, opts.provider);
+        const masked = await maskWithProvider(remover, s.text, opts);
         out.push({ ...s, text: masked.text });
       } else {
         out.push(s);
@@ -171,19 +190,21 @@ async function maskSystem(
 function maskWithProvider(
   remover: PIIRemover,
   text: string,
-  provider: string | undefined
+  opts: AnthropicTransformOptions
 ): Promise<Awaited<ReturnType<PIIRemover["mask"]>>> {
-  const opts: { request_id?: string } & { provider?: string } = { provider };
-  return remover.mask(text, opts);
+  return remover.mask(text, {
+    request_id: opts.requestId,
+    provider: opts.provider,
+  });
 }
 
 function restoreWithProvider(
   remover: PIIRemover,
   text: string,
-  provider: string | undefined
+  opts: AnthropicTransformOptions
 ): ReturnType<PIIRemover["restore"]> {
-  const opts: Parameters<PIIRemover["restore"]>[1] & { provider?: string } = {
-    provider,
-  };
-  return remover.restore(text, opts);
+  return remover.restore(text, {
+    request_id: opts.requestId,
+    provider: opts.provider,
+  });
 }

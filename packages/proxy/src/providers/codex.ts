@@ -1,4 +1,5 @@
 import type { PIIRemover } from "@pii-remover/core";
+import { appendPlaceholderNote } from "@pii-remover/core";
 
 import type {
   CodexInputContentPart,
@@ -16,6 +17,9 @@ export interface CodexTransformResult {
 
 export interface CodexTransformOptions {
   provider?: string;
+  /** Shared across the mask event and every restore event of one HTTP request
+   *  so the audit stream can join them. */
+  requestId?: string;
 }
 
 const MASKABLE_INPUT_TEXT_TYPES = new Set([
@@ -34,11 +38,13 @@ export async function transformCodexResponsesRequest(
   opts: CodexTransformOptions = {}
 ): Promise<CodexTransformResult> {
   const out: CodexResponsesRequestBody = { ...raw };
-  if (typeof raw.instructions === "string") {
-    out.instructions = (await maskWithProvider(remover, raw.instructions, opts.provider)).text;
-  }
+  const instructions =
+    typeof raw.instructions === "string"
+      ? (await maskWithProvider(remover, raw.instructions, opts)).text
+      : undefined;
+  out.instructions = appendPlaceholderNote(instructions);
   if (typeof raw.input === "string") {
-    out.input = (await maskWithProvider(remover, raw.input, opts.provider)).text;
+    out.input = (await maskWithProvider(remover, raw.input, opts)).text;
   } else if (Array.isArray(raw.input)) {
     out.input = await maskInputItems(raw.input, remover, opts);
   }
@@ -55,7 +61,7 @@ export async function restoreCodexResponsesResponse(
     out.output = body.output.map((item) => restoreOutputItem(item, remover, opts));
   }
   if (typeof body.output_text === "string") {
-    out.output_text = restoreWithProvider(remover, body.output_text, opts.provider).text;
+    out.output_text = restoreWithProvider(remover, body.output_text, opts).text;
   }
   return out;
 }
@@ -101,7 +107,7 @@ async function maskInputContent(
       typeof part.text === "string" &&
       MASKABLE_INPUT_TEXT_TYPES.has(part.type)
     ) {
-      const masked = await maskWithProvider(remover, part.text, opts.provider);
+      const masked = await maskWithProvider(remover, part.text, opts);
       out.push({ ...part, text: masked.text });
       continue;
     }
@@ -140,7 +146,7 @@ function restoreOutputContent(
     typeof part.text === "string" &&
     RESTORABLE_OUTPUT_TEXT_TYPES.has(part.type)
   ) {
-    return { ...part, text: restoreWithProvider(remover, part.text, opts.provider).text };
+    return { ...part, text: restoreWithProvider(remover, part.text, opts).text };
   }
   return part;
 }
@@ -167,7 +173,7 @@ function restoreToolArguments(
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return restoreWithProvider(remover, raw, opts.provider).text;
+    return restoreWithProvider(remover, raw, opts).text;
   }
   const walked = walkRestore(parsed, remover, opts);
   return JSON.stringify(walked);
@@ -183,7 +189,7 @@ function walkRestore(
   opts: CodexTransformOptions
 ): unknown {
   if (typeof value === "string") {
-    return restoreWithProvider(remover, value, opts.provider).text;
+    return restoreWithProvider(remover, value, opts).text;
   }
   if (Array.isArray(value)) return value.map((v) => walkRestore(v, remover, opts));
   if (value !== null && typeof value === "object") {
@@ -199,19 +205,21 @@ function walkRestore(
 function maskWithProvider(
   remover: PIIRemover,
   text: string,
-  provider: string | undefined
+  opts: CodexTransformOptions
 ): Promise<Awaited<ReturnType<PIIRemover["mask"]>>> {
-  const opts: { request_id?: string } & { provider?: string } = { provider };
-  return remover.mask(text, opts);
+  return remover.mask(text, {
+    request_id: opts.requestId,
+    provider: opts.provider,
+  });
 }
 
 function restoreWithProvider(
   remover: PIIRemover,
   text: string,
-  provider: string | undefined
+  opts: CodexTransformOptions
 ): ReturnType<PIIRemover["restore"]> {
-  const opts: Parameters<PIIRemover["restore"]>[1] & { provider?: string } = {
-    provider,
-  };
-  return remover.restore(text, opts);
+  return remover.restore(text, {
+    request_id: opts.requestId,
+    provider: opts.provider,
+  });
 }
