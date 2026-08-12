@@ -15,6 +15,11 @@ export {
   isToken,
   TOKEN_STRICT_REGEX,
   TOKEN_LENIENT_REGEX,
+  TOKEN_STRICT_PATTERN,
+  TOKEN_LENIENT_PATTERN,
+  TOKEN_REPAIR_PATTERN,
+  TOKEN_CATEGORY_PATTERN,
+  TOKEN_HASH_PATTERN,
   TOKEN_PREFIX,
   TOKEN_SUFFIX,
   TOKEN_DELIMITER,
@@ -23,10 +28,12 @@ export type { ParsedToken } from "./token/format.js";
 
 export {
   tokenHash,
+  tokenEpoch,
   deriveTokenKey,
   resolveTokenKey,
   defaultKeyPath,
   TOKEN_HASH_LENGTH,
+  TOKEN_EPOCH_LENGTH,
 } from "./redaction/token-hash.js";
 export type {
   TokenKeyResolution,
@@ -119,11 +126,20 @@ export type {
   RestoreAuditData,
 } from "./audit/index.js";
 
-export { Restorer, scanTokens } from "./restorer/index.js";
+export {
+  Restorer,
+  scanTokens,
+  scanTokensWithRepairCandidates,
+  isInsidePath,
+  isWithinOneEdit,
+} from "./restorer/index.js";
 export type {
   TokenMatch,
   RestoreResult,
   RestoreOptions,
+  RestoreOrigin,
+  UnknownTokenInfo,
+  MissCause,
 } from "./restorer/index.js";
 
 export {
@@ -164,6 +180,11 @@ export {
 export { restoreSynthetic } from "./synthetic/restore.js";
 export { loadConfig, substituteEnv } from "./config/loader.js";
 export type { LoadConfigOptions } from "./config/loader.js";
+
+export {
+  OPF_PLACEHOLDER_SYSTEM_NOTE,
+  appendPlaceholderNote,
+} from "./policy/system-note.js";
 
 export { applyPolicy, FailClosedError } from "./policy/failure.js";
 export type { FailurePolicy, ApplyPolicyOptions } from "./policy/failure.js";
