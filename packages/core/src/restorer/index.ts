@@ -1,94 +1,136 @@
-import {
-  TOKEN_LENIENT_REGEX,
-  TOKEN_STRICT_REGEX,
-} from "../token/format.js";
 import type { VaultManager } from "../vault/manager.js";
+import { isInsidePath } from "./path.js";
+import {
+  buildRepairIndex,
+  resolveMiss,
+  type MissCause,
+  type RepairCandidate,
+} from "./repair.js";
+import {
+  scanTokens,
+  scanTokensWithRepairCandidates,
+  type TokenMatch,
+} from "./scan.js";
+
+export {
+  scanTokens,
+  scanTokensWithRepairCandidates,
+  type TokenMatch,
+} from "./scan.js";
+export { isInsidePath } from "./path.js";
+export { isWithinOneEdit, type MissCause } from "./repair.js";
 
 /**
- * A token that was detected in text by the Restorer. May correspond to the
- * canonical strict form (`__OPF_PERSON_1__`) or a lenient/LLM-mangled variant
- * (e.g. `__opf_person_1` — case-folded, suffix dropped). See ADR-0002.
+ * Outcome of a single `Restorer.restore()` call.
  *
- * `normalizedToken` is the canonical form used for vault lookup. `token`
- * preserves the original surface form so callers can attribute LLM
- * transformations.
- */
-export interface TokenMatch {
-  /** Half-open span in the source text: text[start..end). */
-  start: number;
-  end: number;
-  /** Original surface form that was matched (may differ from normalizedToken). */
-  token: string;
-  /** Canonical form used for vault lookup: `__OPF_<CATEGORY>__<HASH>__`. */
-  normalizedToken: string;
-  /** Uppercase category label (e.g. "PERSON", "EMAIL", "BIZ_NUM"). */
-  category: string;
-  /** Deterministic base36 hash identifier (ADR-0020). */
-  hash: string;
-  /** Which regex matched: strict (canonical) or lenient (variant). */
-  matchType: "strict" | "lenient";
-}
-
-/**
- * Outcome of a single `Restorer.restore()` call. Counters are computed
- * independently:
- *  - `restoredCount`: tokens whose vault lookup succeeded.
- *  - `partialMatchCount`: tokens matched by the lenient regex (regardless of
- *    whether the vault contained an entry). Signals "LLM mangled at least N
- *    tokens" to callers.
- *  - `unknownTokenCount`: tokens whose vault lookup failed (hallucinated or
- *    stale references — strict and lenient both count).
+ * Two partitions hold by construction and are worth relying on:
+ *  - `unknownTokenCount === hallucinatedCount + deadTokenCount + ambiguousCount`
+ *  - `repairedCount ⊆ restoredCount`
+ *
+ * `pathSkipCount` is a separate bucket of vault MISSES suppressed because they
+ * sit inside a filesystem path; vault hits inside paths restore normally.
+ * `residualTokenCount` counts tokens still matchable in the OUTPUT text — the
+ * user-visible failure surface, which `unknownTokenCount` stops describing once
+ * an unknown-token handler rewrites the span.
  */
 export interface RestoreResult {
   text: string;
   matches: TokenMatch[];
   restoredCount: number;
   partialMatchCount: number;
+  lenientRestoredCount: number;
+  repairedCount: number;
   unknownTokenCount: number;
+  /**
+   * Misses whose epoch shows this key never minted the token. That is a fact
+   * about the token, NOT blame: the model may have invented it, but a tool
+   * result, a file the agent read, or the user's own message can equally carry
+   * a token-shaped string. Deciding whose fault it was needs provenance, which
+   * only the caller has — see `RestoreOptions.origin`.
+   */
+  foreignCount: number;
+  deadTokenCount: number;
+  ambiguousCount: number;
   pathSkipCount: number;
+  residualTokenCount: number;
+}
+
+export type RestoreOrigin = "model" | "tool" | "user";
+
+export interface UnknownTokenInfo {
+  category: string;
+  cause: MissCause;
 }
 
 export interface RestoreOptions {
-  /** Activate the lenient fallback regex for LLM-mangled tokens.
-   *  Default: true. Set false to restrict to canonical-form tokens only. */
+  /** Activate the lenient fallback regex for LLM-mangled tokens. Default true. */
   lenient?: boolean;
-  /** Emit a warning whenever a lenient (non-canonical) match is encountered.
-   *  Default: true. */
+  /** Warn on every lenient (non-canonical) match. Default true. */
   warnOnPartial?: boolean;
-  /** Emit a warning when a strict-form token is not in the vault (suggests an
-   *  LLM hallucination per ADR-0002). Default: true. */
+  /** Warn when a strict-form token is not in the vault. Default true. */
   warnOnUnknownToken?: boolean;
-  /** Called when a lenient match cannot be resolved against the vault. The
-   *  return value is substituted into the output text. Default: keep the
-   *  original surface form (no replacement). */
+  /**
+   * Attempt vault-bounded repair of a mutated hash (ADR-0021). Only accepts a
+   * replacement when exactly ONE live vault entry lies within a single edit;
+   * two or more candidates fail closed. Default true.
+   */
+  repair?: boolean;
+  /**
+   * Who wrote the text being restored. Only `"model"` text can hallucinate a
+   * token; a `"tool"` result (a file the agent read, shell stdout, a web page)
+   * or a `"user"` message carrying a token-shaped string is third-party data,
+   * and counting it as a model failure poisons `hallucination_rate` — the very
+   * number the prompt lever is chosen from. Defaults to `"model"`, so a caller
+   * that forgets is attributed conservatively rather than silently exonerated.
+   */
+  origin?: RestoreOrigin;
+  /** Called when a lenient match cannot be resolved. Return value replaces the
+   *  span. Default: keep the original surface form. */
   partialMatchHandler?: (text: string, match: TokenMatch) => string;
-  /** Called when a strict-form token is not in the vault. The return value
-   *  is substituted into the output text. Default: keep the original token
-   *  text (no replacement). */
-  unknownTokenHandler?: (token: string) => string;
-  /** Sink for warning messages. Falls back to defaultOpts.warn (set on the
-   *  Restorer) and finally to a no-op. */
+  /** Called when a token cannot be resolved. Return value replaces the span.
+   *  Default: keep the original token text. */
+  unknownTokenHandler?: (token: string, info: UnknownTokenInfo) => string;
   warn?: (msg: string) => void;
-  /** When true (default), tokens that appear inside a file-system path span
-   *  (Windows drive, UNC, POSIX absolute/relative, URL) are skipped and not
-   *  restored. This prevents false restoration of tokens embedded in paths
-   *  like `D:\Git\__OPF_PERSON_2__Plugin`. Set false to disable. */
+  /** Skip tokens sitting inside a filesystem path span. Default true. */
   skipPathMatches?: boolean;
 }
 
+interface UnresolvedToken {
+  match: TokenMatch;
+  cause: MissCause;
+}
+
 /**
- * Token restorer (ADR-0002 §Implementation Notes, ADR-0003 §round-trip,
- * ADR-0004 §LLM variation scenarios).
+ * Typed as `Record<MissCause, ...>` so adding a fourth cause fails the build
+ * instead of silently landing in no counter.
+ */
+const CAUSE_COUNTER = {
+  foreign: "foreignCount",
+  expired: "deadTokenCount",
+  ambiguous: "ambiguousCount",
+} as const satisfies Record<MissCause, keyof RestoreResult>;
+
+const EMPTY_RESULT: Omit<RestoreResult, "text" | "matches"> = {
+  restoredCount: 0,
+  partialMatchCount: 0,
+  lenientRestoredCount: 0,
+  repairedCount: 0,
+  unknownTokenCount: 0,
+  foreignCount: 0,
+  deadTokenCount: 0,
+  ambiguousCount: 0,
+  pathSkipCount: 0,
+  residualTokenCount: 0,
+};
+
+/**
+ * Token restorer (ADR-0020 round-trip, ADR-0021 miss classification).
  *
- *  1. Scan text with the strict regex.
- *  2. Scan text with the lenient regex; drop any matches that overlap a
- *     strict span (avoids double-counting the same canonical token).
- *  3. Walk matches right-to-left, looking each one up in the vault. Hits
- *     are substituted with the original surface form; misses go through
- *     the appropriate handler (default: keep original).
- *
- * Right-to-left replacement preserves earlier-match offsets after each
- * substitution.
+ *  1. Scan with the strict regex, then the lenient regex minus overlaps.
+ *  2. Walk matches right-to-left so each substitution preserves the offsets of
+ *     the matches still to come.
+ *  3. Exact vault hit wins. Otherwise classify the miss and, when repair finds
+ *     exactly one live vault entry within a single edit, restore that.
  */
 export class Restorer {
   private readonly vault: VaultManager;
@@ -99,10 +141,6 @@ export class Restorer {
     this.defaultOpts = defaultOpts;
   }
 
-  /**
-   * Scan `text` for all OPF tokens (strict + lenient), returning the matches
-   * sorted by start position. Does not consult the vault.
-   */
   scan(text: string): TokenMatch[] {
     return scanTokens(text);
   }
@@ -110,9 +148,8 @@ export class Restorer {
   /**
    * Resolve every token in `text` using the vault for `sessionId`.
    *
-   * Throws `TypeError` if `sessionId` is empty / non-string. Passing a
-   * session that was never populated is allowed and yields all-unknown
-   * counts (no entries means every token is a vault miss).
+   * Throws `TypeError` if `sessionId` is empty. A session that was never
+   * populated is allowed and yields all-unknown counts.
    */
   restore(
     text: string,
@@ -124,166 +161,136 @@ export class Restorer {
         `Restorer.restore: sessionId must be a non-empty string (got ${JSON.stringify(sessionId)})`
       );
     }
-    if (text === "") {
-      return {
-        text: "",
-        matches: [],
-        restoredCount: 0,
-        partialMatchCount: 0,
-        unknownTokenCount: 0,
-        pathSkipCount: 0,
-      };
-    }
+    if (text === "") return { text: "", matches: [], ...EMPTY_RESULT };
 
     const merged = mergeOptions(this.defaultOpts, opts);
-    const useLenient = merged.lenient ?? true;
-    const warnOnPartial = merged.warnOnPartial ?? true;
-    const warnOnUnknownToken = merged.warnOnUnknownToken ?? true;
     const warn = merged.warn ?? noopWarn;
+    const warnOnPartial = merged.warnOnPartial ?? true;
     const skipPaths = merged.skipPathMatches ?? true;
+    const repairEnabled = merged.repair ?? true;
 
-    const allMatches = scanTokens(text);
-    const matches = useLenient
-      ? allMatches
-      : allMatches.filter((m) => m.matchType === "strict");
+    const scan = repairEnabled ? scanTokensWithRepairCandidates : scanTokens;
+    const allMatches = scan(text);
+    const matches =
+      merged.lenient === false
+        ? allMatches.filter((m) => m.matchType === "strict")
+        : allMatches;
 
-    let partialMatchCount = 0;
+    const counts = { ...EMPTY_RESULT };
     for (const m of matches) {
-      if (m.matchType === "lenient") partialMatchCount++;
+      if (m.matchType === "lenient") counts.partialMatchCount++;
     }
 
-    let restoredCount = 0;
-    let unknownTokenCount = 0;
-    let pathSkipCount = 0;
-
-    const reverseMatches = [...matches].sort((a, b) => b.start - a.start);
+    const epoch = this.vault.epoch();
+    let repairIndex: RepairCandidate[] | null = null;
 
     let out = text;
-    for (const m of reverseMatches) {
+    for (const m of [...matches].sort((a, b) => b.start - a.start)) {
       const entry = this.vault.lookup(sessionId, m.normalizedToken);
-
       if (entry) {
-        out = out.slice(0, m.start) + entry.text + out.slice(m.end);
-        restoredCount++;
-        if (m.matchType === "lenient" && warnOnPartial) {
-          warn(
-            `[WARN] PII restore: lenient match '${m.token}' resolved as '${m.normalizedToken}' (LLM transformation suspected)`
-          );
+        out = splice(out, m, entry.text);
+        counts.restoredCount++;
+        if (m.matchType === "lenient") {
+          counts.lenientRestoredCount++;
+          if (warnOnPartial) warn(lenientResolvedMessage(m));
         }
         continue;
+      }
+
+      if (repairEnabled && repairIndex === null) {
+        repairIndex = buildRepairIndex(this.vault.tokens(sessionId));
+      }
+      const resolution = repairEnabled
+        ? resolveMiss(
+            { category: m.category, hash: m.hash },
+            epoch,
+            repairIndex ?? []
+          )
+        : ({ kind: "unresolved", cause: "expired" } as const);
+
+      if (resolution.kind === "repaired") {
+        const repaired = this.vault.lookup(sessionId, resolution.normalizedToken);
+        if (repaired) {
+          out = splice(out, m, repaired.text);
+          counts.restoredCount++;
+          counts.repairedCount++;
+          warn(repairedMessage(m, resolution.normalizedToken));
+          continue;
+        }
       }
 
       if (skipPaths && isInsidePath(out, m.start, m.end)) {
-        pathSkipCount++;
+        counts.pathSkipCount++;
         continue;
       }
 
-      unknownTokenCount++;
-      if (m.matchType === "strict") {
-        if (warnOnUnknownToken) {
-          warn(
-            `[WARN] PII restore: unknown token '${m.token}' not in vault (possibly hallucinated, ADR-0002)`
-          );
-        }
-        const handler = merged.unknownTokenHandler;
-        if (handler) {
-          const replacement = handler(m.token);
-          out = out.slice(0, m.start) + replacement + out.slice(m.end);
-        }
-      } else {
-        if (warnOnPartial) {
-          warn(
-            `[WARN] PII restore: lenient match '${m.token}' (normalized '${m.normalizedToken}') not in vault`
-          );
-        }
-        const handler = merged.partialMatchHandler;
-        if (handler) {
-          const replacement = handler(m.token, m);
-          out = out.slice(0, m.start) + replacement + out.slice(m.end);
-        }
-      }
+      const cause =
+        resolution.kind === "unresolved" ? resolution.cause : "expired";
+      counts.unknownTokenCount++;
+      counts[CAUSE_COUNTER[cause]]++;
+
+      out = this.handleUnresolved(out, { match: m, cause }, merged);
     }
 
     return {
       text: out,
       matches,
-      restoredCount,
-      partialMatchCount,
-      unknownTokenCount,
-      pathSkipCount,
+      ...counts,
+      residualTokenCount: matches.length === 0 ? 0 : scan(out).length,
     };
   }
+
+  private handleUnresolved(
+    text: string,
+    unresolved: UnresolvedToken,
+    opts: RestoreOptions
+  ): string {
+    const { match, cause } = unresolved;
+    const warn = opts.warn ?? noopWarn;
+    // A repair candidate is a guess about what the span even is, so an
+    // unresolved one is left byte-for-byte alone: rewriting it could destroy
+    // ordinary text that merely resembles a token.
+    if (match.matchType === "repair") {
+      if (opts.warnOnUnknownToken ?? true) warn(unresolvedMessage(match, cause));
+      return text;
+    }
+    if (match.matchType === "strict") {
+      if (opts.warnOnUnknownToken ?? true) warn(unresolvedMessage(match, cause));
+      const handler = opts.unknownTokenHandler;
+      if (handler) {
+        return splice(text, match, handler(match.token, { category: match.category, cause }));
+      }
+      return text;
+    }
+    if (opts.warnOnPartial ?? true) warn(unresolvedMessage(match, cause));
+    const handler = opts.partialMatchHandler;
+    return handler ? splice(text, match, handler(match.token, match)) : text;
+  }
 }
 
-/**
- * Scan `text` for all OPF tokens (strict + lenient), returning matches sorted
- * by start position. Lenient matches that overlap a strict match are
- * suppressed to avoid double-counting the same canonical token.
- *
- * Exposed as a free function (not just `Restorer.scan`) so the proxy stream
- * boundary detector can share the same source of truth without instantiating
- * a Restorer.
- */
-export function scanTokens(text: string): TokenMatch[] {
-  if (text === "") return [];
-
-  const matches: TokenMatch[] = [];
-  const strictRanges: Array<readonly [number, number]> = [];
-
-  const strictRe = new RegExp(TOKEN_STRICT_REGEX.source, "g");
-  for (const m of text.matchAll(strictRe)) {
-    const start = m.index ?? 0;
-    const end = start + m[0].length;
-    const category = m[1]!;
-    const hash = m[2]!.toLowerCase();
-    strictRanges.push([start, end]);
-    matches.push({
-      start,
-      end,
-      token: m[0],
-      normalizedToken: buildNormalized(category, hash),
-      category,
-      hash,
-      matchType: "strict",
-    });
-  }
-
-  const lenientRe = new RegExp(TOKEN_LENIENT_REGEX.source, "gi");
-  for (const m of text.matchAll(lenientRe)) {
-    const start = m.index ?? 0;
-    const end = start + m[0].length;
-    if (overlapsAny(strictRanges, start, end)) continue;
-    const category = m[1]!.toUpperCase();
-    const hash = m[2]!.toLowerCase();
-    matches.push({
-      start,
-      end,
-      token: m[0],
-      normalizedToken: buildNormalized(category, hash),
-      category,
-      hash,
-      matchType: "lenient",
-    });
-  }
-
-  matches.sort((a, b) => a.start - b.start);
-  return matches;
+function splice(text: string, match: TokenMatch, replacement: string): string {
+  return text.slice(0, match.start) + replacement + text.slice(match.end);
 }
 
-function buildNormalized(category: string, hash: string): string {
-  return `__OPF_${category}__${hash}__`;
+function lenientResolvedMessage(m: TokenMatch): string {
+  return `[WARN] PII restore: lenient match '${m.token}' resolved as '${m.normalizedToken}' (LLM transformation suspected)`;
 }
 
-function overlapsAny(
-  ranges: ReadonlyArray<readonly [number, number]>,
-  start: number,
-  end: number
-): boolean {
-  for (const [s, e] of ranges) {
-    // Half-open intersection: [start, end) ∩ [s, e) ≠ ∅
-    if (start < e && end > s) return true;
-  }
-  return false;
+function repairedMessage(m: TokenMatch, resolved: string): string {
+  return `[WARN] PII restore: repaired mutated token '${m.token}' to '${resolved}' (single vault candidate within one edit)`;
+}
+
+const CAUSE_EXPLANATION: Record<MissCause, string> = {
+  foreign:
+    "not minted by this token key — possibly hallucinated by the model, or the key was replaced",
+  expired:
+    "minted by this token key but absent from the vault — dead token, likely from a previous process",
+  ambiguous:
+    "repair found more than one vault entry within a single edit — failing closed rather than guessing",
+};
+
+function unresolvedMessage(m: TokenMatch, cause: MissCause): string {
+  return `[WARN] PII restore: token '${m.token}' unresolved (${cause}): ${CAUSE_EXPLANATION[cause]}`;
 }
 
 function mergeOptions(
@@ -295,6 +302,8 @@ function mergeOptions(
     warnOnPartial: overrides.warnOnPartial ?? defaults.warnOnPartial,
     warnOnUnknownToken:
       overrides.warnOnUnknownToken ?? defaults.warnOnUnknownToken,
+    repair: overrides.repair ?? defaults.repair,
+    origin: overrides.origin ?? defaults.origin,
     partialMatchHandler:
       overrides.partialMatchHandler ?? defaults.partialMatchHandler,
     unknownTokenHandler:
@@ -305,56 +314,3 @@ function mergeOptions(
 }
 
 function noopWarn(_msg: string): void {}
-
-/**
- * Detect whether a token match sits inside a file-system path span.
- *
- * Extracts the surrounding non-whitespace segment and checks for strong
- * path evidence (drive-letter, UNC, POSIX absolute/relative, URL scheme,
- * or multiple separators). The heuristic is intentionally conservative —
- * it only suppresses restoration when the token is clearly part of a path
- * so that legitimate LLM output like `"__OPF_EMAIL_1__please respond"`
- * is never blocked.
- *
- * Exported for direct unit-testing.
- */
-export function isInsidePath(text: string, start: number, end: number): boolean {
-  // --- 1. Extract the surrounding non-whitespace span ---
-  let spanStart = start;
-  while (spanStart > 0 && !/\s/.test(text[spanStart - 1]!)) spanStart--;
-  let spanEnd = end;
-  while (spanEnd < text.length && !/\s/.test(text[spanEnd]!)) spanEnd++;
-
-  const span = text.slice(spanStart, spanEnd);
-
-  // --- 2. Strong path evidence on the whole span ---
-  // Windows drive path: C:\... D:/...
-  if (/^[A-Za-z]:[\\\/]/.test(span)) return true;
-  // UNC path: \\server\share\...
-  if (/^\\\\/.test(span)) return true;
-  // POSIX absolute path: /foo/bar...
-  if (/^\//.test(span)) return true;
-  // Relative path with separator: ./foo... or ../foo...
-  if (/^\.\.?[\/\\]/.test(span)) return true;
-  // URL scheme: file://... https://...
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(span)) return true;
-
-  // --- 3. Separator adjacency: token directly touches a path separator ---
-  const charBefore = start > 0 ? text[start - 1] : "";
-  const charAfter = end < text.length ? text[end] : "";
-  const precededBySep = charBefore === "/" || charBefore === "\\";
-  const followedBySep = charAfter === "/" || charAfter === "\\";
-
-  // If the token is flanked by separators, count path separators in the
-  // surrounding span — more than 1 is very strong path evidence.
-  if (precededBySep || followedBySep) {
-    let sepCount = 0;
-    for (let i = spanStart; i < spanEnd; i++) {
-      const c = text[i];
-      if (c === "/" || c === "\\") sepCount++;
-    }
-    if (sepCount >= 2) return true;
-  }
-
-  return false;
-}

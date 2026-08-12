@@ -150,8 +150,14 @@ describe("Restorer.restore — happy path", () => {
       matches: [],
       restoredCount: 0,
       partialMatchCount: 0,
+      lenientRestoredCount: 0,
+      repairedCount: 0,
       unknownTokenCount: 0,
+      foreignCount: 0,
+      deadTokenCount: 0,
+      ambiguousCount: 0,
       pathSkipCount: 0,
+      residualTokenCount: 0,
     });
   });
 
