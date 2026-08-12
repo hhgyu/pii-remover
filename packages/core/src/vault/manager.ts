@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { Detection, PIICategory, TokenizedSpan } from "../types.js";
 import { formatToken } from "../token/format.js";
 import { categoryToTokenLabel } from "../token/category-map.js";
-import { tokenHash } from "../redaction/token-hash.js";
+import { tokenEpoch, tokenHash } from "../redaction/token-hash.js";
 import { SCHEMA_VERSION, type Vault, type VaultEntry } from "./schema.js";
 
 const MAX_ENTRIES_HARD = 100_000;
@@ -44,6 +44,19 @@ export class VaultManager {
     const v = this.sessions.get(sessionId);
     if (!v) return [];
     return Object.values(v.entries);
+  }
+
+  /** Fingerprint of the active token key; every token this vault mints starts
+   *  with it. A miss whose epoch differs was minted under a different key. */
+  epoch(): string {
+    return tokenEpoch(this.tokenKey);
+  }
+
+  /** Token keys of one session, for vault-bounded repair (ADR-0021). */
+  tokens(sessionId: string): string[] {
+    const v = this.sessions.get(sessionId);
+    if (!v) return [];
+    return Object.keys(v.entries);
   }
 
   getOrCreate(sessionId: string): Vault {
