@@ -51,7 +51,12 @@ export function createDesanitizeHandler(deps: DesanitizeDeps) {
   return async (input: DesanitizeInput) => {
     return withToolErrorMapping(async () => {
       const remover = await vaultPool.resolve(input.vault_id);
-      const result = remover.restore(input.text, { provider: "mcp" });
+      // The text belongs to whatever MCP client called us, not to a model this
+      // process drove, so an unminted token here is not our model's mistake.
+      const result = remover.restore(input.text, {
+        provider: "mcp",
+        origin: "tool",
+      });
       const out: DesanitizeOutput = {
         text: result.text,
         restored_count: result.restoredCount,

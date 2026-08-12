@@ -51,7 +51,11 @@ export function createDesanitizeBatchHandler(deps: DesanitizeBatchDeps) {
       let totalRestored = 0;
       let totalUnknown = 0;
       for (const text of input.texts) {
-        const result = remover.restore(text, { provider: "mcp" });
+        // Caller-supplied text — see the note in desanitize.ts.
+        const result = remover.restore(text, {
+          provider: "mcp",
+          origin: "tool",
+        });
         results.push({
           text: result.text,
           restored_count: result.restoredCount,
