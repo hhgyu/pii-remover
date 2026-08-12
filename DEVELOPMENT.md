@@ -188,7 +188,7 @@ node packages/cli/bin/pii-remover.js install --target opencode
 
 # Codex CLI용 설치
 node packages/cli/bin/pii-remover.js install --target codex \
-  --proxy-url http://localhost:8765/codex/v1
+  --proxy-url http://localhost:8000/codex/v1
 ```
 
 > **Windows 경로**: 반드시 절대경로를 따옴표로 감쌀 것.
@@ -223,23 +223,30 @@ bare-package entry로 fallback하면서 WARNING을 출력 (수동으로
 
 ### 6.2 프록시 로컬 실행
 
-```bash
-# 소스에서 직접 실행 (빌드 불필요, Bun이 TS 네이티브 실행)
-bun run packages/proxy/bin/pii-remover-proxy.ts start
+프록시는 백엔드와 같은 프로세스에서 서빙됩니다 (Python 포팅, 포트 8000).
+별도 프록시 데몬은 없습니다.
 
-# 또는 빌드 후 실행
-bun run build
-node packages/proxy/bin/pii-remover-proxy.js start
+```bash
+docker compose -f packages/backend/docker-compose.yml up -d
+# 탐지(/redact)와 프록시(/anthropic, /openai, /codex)가 함께 8000에 뜸
+
+# 또는 컨테이너 없이 로컬에서
+cd packages/backend
+PII_PROXY_ENABLED=1 uvicorn server.main:app --port 8000
 ```
+
+`packages/proxy`(TypeScript)는 더 이상 런타임이 아닙니다. 골든 벡터
+생성기(`scripts/gen-*-vectors.ts`)와 eval 하니스가 참조하는 레퍼런스
+구현으로만 남아 있으며 배포되지 않습니다.
 
 프록시 실행 후 환경변수 설정:
 
 ```bash
 # Claude Code
-export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1
+export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
 
 # OpenAI
-export OPENAI_API_BASE=http://localhost:8765/openai/v1
+export OPENAI_API_BASE=http://localhost:8000/openai/v1
 ```
 
 ### 6.3 백엔드 로컬 실행
@@ -422,8 +429,8 @@ curl -s -X POST http://localhost:8000/redact \
   -H 'content-type: application/json' \
   -d '{"text":"연락처: 010-1234-5678, 이메일: test@example.com"}'
 
-# 프록시 헬스체크
-bun run packages/proxy/bin/pii-remover-proxy.ts health
+# 프록시 헬스체크 (백엔드 /health와 동일 — 단일 서비스)
+curl -s http://localhost:8000/health
 
 # CLI 헬스체크
 node packages/cli/bin/pii-remover.js health

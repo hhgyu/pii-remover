@@ -87,8 +87,8 @@ LLM(OpenCode·Claude Code 등)에 PII가 평문으로 전송되지 않도록 **�
         ▼                        │
 +-----------------+              │
 | LLM Provider    │◀─────────────┘
-| (Anthropic API,│        ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1
-|  OpenAI, etc.)  │        OPENAI_API_BASE   =http://localhost:8765/openai/v1
+| (Anthropic API,│        ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
+|  OpenAI, etc.)  │        OPENAI_API_BASE   =http://localhost:8000/openai/v1
 +-----------------+        (path prefix로 프로바이더 라우팅)
 ```
 
@@ -551,10 +551,11 @@ export const PiiRemoverPlugin = async (ctx) => {
 #### 12.3.1 사용자 환경변수 (단일 포트, path 기반 라우팅)
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1
-export OPENAI_API_BASE=http://localhost:8765/openai/v1
+export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
+export OPENAI_API_BASE=http://localhost:8000/openai/v1
 
-pii-remover proxy start    # localhost:8765에서 단일 HTTP 서버 가동
+# 프록시는 백엔드와 같은 프로세스에서 서빙됨 (Python 포팅, 단일 포트 8000)
+docker compose -f packages/backend/docker-compose.yml up -d
 ```
 
 **path prefix → 업스트림 매핑**:
@@ -704,7 +705,7 @@ pii-remover/
 │   │
 │   ├── proxy/                        # @pii-remover/proxy
 │   │   ├── src/
-│   │   │   ├── server.ts              # HTTP 서버 (Bun, 127.0.0.1:8765)
+│   │   │   ├── server.ts              # HTTP 서버 (레퍼런스 구현; 런타임은 packages/backend)
 │   │   │   ├── router.ts              # path prefix → provider 라우팅
 │   │   │   ├── providers/
 │   │   │   │   ├── anthropic.ts       # /v1/messages 변환

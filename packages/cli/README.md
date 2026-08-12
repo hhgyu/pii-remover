@@ -81,7 +81,7 @@ and prints a warning telling you to install the plugin before re-running.
 
 ```bash
 pii-remover install --target codex \
-  --proxy-url http://localhost:8765/codex/v1
+  --proxy-url http://localhost:8000/codex/v1
 ```
 
 Writes:
@@ -105,16 +105,16 @@ node packages/cli/bin/pii-remover.js detect --text "test user@example.com"
 ### Start the proxy (required for masking)
 
 ```bash
-pii-remover-proxy start
+docker compose -f packages/backend/docker-compose.yml up -d
 ```
 
 Per-host base-URL setup:
 
 | Host | Setup |
 | --- | --- |
-| Claude Code | `export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1` |
+| Claude Code | `export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1` |
 | OpenCode | proxy optional if the plugin is active (plugin alone covers most cases) |
-| Codex | set `openai_base_url = "http://localhost:8765/codex/v1"` in `~/.codex/config.toml` |
+| Codex | set `openai_base_url = "http://localhost:8000/codex/v1"` in `~/.codex/config.toml` |
 
 ## CLI
 

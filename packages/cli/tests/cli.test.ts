@@ -329,6 +329,6 @@ describe("runCli — help text mentions new lifecycle flags", () => {
   });
 
   test("helpText snapshot includes default port", () => {
-    expect(helpText()).toContain("8765");
+    expect(helpText()).toContain("8000");
   });
 });

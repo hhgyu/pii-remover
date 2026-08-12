@@ -15,7 +15,7 @@
     ]
   },
   "_env_hint": {
-    "ANTHROPIC_BASE_URL": "http://localhost:8765/anthropic/v1",
+    "ANTHROPIC_BASE_URL": "http://localhost:8000/anthropic/v1",
     "_PII_REMOVER_PROXY_TRUST": "set to '1' to skip the localhost-URL check if a proxy is already running elsewhere (advanced, see ADR-0012 risks)",
     "_PII_REMOVER_BYPASS": "set to '1' to disable masking entirely — NOT recommended; the hook will allow all prompts and the proxy will pass through unchanged"
   }

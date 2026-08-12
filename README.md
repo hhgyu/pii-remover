@@ -52,8 +52,8 @@ docker compose up --build   # ~5-10 min the first time (model weights)
 **Claude Code**:
 ```bash
 npx @pii-remover/cli install --target claude-code
-pii-remover-proxy start &
-export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1
+docker compose -f packages/backend/docker-compose.yml up -d
+export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
 ```
 
 **OpenCode**:
@@ -68,8 +68,8 @@ Re-running is idempotent and survives hand-edits to the array.
 
 **OpenAI Codex CLI**:
 ```bash
-npx @pii-remover/cli install --target codex --proxy-url http://localhost:8765/codex/v1
-pii-remover-proxy start &
+npx @pii-remover/cli install --target codex --proxy-url http://localhost:8000/codex/v1
+docker compose -f packages/backend/docker-compose.yml up -d
 export PII_REMOVER_PROXY_TRUST=1
 ```
 
@@ -142,7 +142,7 @@ Set in `pii-remover.json` (same shape as the default config — see [`packages/c
 }
 ```
 
-When `auto_start: true`, the plugin / `pii-remover-proxy start` / `pii-remover hook`:
+When `auto_start: true`, the plugin / `docker compose -f packages/backend/docker-compose.yml up -d` / `pii-remover hook`:
 1. Probes `<endpoint>/health` (1.5s timeout) — if already healthy, skips spawn.
 2. Otherwise runs `docker compose -f <resolved-path> up -d`.
 3. Polls `/health` until `model_loaded: true` (or `start_timeout_ms` elapses).
@@ -257,8 +257,8 @@ Audit logging records PII processing events (mask/restore/bypass/block/error) to
 
 Runtime toggle (overrides config):
 ```bash
-PII_REMOVER_AUDIT=true  pii-remover-proxy start   # force on
-PII_REMOVER_AUDIT=false pii-remover-proxy start   # force off
+PII_REMOVER_AUDIT=true  docker compose -f packages/backend/docker-compose.yml up -d   # force on
+PII_REMOVER_AUDIT=false docker compose -f packages/backend/docker-compose.yml up -d   # force off
 ```
 
 Sample entry:

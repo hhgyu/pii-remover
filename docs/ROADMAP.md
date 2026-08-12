@@ -146,8 +146,8 @@
   - `proxy.upstream.{anthropic, openai}` (azure openai 등 override)
   - `proxy.streaming.{enabled, buffer_window, flush_on_close}`
   - 환경변수 안내:
-    - `ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1`
-    - `OPENAI_API_BASE=http://localhost:8765/openai/v1`
+    - `ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1`
+    - `OPENAI_API_BASE=http://localhost:8000/openai/v1`
 - Vault 세션 관리:
   - 프록시 단위 vault, 멀티 프로바이더 간 공유 (한 프로젝트가 Anthropic + OpenAI 혼용 시 같은 PII 매핑)
 - 통합 테스트:
@@ -212,7 +212,7 @@
 - [x] 1초 이내 cold-start — Bun compile windows-x64 바이너리 실측 (2026-05-13): `version` 71ms (mean of 5), `hook` empty prompt 121ms, `hook` with PII detection 127ms. 모두 ≪ 1000ms ✅
 
 **Success Metric**:
-- 사용자 셋업 시간 ≤ 5분 (README 따라 실행 — `pii-remover install --target claude-code` + `pii-remover-proxy start` + `ANTHROPIC_BASE_URL` 설정)
+- 사용자 셋업 시간 ≤ 5분 (README 따라 실행 — `pii-remover install --target claude-code` + `docker compose up -d` + `ANTHROPIC_BASE_URL` 설정)
 - Claude Code 평소 워크플로에서 사용자 체감 지연 추가 ≤ 200ms
 
 **Phase 4 변경 사항 (ADR-0012)**:

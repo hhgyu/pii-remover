@@ -209,7 +209,7 @@ export const DEFAULT_CONFIG: PiiRemoverConfig = {
   bypass_env: "PII_REMOVER_BYPASS",
   proxy: {
     enabled: false,
-    port: 8765,
+    port: 8000,
     upstream: {
       anthropic: "https://api.anthropic.com",
       openai: "https://api.openai.com",

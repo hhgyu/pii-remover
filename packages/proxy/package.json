@@ -1,8 +1,9 @@
 {
   "name": "@pii-remover/proxy",
   "version": "0.0.1",
-  "description": "Local LLM proxy — masks PII before Anthropic/OpenAI requests and restores tokens in responses (Phase 3A: non-streaming only).",
+  "description": "Reference implementation of the PII masking proxy. The shipped runtime is the Python port in packages/backend; this package is retained, unpublished, as the source of truth for the golden vectors that prove the port correct (scripts/gen-*-vectors.ts) and for the eval harness's streaming mutator.",
   "license": "Apache-2.0",
+  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,14 +17,10 @@
   "files": [
     "dist",
     "src",
-    "bin",
     "README.md",
     "LICENSE",
     "NOTICE"
   ],
-  "bin": {
-    "pii-remover-proxy": "./bin/pii-remover-proxy.ts"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -36,10 +33,6 @@
     "@types/bun": "^1.1.14",
     "@types/node": "^22.10.0",
     "typescript": "^5.9.3"
-  },
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
   },
   "engines": {
     "bun": ">=1.0.0",

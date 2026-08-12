@@ -32,7 +32,7 @@ This adds `@pii-remover/opencode-plugin` to your `opencode.json` plugin array. T
 
 ```bash
 npx @pii-remover/cli install --target codex \
-  --proxy-url http://localhost:8765/codex/v1 \
+  --proxy-url http://localhost:8000/codex/v1 \
   --endpoint http://localhost:8000/redact \
   --categories private_person,private_email,private_phone,private_address,account_number,private_date,private_url,secret,rrn,biz_num,card
 ```
@@ -97,7 +97,7 @@ Fail-closed contract: when `--auto-start` is set and the backend cannot be broug
 The hook detects PII but cannot rewrite prompts — the proxy does the actual masking at the HTTP layer:
 
 ```bash
-pii-remover-proxy start
+docker compose -f packages/backend/docker-compose.yml up -d
 ```
 
 ### Proxy mode: let the installer wire the base URL
@@ -113,9 +113,9 @@ npx @pii-remover/cli install --target codex       --proxy
 
 | Host | Key the installer writes | Value |
 | --- | --- | --- |
-| Claude Code | `env.ANTHROPIC_BASE_URL` in `settings.json` | `http://localhost:8765/anthropic/v1` |
-| OpenCode | `provider.anthropic.options.baseURL` in `opencode.json` | `http://localhost:8765/anthropic/v1` |
-| Codex | `openai_base_url` in `config.toml` | `http://localhost:8765/codex/v1` |
+| Claude Code | `env.ANTHROPIC_BASE_URL` in `settings.json` | `http://localhost:8000/anthropic/v1` |
+| OpenCode | `provider.anthropic.options.baseURL` in `opencode.json` | `http://localhost:8000/anthropic/v1` |
+| Codex | `openai_base_url` in `config.toml` | `http://localhost:8000/codex/v1` |
 
 The route prefix differs per upstream API and is derived from `--target`, so it
 cannot be mismatched. Use `--proxy-url <url>` instead of `--proxy` to point at a
@@ -130,9 +130,9 @@ Manual setup, if you prefer not to let the installer touch host config:
 
 | Host | Configuration |
 | --- | --- |
-| Claude Code | `export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1` |
+| Claude Code | `export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1` |
 | OpenCode | plugin handles masking directly (proxy optional) |
-| Codex | `openai_base_url = "http://localhost:8765/codex/v1"` in `~/.codex/config.toml` |
+| Codex | `openai_base_url = "http://localhost:8000/codex/v1"` in `~/.codex/config.toml` |
 
 Without the proxy, the hook **blocks** any prompt containing PII (fail-closed).
 With the proxy, PII is masked before the request leaves your machine.

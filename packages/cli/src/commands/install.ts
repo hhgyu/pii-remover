@@ -487,7 +487,7 @@ function buildProxyNextSteps(
     return [
       `Proxy mode: ${location} = ${proxyUrl}`,
       `   Traffic routes through the local proxy on the next start — no manual export needed.`,
-      `   Start it first: pii-remover-proxy start`,
+          `   Start it first: docker compose -f packages/backend/docker-compose.yml up -d`,
     ];
   }
   return [
@@ -681,9 +681,9 @@ function buildNextSteps(
     `1) Hook installed. Test it:`,
     `   echo '{"hook_event_name":"UserPromptSubmit","prompt":"test email user@example.com","session_id":"s","transcript_path":"","cwd":"","permission_mode":"default"}' | ${runCmd} hook`,
     "",
-    `2) Start the local proxy (required for actual masking):`,
-    `   pii-remover-proxy start`,
-    `   # listens on http://127.0.0.1:${DEFAULT_PROXY_PORT}`,
+        `2) Start the backend (detection + proxy, required for actual masking):`,
+        `   docker compose -f packages/backend/docker-compose.yml up -d`,
+        `   # serves both on http://127.0.0.1:${DEFAULT_PROXY_PORT}`,
     "",
     ...pointAtProxy,
     "",

@@ -217,9 +217,9 @@ describe("runInstall", () => {
       fs,
     });
     const joined = r.next_steps.join("\n");
-    expect(joined).toContain("pii-remover-proxy start");
+    expect(joined).toContain("docker compose");
     expect(joined).toContain("ANTHROPIC_BASE_URL=");
-    expect(joined).toContain("8765");
+    expect(joined).toContain("8000");
   });
 
   test("piiConfig writes .pii-remover.json", async () => {
@@ -612,9 +612,9 @@ describe("runOpenCodeInstall split-mode", () => {
 
 describe("defaultProxyUrl", () => {
   test("routes anthropic hosts to /anthropic/v1 and codex to /codex/v1", () => {
-    expect(defaultProxyUrl("claude-code")).toBe("http://localhost:8765/anthropic/v1");
-    expect(defaultProxyUrl("opencode")).toBe("http://localhost:8765/anthropic/v1");
-    expect(defaultProxyUrl("codex")).toBe("http://localhost:8765/codex/v1");
+    expect(defaultProxyUrl("claude-code")).toBe("http://localhost:8000/anthropic/v1");
+    expect(defaultProxyUrl("opencode")).toBe("http://localhost:8000/anthropic/v1");
+    expect(defaultProxyUrl("codex")).toBe("http://localhost:8000/codex/v1");
   });
 
   test("honours a custom port", () => {

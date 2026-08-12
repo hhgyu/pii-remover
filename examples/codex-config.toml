@@ -1,7 +1,7 @@
 # Example ~/.codex/config.toml for use with @pii-remover/cli.
 #
 # Generated style (closely matches what `pii-remover install --target codex
-# --proxy-url http://localhost:8765/codex/v1` would produce). Adapt to your
+# --proxy-url http://localhost:8000/codex/v1` would produce). Adapt to your
 # environment before use.
 #
 # See:
@@ -11,7 +11,7 @@
 # Route Codex Responses API calls through the local PII Remover proxy.
 # Codex has no env-var override for the base URL, so this MUST be set in
 # config.toml (not as an environment variable).
-openai_base_url = "http://localhost:8765/codex/v1"
+openai_base_url = "http://localhost:8000/codex/v1"
 
 # Optional: pick a model.
 # model = "o1"

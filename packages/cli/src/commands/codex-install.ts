@@ -40,7 +40,7 @@ export interface CodexInstallOptions {
   commandPath: string;
   /**
    * Local proxy base URL to write into `openai_base_url`. Typical value:
-   *   `http://localhost:8765/codex/v1`
+   *   `http://localhost:8000/codex/v1`
    * If omitted, `openai_base_url` is left alone and the install only patches
    * the hook block (user must set the base URL manually).
    */
@@ -331,9 +331,9 @@ function buildCodexNextSteps(
     `1) Hook installed for Codex. Test it:`,
     `   echo '{"hook_event_name":"UserPromptSubmit","prompt":"test email user@example.com","session_id":"s","transcript_path":"","cwd":"","permission_mode":"default"}' | ${runCmd} hook`,
     "",
-    `2) Start the local proxy (required for actual masking):`,
-    `   pii-remover-proxy start`,
-    `   # listens on http://127.0.0.1:${DEFAULT_PROXY_PORT}`,
+        `2) Start the backend (detection + proxy, required for actual masking):`,
+        `   docker compose -f packages/backend/docker-compose.yml up -d`,
+        `   # serves both on http://127.0.0.1:${DEFAULT_PROXY_PORT}`,
     "",
   ];
   if (proxyUrl && !baseUrlAlreadySet) {

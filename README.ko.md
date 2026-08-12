@@ -52,8 +52,8 @@ docker compose up --build   # 초회 ~5-10분 (모델 weights 다운로드)
 **Claude Code**:
 ```bash
 npx @pii-remover/cli install --target claude-code
-pii-remover-proxy start &
-export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1
+docker compose -f packages/backend/docker-compose.yml up -d
+export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
 ```
 
 **OpenCode** (단일 plugin 라인이면 끝):
@@ -66,8 +66,8 @@ export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1
 
 **OpenAI Codex CLI**:
 ```bash
-npx @pii-remover/cli install --target codex --proxy-url http://localhost:8765/codex/v1
-pii-remover-proxy start &
+npx @pii-remover/cli install --target codex --proxy-url http://localhost:8000/codex/v1
+docker compose -f packages/backend/docker-compose.yml up -d
 export PII_REMOVER_PROXY_TRUST=1
 ```
 
@@ -209,8 +209,8 @@ PII 처리 이벤트(mask/restore/bypass/block/error)를 JSONL 파일로 기록 
 
 런타임 토글 (config보다 우선):
 ```bash
-PII_REMOVER_AUDIT=true  pii-remover-proxy start   # 강제 켜기
-PII_REMOVER_AUDIT=false pii-remover-proxy start   # 강제 끄기
+PII_REMOVER_AUDIT=true  docker compose -f packages/backend/docker-compose.yml up -d   # 강제 켜기
+PII_REMOVER_AUDIT=false docker compose -f packages/backend/docker-compose.yml up -d   # 강제 끄기
 ```
 
 출력 예:

@@ -1,43 +1,32 @@
-# @pii-remover/proxy
+# @pii-remover/proxy — reference implementation (not shipped)
 
-Local LLM proxy that masks PII before Anthropic/OpenAI requests and restores
-the original values in responses — for both **non-streaming** and **SSE
-streaming** chat completions (Phase 3).
+> **This package is no longer a runtime.** The proxy that actually runs is the
+> Python port in [`packages/backend`](../backend), served on the same port as
+> detection (`8000`). Start it with
+> `docker compose -f packages/backend/docker-compose.yml up -d`.
+>
+> This package is kept, unpublished (`"private": true`), for two jobs that
+> nothing else can do:
+>
+> 1. **It is the source of truth for the golden vectors.**
+>    `scripts/gen-*-vectors.ts` import from here to generate the fixtures in
+>    `packages/backend/tests/fixtures/`, which are what prove the Python port
+>    byte-identical. Delete this package and the port becomes unverifiable.
+> 2. **The eval harness's streaming mutator** imports `findUnsafeBoundary` and
+>    `createStreamBuffer` from here.
+>
+> The `pii-remover-proxy` binary and its `start` / `health` commands were
+> removed along with `src/cli.ts`. The programmatic `startProxy()` remains for
+> the tests below.
+
+The sections that follow describe the TypeScript behaviour that the Python port
+reproduces. They are the specification the parity tests check against.
 
 - **License**: Apache-2.0
 - **Related ADRs**:
   - [ADR-0004](../../docs/ADR/0004-local-llm-proxy-streaming.md) — proxy architecture, path-prefix routing, streaming algorithm
   - [ADR-0005](../../docs/ADR/0005-backend-strategy-trust-tiers.md) — backend trust tiers
   - [ADR-0011](../../docs/ADR/0011-message-part-updated-feasibility.md) — why both proxy & OpenCode plugin
-
-## Quick start (CLI)
-
-```bash
-bun run --cwd packages/proxy ./bin/pii-remover-proxy.ts start
-# pii-remover-proxy listening on http://127.0.0.1:8765
-```
-
-Then point your LLM client at the proxy:
-
-```bash
-export ANTHROPIC_BASE_URL=http://localhost:8765/anthropic/v1
-export OPENAI_API_BASE=http://localhost:8765/openai/v1
-```
-
-That's all. Stream-style chats (`stream: true`) and plain completions both
-round-trip through the proxy: PII tokens go out, real values come back.
-
-### CLI commands
-
-| Command | Purpose |
-| --- | --- |
-| `start` | Start the proxy in the foreground (`Ctrl+C` to stop) |
-| `health` | `GET /health` on a running proxy and print the JSON body |
-| `version` | Print the package version |
-| `help` | Print usage |
-
-Flags: `--port <n>` (default 8765), `--host <h>` (default 127.0.0.1),
-`--config <file>` (path to `.pii-remover.json`), `--url <u>` (for `health`).
 
 ## Path-prefix routing
 
@@ -138,7 +127,7 @@ Implemented:
 - Anthropic / OpenAI **non-streaming + streaming** round-trip
 - Token-boundary buffering for SSE deltas (ADR-0004 §12.3.3)
 - Multi-provider shared vault
-- CLI (`pii-remover-proxy start/health/version`)
+- ~~CLI (`pii-remover-proxy start/health/version`)~~ — removed; the runtime is now `packages/backend`
 - Header pass-through + redaction-on-log
 
 Coming in **Phase 4** ([ROADMAP](../../docs/ROADMAP.md#phase-4--claude-code-hook-통합)):

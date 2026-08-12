@@ -58,7 +58,7 @@ describe("runHealthCommand", () => {
     expect(urls[0]).toBe("http://127.0.0.1:7777/health");
   });
 
-  test("missing env emits stderr warning + defaults to 8765", async () => {
+  test("missing env emits stderr warning + defaults to 8000", async () => {
     const out: string[] = [];
     const err: string[] = [];
     const urls: string[] = [];
@@ -73,7 +73,7 @@ describe("runHealthCommand", () => {
       fetchFn,
     });
     expect(err.join("")).toContain("ANTHROPIC_BASE_URL not set");
-    expect(urls[0]).toBe("http://127.0.0.1:8765/health");
+    expect(urls[0]).toBe("http://127.0.0.1:8000/health");
   });
 
   test("fetch failure -> exit 2", async () => {
