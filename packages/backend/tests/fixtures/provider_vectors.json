@@ -1,0 +1,852 @@
+{
+  "_generated_by": "scripts/gen-provider-vectors.ts",
+  "_contract": "Python must produce identical request/response bodies given the same trivial codec. Field order matters: these are compared as parsed JSON, but the proxy re-serialises them, so a reordered key changes the bytes on the wire.",
+  "setup": {
+    "secret": "pii-remover-baseline-secret",
+    "session_id": "provider-session",
+    "detections": [
+      {
+        "category": "private_person",
+        "text": "김철수"
+      },
+      {
+        "category": "private_email",
+        "text": "alice@example.com"
+      },
+      {
+        "category": "private_phone",
+        "text": "010-1234-5678"
+      }
+    ],
+    "pii_table": [
+      [
+        "alice@example.com",
+        "__OPF_EMAIL__4ov1qksihef66la1__"
+      ],
+      [
+        "010-1234-5678",
+        "__OPF_PHONE__4ov3lglyfs7qftua__"
+      ],
+      [
+        "김철수",
+        "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+      ]
+    ],
+    "placeholder_note": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+  },
+  "anthropic": {
+    "requests": [
+      {
+        "name": "string-content",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": "저는 김철수입니다"
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": "저는 __OPF_PERSON__4ov9mhqtc1vepqf5__입니다"
+            }
+          ],
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      },
+      {
+        "name": "block-content",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "메일은 alice@example.com"
+                },
+                {
+                  "type": "image",
+                  "source": {
+                    "type": "base64",
+                    "data": "AAAA",
+                    "media_type": "image/png"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "메일은 __OPF_EMAIL__4ov1qksihef66la1__"
+                },
+                {
+                  "type": "image",
+                  "source": {
+                    "type": "base64",
+                    "data": "AAAA",
+                    "media_type": "image/png"
+                  }
+                }
+              ]
+            }
+          ],
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      },
+      {
+        "name": "system-string",
+        "input": {
+          "model": "m",
+          "system": "돕는 도우미. 김철수 담당.",
+          "messages": []
+        },
+        "expected": {
+          "model": "m",
+          "system": "돕는 도우미. __OPF_PERSON__4ov9mhqtc1vepqf5__ 담당.\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written.",
+          "messages": []
+        }
+      },
+      {
+        "name": "system-array",
+        "input": {
+          "model": "m",
+          "system": [
+            {
+              "type": "text",
+              "text": "연락처 010-1234-5678"
+            }
+          ],
+          "messages": []
+        },
+        "expected": {
+          "model": "m",
+          "system": [
+            {
+              "type": "text",
+              "text": "연락처 __OPF_PHONE__4ov3lglyfs7qftua__"
+            },
+            {
+              "type": "text",
+              "text": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ],
+          "messages": []
+        }
+      },
+      {
+        "name": "system-already-noted",
+        "input": {
+          "model": "m",
+          "system": [
+            {
+              "type": "text",
+              "text": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ],
+          "messages": []
+        },
+        "expected": {
+          "model": "m",
+          "system": [
+            {
+              "type": "text",
+              "text": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ],
+          "messages": []
+        }
+      },
+      {
+        "name": "no-system",
+        "input": {
+          "model": "m",
+          "messages": []
+        },
+        "expected": {
+          "model": "m",
+          "messages": [],
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      },
+      {
+        "name": "non-text-block-passthrough",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "thinking"
+                }
+              ]
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "thinking"
+                }
+              ]
+            }
+          ],
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      }
+    ],
+    "responses": [
+      {
+        "name": "text-block",
+        "input": {
+          "content": [
+            {
+              "type": "text",
+              "text": "안녕 __OPF_PERSON__4ov9mhqtc1vepqf5__"
+            }
+          ]
+        },
+        "expected": {
+          "content": [
+            {
+              "type": "text",
+              "text": "안녕 김철수"
+            }
+          ]
+        }
+      },
+      {
+        "name": "tool-use-input",
+        "input": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "t1",
+              "name": "send",
+              "input": {
+                "to": "__OPF_EMAIL__4ov1qksihef66la1__",
+                "cc": [
+                  "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                ]
+              }
+            }
+          ]
+        },
+        "expected": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "t1",
+              "name": "send",
+              "input": {
+                "to": "alice@example.com",
+                "cc": [
+                  "김철수"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "no-content",
+        "input": {
+          "id": "x"
+        },
+        "expected": {
+          "id": "x"
+        }
+      },
+      {
+        "name": "unknown-block",
+        "input": {
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+            }
+          ]
+        },
+        "expected": {
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "openai": {
+    "requests": [
+      {
+        "name": "string-content-no-system",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": "김철수 010-1234-5678"
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            },
+            {
+              "role": "user",
+              "content": "__OPF_PERSON__4ov9mhqtc1vepqf5__ __OPF_PHONE__4ov3lglyfs7qftua__"
+            }
+          ]
+        }
+      },
+      {
+        "name": "with-system",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "너는 조수다"
+            },
+            {
+              "role": "user",
+              "content": "alice@example.com 로 보내"
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "너는 조수다\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            },
+            {
+              "role": "user",
+              "content": "__OPF_EMAIL__4ov1qksihef66la1__ 로 보내"
+            }
+          ]
+        }
+      },
+      {
+        "name": "two-systems-note-goes-to-last",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "first"
+            },
+            {
+              "role": "user",
+              "content": "hi"
+            },
+            {
+              "role": "system",
+              "content": "second"
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "first"
+            },
+            {
+              "role": "user",
+              "content": "hi"
+            },
+            {
+              "role": "system",
+              "content": "second\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ]
+        }
+      },
+      {
+        "name": "system-already-noted",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ]
+        }
+      },
+      {
+        "name": "system-non-string-content",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "김철수"
+                }
+              ]
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                }
+              ]
+            },
+            {
+              "role": "system",
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ]
+        }
+      },
+      {
+        "name": "parts-content",
+        "input": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "메일 alice@example.com"
+                },
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "https://x/y.png"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "메일 __OPF_EMAIL__4ov1qksihef66la1__"
+                },
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "https://x/y.png"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "empty-messages",
+        "input": {
+          "model": "m",
+          "messages": []
+        },
+        "expected": {
+          "model": "m",
+          "messages": [
+            {
+              "role": "system",
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+            }
+          ]
+        }
+      }
+    ],
+    "responses": [
+      {
+        "name": "string-content",
+        "input": {
+          "choices": [
+            {
+              "message": {
+                "content": "안녕 __OPF_PERSON__4ov9mhqtc1vepqf5__"
+              }
+            }
+          ]
+        },
+        "expected": {
+          "choices": [
+            {
+              "message": {
+                "content": "안녕 김철수"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "array-content",
+        "input": {
+          "choices": [
+            {
+              "message": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "__OPF_EMAIL__4ov1qksihef66la1__"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "expected": {
+          "choices": [
+            {
+              "message": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "alice@example.com"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "tool-calls",
+        "input": {
+          "choices": [
+            {
+              "message": {
+                "tool_calls": [
+                  {
+                    "id": "c1",
+                    "function": {
+                      "name": "send",
+                      "arguments": "{\"to\":\"__OPF_EMAIL__4ov1qksihef66la1__\"}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "expected": {
+          "choices": [
+            {
+              "message": {
+                "tool_calls": [
+                  {
+                    "id": "c1",
+                    "function": {
+                      "name": "send",
+                      "arguments": "{\"to\":\"alice@example.com\"}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "tool-calls-invalid-json",
+        "input": {
+          "choices": [
+            {
+              "message": {
+                "tool_calls": [
+                  {
+                    "function": {
+                      "name": "x",
+                      "arguments": "bare __OPF_PERSON__4ov9mhqtc1vepqf5__"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "expected": {
+          "choices": [
+            {
+              "message": {
+                "tool_calls": [
+                  {
+                    "function": {
+                      "name": "x",
+                      "arguments": "bare 김철수"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "no-choices",
+        "input": {
+          "id": "x"
+        },
+        "expected": {
+          "id": "x"
+        }
+      }
+    ]
+  },
+  "codex": {
+    "requests": [
+      {
+        "name": "instructions-and-string-input",
+        "input": {
+          "model": "m",
+          "instructions": "김철수를 도와라",
+          "input": "alice@example.com 확인"
+        },
+        "expected": {
+          "model": "m",
+          "instructions": "__OPF_PERSON__4ov9mhqtc1vepqf5__를 도와라\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written.",
+          "input": "__OPF_EMAIL__4ov1qksihef66la1__ 확인"
+        }
+      },
+      {
+        "name": "no-instructions",
+        "input": {
+          "model": "m",
+          "input": "김철수"
+        },
+        "expected": {
+          "model": "m",
+          "input": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      },
+      {
+        "name": "input-items-content",
+        "input": {
+          "model": "m",
+          "input": [
+            {
+              "type": "message",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "전화 010-1234-5678"
+                }
+              ]
+            },
+            {
+              "type": "message",
+              "content": [
+                {
+                  "type": "other",
+                  "text": "김철수"
+                }
+              ]
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "input": [
+            {
+              "type": "message",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "전화 __OPF_PHONE__4ov3lglyfs7qftua__"
+                }
+              ]
+            },
+            {
+              "type": "message",
+              "content": [
+                {
+                  "type": "other",
+                  "text": "김철수"
+                }
+              ]
+            }
+          ],
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      },
+      {
+        "name": "input-item-arguments-NOT-masked",
+        "input": {
+          "model": "m",
+          "input": [
+            {
+              "type": "function_call",
+              "arguments": "{\"to\":\"alice@example.com\"}"
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "input": [
+            {
+              "type": "function_call",
+              "arguments": "{\"to\":\"alice@example.com\"}"
+            }
+          ],
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      },
+      {
+        "name": "input-item-arguments-invalid-json",
+        "input": {
+          "model": "m",
+          "input": [
+            {
+              "type": "function_call",
+              "arguments": "not json 김철수"
+            }
+          ]
+        },
+        "expected": {
+          "model": "m",
+          "input": [
+            {
+              "type": "function_call",
+              "arguments": "not json 김철수"
+            }
+          ],
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+        }
+      }
+    ],
+    "responses": [
+      {
+        "name": "output-text-parts",
+        "input": {
+          "output": [
+            {
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "안녕 __OPF_PERSON__4ov9mhqtc1vepqf5__"
+                }
+              ]
+            }
+          ]
+        },
+        "expected": {
+          "output": [
+            {
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "안녕 김철수"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "name": "output-arguments",
+        "input": {
+          "output": [
+            {
+              "arguments": "{\"to\":\"__OPF_EMAIL__4ov1qksihef66la1__\"}"
+            }
+          ]
+        },
+        "expected": {
+          "output": [
+            {
+              "arguments": "{\"to\":\"alice@example.com\"}"
+            }
+          ]
+        }
+      },
+      {
+        "name": "output-text-top-level",
+        "input": {
+          "output_text": "연락 __OPF_EMAIL__4ov1qksihef66la1__"
+        },
+        "expected": {
+          "output_text": "연락 alice@example.com"
+        }
+      },
+      {
+        "name": "non-restorable-part-type",
+        "input": {
+          "output": [
+            {
+              "content": [
+                {
+                  "type": "refusal",
+                  "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                }
+              ]
+            }
+          ]
+        },
+        "expected": {
+          "output": [
+            {
+              "content": [
+                {
+                  "type": "refusal",
+                  "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -7,15 +7,14 @@ name = "pii-remover-backend"
 version = "0.0.1"
 description = "FastAPI HTTP backend wrapping openai/privacy-filter for the pii-remover project (gh0stkey OPF API compatible)."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = { text = "Apache-2.0" }
 authors = [{ name = "pii-remover contributors" }]
 keywords = ["pii", "privacy", "redaction", "opf", "fastapi", "huggingface"]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: POSIX :: Linux",
     "Framework :: FastAPI",
     "Topic :: Security",
@@ -24,6 +23,7 @@ dependencies = [
     "fastapi>=0.115,<0.117",
     "uvicorn[standard]>=0.30,<0.33",
     "pydantic>=2.7,<3",
+    "httpx>=0.27,<1",
     "transformers>=4.55",
     "huggingface_hub>=0.24",
     "onnxruntime>=1.18,<2",
@@ -48,7 +48,7 @@ Source = "https://github.com/hhgyu/pii-remover"
 Issues = "https://github.com/hhgyu/pii-remover/issues"
 
 [tool.setuptools]
-packages = ["server", "server.api"]
+packages = ["server", "server.api", "server.pii"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -62,7 +62,7 @@ markers = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "PL", "RUF"]
@@ -92,7 +92,7 @@ ignore = ["PLR0913"]
 ]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true

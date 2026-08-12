@@ -17,7 +17,7 @@
 # (not committed to the image), so re-builds reuse them when source layers
 # are unchanged.
 
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.14
 ARG OPF_MODEL_ID=openai/privacy-filter
 ARG KNER_MODEL_ID=soddokayo/koelectra-base-klue-ner
 
@@ -125,6 +125,7 @@ ARG OPF_MODEL_ID
 ARG KNER_MODEL_ID
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHON_JIT=1 \
     UV_SYSTEM_PYTHON=1 \
     UV_LINK_MODE=copy \
     HF_HOME=/home/app/.cache/huggingface \

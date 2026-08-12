@@ -15,8 +15,11 @@
 # in the published image. BuildKit cache mounts on /root/.cache/uv and
 # /root/.cache/huggingface keep pip/HF downloads in build-time cache only.
 
-ARG CUDA_IMAGE=nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
-ARG PYTHON_VERSION=3.11
+# Ubuntu 24.04 rather than 22.04 so the base is current; CUDA deliberately stays
+# on 12.x because onnxruntime-gpu ships cu12 builds. Moving to a CUDA 13 tag
+# would need an ORT build to match, and raises the host driver floor again.
+ARG CUDA_IMAGE=nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04
+ARG PYTHON_VERSION=3.14
 ARG OPF_MODEL_ID=openai/privacy-filter
 ARG KNER_MODEL_ID=soddokayo/koelectra-base-klue-ner
 
@@ -127,11 +130,15 @@ FROM ${CUDA_IMAGE} AS runtime
 
 ARG OPF_MODEL_ID
 ARG KNER_MODEL_ID
+ARG PYTHON_VERSION
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_SYSTEM_PYTHON=1 \
+    PYTHON_JIT=1 \
+    UV_PYTHON_INSTALL_DIR=/opt/python \
     UV_LINK_MODE=copy \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
     HF_HOME=/home/app/.cache/huggingface \
     OPF_DEVICE=cuda \
     OPF_HOST=0.0.0.0 \
@@ -148,22 +155,29 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        python3.11 python3-pip \
         ca-certificates curl \
         tesseract-ocr tesseract-ocr-eng tesseract-ocr-kor \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3.11 /usr/local/bin/python \
-    && ln -sf /usr/bin/python3.11 /usr/local/bin/python3 \
     && groupadd --system app \
     && useradd --system --gid app --home /home/app --create-home app
 
 WORKDIR /app
 
+# Python comes from uv, not apt: Ubuntu 24.04 only ships 3.12 and this image
+# tracks the CPU image's 3.14. Two constraints the obvious version gets wrong:
+#   - UV_PYTHON_INSTALL_DIR must stay outside /root, which is mode 700, or the
+#     `app` user cannot traverse to the interpreter.
+#   - Packages go into a venv, not the managed interpreter: uv marks its own
+#     Python EXTERNALLY-MANAGED and refuses to install into it.
 COPY requirements-gpu.txt requirements.txt
 RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv \
     --mount=type=cache,target=/root/.cache/uv,sharing=locked \
-    uv pip install -r requirements.txt
+    uv python install "${PYTHON_VERSION}" \
+    && uv venv --python "${PYTHON_VERSION}" /opt/venv \
+    && uv pip install --python /opt/venv/bin/python -r requirements.txt \
+    && chmod -R a+rX /opt/python /opt/venv \
+    && python -VV
 
 COPY --from=opf-weights --chown=app:app /models/opf-int8 /models/opf-int8
 COPY --from=kner-export --chown=app:app /models/klue-ner-int8 /models/klue-ner-int8

@@ -23,6 +23,7 @@ from fastapi import FastAPI, Request, Response
 
 from . import __version__
 from .api import health as health_api
+from .api import proxy as proxy_api
 from .api import redact as redact_api
 from .api import redact_image as redact_image_api
 from .api import warmup as warmup_api
@@ -46,9 +47,7 @@ async def _idle_unload_monitor(app: FastAPI) -> None:
     if timeout <= 0:
         log.info("idle-unload monitor disabled (OPF_IDLE_TIMEOUT_SECONDS=0)")
         return
-    log.info(
-        "idle-unload monitor running timeout=%ds interval=%ds", timeout, interval
-    )
+    log.info("idle-unload monitor running timeout=%ds interval=%ds", timeout, interval)
     try:
         while True:
             await asyncio.sleep(interval)
@@ -119,9 +118,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
             kner_runner.load()
         except Exception:
-            log.exception(
-                "Korean NER preload failed; /redact will lazy-load Korean NER"
-            )
+            log.exception("Korean NER preload failed; /redact will lazy-load Korean NER")
 
     monitor_task: asyncio.Task[None] | None = None
     if settings.idle_timeout_seconds > 0:
@@ -134,6 +131,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             monitor_task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await monitor_task
+        client = getattr(app.state, "proxy_http_client", None)
+        if client is not None:
+            with contextlib.suppress(Exception):
+                await client.aclose()
+            app.state.proxy_http_client = None
+        pool = getattr(app.state, "proxy_session_pool", None)
+        if pool is not None:
+            with contextlib.suppress(Exception):
+                pool.dispose_all()
+            app.state.proxy_session_pool = None
         app.state.opf_runner = None
         app.state.korean_ner_runner = None
         app.state.ocr_pipeline = None
@@ -151,7 +158,7 @@ async def _track_redact_activity(
 
     response = await call_next(request)
     path = request.url.path
-    if path.startswith("/redact"):
+    if path.startswith("/redact") or path.startswith(proxy_api.PROXY_PATH_PREFIXES):
         request.app.state.last_request_at = time.monotonic()
         if getattr(request.app.state, "idle_unloaded", False):
             request.app.state.idle_unloaded = False
@@ -178,6 +185,8 @@ def create_app() -> FastAPI:
     app.include_router(warmup_api.router)
     app.include_router(redact_api.router)
     app.include_router(redact_image_api.router)
+    # MUST stay last: catch-all, shadows /health and /redact if moved up.
+    app.include_router(proxy_api.router)
     return app
 
 

@@ -58,27 +58,21 @@ def _env_int(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError as exc:
-        raise ValueError(
-            f"environment variable {name}={raw!r} is not a valid integer"
-        ) from exc
+        raise ValueError(f"environment variable {name}={raw!r} is not a valid integer") from exc
 
 
 def _normalise_device(raw: str) -> Device:
     lowered = raw.strip().lower()
     if lowered in ("cpu", "cuda", "mps"):
         return lowered  # type: ignore[return-value]
-    raise ValueError(
-        f"OPF_DEVICE must be one of cpu|cuda|mps, got {raw!r}"
-    )
+    raise ValueError(f"OPF_DEVICE must be one of cpu|cuda|mps, got {raw!r}")
 
 
 def _normalise_opf_variant(raw: str) -> OpfVariant:
     lowered = raw.strip().lower()
     if lowered in ("int8", "fp32"):
         return lowered  # type: ignore[return-value]
-    raise ValueError(
-        f"OPF_VARIANT must be one of int8|fp32, got {raw!r}"
-    )
+    raise ValueError(f"OPF_VARIANT must be one of int8|fp32, got {raw!r}")
 
 
 @dataclass(frozen=True)
@@ -130,9 +124,7 @@ def _env_float(name: str, default: float) -> float:
     try:
         return float(raw)
     except ValueError as exc:
-        raise ValueError(
-            f"environment variable {name}={raw!r} is not a valid float"
-        ) from exc
+        raise ValueError(f"environment variable {name}={raw!r} is not a valid float") from exc
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -140,6 +132,44 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None or raw == "":
         return default
     return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+_SECONDS_A_LONG_LLM_STREAM_MAY_RUN = 600.0
+
+
+@dataclass(frozen=True)
+class ProxySettings:
+    """LLM proxy configuration (ADR-0004), served from this same process."""
+
+    enabled: bool
+    anthropic_upstream: str
+    openai_upstream: str
+    codex_upstream: str
+    buffer_window: int
+    flush_on_close: bool
+    timeout_seconds: float
+
+
+@lru_cache(maxsize=1)
+def get_proxy_settings() -> ProxySettings:
+    """Return the proxy settings singleton.
+
+    ``enabled`` defaults to **off**. This image is also deployed standalone as a
+    shared detection backend (trust tier 2), and turning that into an outbound
+    LLM proxy by default would be a posture change nobody asked for: it would
+    start relaying callers' API keys to api.anthropic.com. The merged
+    single-service compose opts in explicitly via ``PII_PROXY_ENABLED=1``.
+    """
+
+    return ProxySettings(
+        enabled=_env_bool("PII_PROXY_ENABLED", False),
+        anthropic_upstream=_env_str("PII_PROXY_ANTHROPIC_UPSTREAM", "https://api.anthropic.com"),
+        openai_upstream=_env_str("PII_PROXY_OPENAI_UPSTREAM", "https://api.openai.com"),
+        codex_upstream=_env_str("PII_PROXY_CODEX_UPSTREAM", "https://api.openai.com"),
+        buffer_window=_env_int("PII_PROXY_BUFFER_WINDOW", 64),
+        flush_on_close=_env_bool("PII_PROXY_FLUSH_ON_CLOSE", True),
+        timeout_seconds=_env_float("PII_PROXY_TIMEOUT_SECONDS", _SECONDS_A_LONG_LLM_STREAM_MAY_RUN),
+    )
 
 
 @dataclass(frozen=True)
@@ -163,9 +193,7 @@ def get_korean_ner_settings() -> KoreanNerSettings:
         model_id=_env_str("KNER_MODEL_ID", "soddokayo/koelectra-base-klue-ner"),
         model_revision=os.environ.get("KNER_MODEL_REVISION") or None,
         hf_cache_dir=(
-            os.environ.get("KNER_HF_CACHE_DIR")
-            or os.environ.get("OPF_HF_CACHE_DIR")
-            or None
+            os.environ.get("KNER_HF_CACHE_DIR") or os.environ.get("OPF_HF_CACHE_DIR") or None
         ),
         onnx_model_path=os.environ.get("KNER_ONNX_PATH") or None,
         device=_normalise_device(_env_str("OPF_DEVICE", "cpu")),

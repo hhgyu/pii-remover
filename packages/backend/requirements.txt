@@ -1,6 +1,7 @@
 fastapi>=0.115,<0.117
 uvicorn[standard]>=0.30,<0.33
 pydantic>=2.7,<3
+httpx>=0.27,<1
 transformers>=4.55
 huggingface_hub>=0.24
 pytesseract>=0.3.10,<1

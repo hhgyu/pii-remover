@@ -13,6 +13,10 @@ services:
       OPF_HOST: 0.0.0.0
       OPF_PORT: "8000"
       OPF_LOG_LEVEL: info
+      PII_PROXY_ENABLED: "${PII_PROXY_ENABLED:-1}"
+      # Must match the host-side hook's key, or neither side can restore the
+      # other's tokens. Unset = fresh key per start, nothing survives a restart.
+      PII_REMOVER_TOKEN_KEY: "${PII_REMOVER_TOKEN_KEY:-}"
       OPF_IDLE_TIMEOUT_SECONDS: "${OPF_IDLE_TIMEOUT_SECONDS:-1800}"
       OPF_IDLE_CHECK_INTERVAL_SECONDS: "${OPF_IDLE_CHECK_INTERVAL_SECONDS:-60}"
       OPF_BATCH_MAX: "${OPF_BATCH_MAX:-256}"

@@ -67,6 +67,68 @@ docker compose -f docker-compose.gpu.yml up --build
 Requires a host with the NVIDIA Container Toolkit installed and a CUDA
 12.1-compatible driver.
 
+## LLM proxy (same port)
+
+This service also hosts the local LLM proxy (ADR-0004), so `docker compose up`
+brings up detection **and** the masking proxy as one container on one port.
+Providers are selected by path prefix:
+
+| Client sends to | Forwarded to | Body |
+| --- | --- | --- |
+| `POST /anthropic/v1/messages` | `api.anthropic.com/v1/messages` | masked / restored |
+| `POST /openai/v1/chat/completions` | `api.openai.com/v1/chat/completions` | masked / restored |
+| `POST /codex/v1/responses` | `api.openai.com/v1/responses` | masked / restored |
+| `/anthropic/api/*`, other `/openai/*`, `/codex/*` | same host | relayed untouched |
+
+Point your client at it:
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
+export OPENAI_API_BASE=http://localhost:8000/openai/v1
+```
+
+Streaming works: tokens split across SSE deltas are buffered and reassembled
+before restoration, so the client never sees a half-token.
+
+### Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PII_PROXY_ENABLED` | `0` | Master switch. **Off by default** — this image also ships as a standalone shared detection backend, and enabling an outbound proxy there would start relaying callers' API keys. The bundled compose sets it to `1`. |
+| `PII_REMOVER_TOKEN_KEY` | (unset) | Secret the token HMAC is derived from. Must match the host-side hook's key. |
+| `PII_PROXY_ANTHROPIC_UPSTREAM` | `https://api.anthropic.com` | Upstream override |
+| `PII_PROXY_OPENAI_UPSTREAM` | `https://api.openai.com` | Upstream override |
+| `PII_PROXY_CODEX_UPSTREAM` | `https://api.openai.com` | Upstream override |
+| `PII_PROXY_BUFFER_WINDOW` | `64` | SSE token-boundary lookback |
+| `PII_PROXY_TIMEOUT_SECONDS` | `600` | Upstream timeout; LLM streams run for minutes |
+
+### Two things that will bite you
+
+**Know what the published port exposes.** The bundled compose publishes
+`8000:8000`, i.e. on every interface. That was fine when this image only did
+detection; with `PII_PROXY_ENABLED=1` the same port also relays the caller's
+`Authorization` header upstream and serves PII vaults whose `X-PII-Session`
+header is *not* authenticated — any caller that reaches the port can name any
+session and read that vault back. There is no auth in front of it.
+
+On a machine that is not alone on a trusted network, pick one:
+
+```yaml
+ports:
+  - "127.0.0.1:8000:8000"   # single-user workstation: proxy stays local
+```
+
+```yaml
+environment:
+  PII_PROXY_ENABLED: "0"    # shared server: detection only, as before
+```
+
+**Set `PII_REMOVER_TOKEN_KEY`.** Tokens are `HMAC(key, category + text)`, so the
+key decides the token. The TypeScript hook running on the host and this
+container must derive the same key or neither can restore the other's tokens.
+Leave it unset and the container mints a fresh key on every start, so nothing
+survives a restart.
+
 ## HTTP API
 
 All endpoints accept and return `application/json` unless noted otherwise.

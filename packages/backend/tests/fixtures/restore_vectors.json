@@ -1,0 +1,1020 @@
+{
+  "_generated_by": "scripts/gen-restore-vectors.ts",
+  "_contract": "Python must reproduce every `expected` field exactly. A diff means the restore semantics diverged between the host-side hook and the backend.",
+  "setup": {
+    "secret": "pii-remover-baseline-secret",
+    "session_id": "restore-session",
+    "epoch": "4ov",
+    "detections": [
+      {
+        "category": "private_person",
+        "text": "김철수"
+      },
+      {
+        "category": "private_email",
+        "text": "alice@example.com"
+      },
+      {
+        "category": "private_phone",
+        "text": "010-1234-5678"
+      },
+      {
+        "category": "rrn",
+        "text": "900101-1234567"
+      }
+    ],
+    "tokens": {
+      "김철수": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "alice@example.com": "__OPF_EMAIL__4ov1qksihef66la1__",
+      "010-1234-5678": "__OPF_PHONE__4ov3lglyfs7qftua__",
+      "900101-1234567": "__OPF_RRN__4ov3t471giz7l1ov__"
+    },
+    "expired_token": "__OPF_PERSON__4ovzzzzzzzzzzzzz__",
+    "foreign_token": "__OPF_PERSON__aaazzzzzzzzzzzzz__",
+    "repairable_token": "__OPF_PERSON__4ov9mhqtc1vepqfa__"
+  },
+  "scan": [
+    {
+      "text": "",
+      "strict_and_lenient": [],
+      "with_repair": []
+    },
+    {
+      "text": "no tokens here at all",
+      "strict_and_lenient": [],
+      "with_repair": []
+    },
+    {
+      "text": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+      "strict_and_lenient": [
+        {
+          "start": 8,
+          "end": 40,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 8,
+          "end": 40,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ]
+    },
+    {
+      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMAIL__4ov1qksihef66la1__ both.",
+      "strict_and_lenient": [
+        {
+          "start": 0,
+          "end": 32,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        },
+        {
+          "start": 37,
+          "end": 68,
+          "token": "__OPF_EMAIL__4ov1qksihef66la1__",
+          "normalizedToken": "__OPF_EMAIL__4ov1qksihef66la1__",
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 32,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        },
+        {
+          "start": 37,
+          "end": 68,
+          "token": "__OPF_EMAIL__4ov1qksihef66la1__",
+          "normalizedToken": "__OPF_EMAIL__4ov1qksihef66la1__",
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "matchType": "strict"
+        }
+      ]
+    },
+    {
+      "text": "__OPF_person__4ov9mhqtc1vepqf5__",
+      "strict_and_lenient": [
+        {
+          "start": 0,
+          "end": 32,
+          "token": "__OPF_person__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 32,
+          "token": "__OPF_person__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ]
+    },
+    {
+      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5",
+      "strict_and_lenient": [
+        {
+          "start": 0,
+          "end": 30,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 30,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ]
+    },
+    {
+      "text": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
+      "strict_and_lenient": [
+        {
+          "start": 3,
+          "end": 35,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 3,
+          "end": 35,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ]
+    },
+    {
+      "text": "\\_\\_OPF\\_PERSON\\_\\_4ov9mhqtc1vepqf5\\_\\_",
+      "strict_and_lenient": [],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 39,
+          "token": "\\_\\_OPF\\_PERSON\\_\\_4ov9mhqtc1vepqf5\\_\\_",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "repair"
+        }
+      ]
+    },
+    {
+      "text": "__OPF_PERSON__aaaaaaaaaaaaaaaaa__",
+      "strict_and_lenient": [],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 33,
+          "token": "__OPF_PERSON__aaaaaaaaaaaaaaaaa__",
+          "normalizedToken": "__OPF_PERSON__aaaaaaaaaaaaaaaaa__",
+          "category": "PERSON",
+          "hash": "aaaaaaaaaaaaaaaaa",
+          "matchType": "repair"
+        }
+      ]
+    },
+    {
+      "text": "path D:\\Git\\__OPF_PERSON__4ov9mhqtc1vepqf5__\\file.ts here",
+      "strict_and_lenient": [
+        {
+          "start": 12,
+          "end": 44,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 12,
+          "end": 44,
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ]
+    }
+  ],
+  "is_within_one_edit": [
+    {
+      "a": "",
+      "b": "",
+      "within_one_edit": true
+    },
+    {
+      "a": "abc",
+      "b": "abc",
+      "within_one_edit": true
+    },
+    {
+      "a": "abc",
+      "b": "abd",
+      "within_one_edit": true
+    },
+    {
+      "a": "abc",
+      "b": "ab",
+      "within_one_edit": true
+    },
+    {
+      "a": "ab",
+      "b": "abc",
+      "within_one_edit": true
+    },
+    {
+      "a": "abc",
+      "b": "abcd",
+      "within_one_edit": true
+    },
+    {
+      "a": "abc",
+      "b": "axd",
+      "within_one_edit": false
+    },
+    {
+      "a": "abc",
+      "b": "cba",
+      "within_one_edit": false
+    },
+    {
+      "a": "abc",
+      "b": "abcde",
+      "within_one_edit": false
+    },
+    {
+      "a": "abcdef",
+      "b": "abcdf",
+      "within_one_edit": true
+    },
+    {
+      "a": "abcdef",
+      "b": "abdcef",
+      "within_one_edit": false
+    },
+    {
+      "a": "a",
+      "b": "",
+      "within_one_edit": true
+    },
+    {
+      "a": "",
+      "b": "a",
+      "within_one_edit": true
+    },
+    {
+      "a": "4ov9mhqtc1vepqf5",
+      "b": "4ov9mhqtc1vepqf6",
+      "within_one_edit": true
+    },
+    {
+      "a": "4ov9mhqtc1vepqf5",
+      "b": "4ov9mhqtc1vepq5",
+      "within_one_edit": true
+    }
+  ],
+  "resolve_miss": [
+    {
+      "name": "exact-live-entry",
+      "category": "PERSON",
+      "hash": "4ov9mhqtc1vepqf5",
+      "epoch": "4ov",
+      "index": [
+        {
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        },
+        {
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+        },
+        {
+          "category": "PHONE",
+          "hash": "4ov3lglyfs7qftua",
+          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+        },
+        {
+          "category": "RRN",
+          "hash": "4ov3t471giz7l1ov",
+          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+        }
+      ],
+      "resolution": {
+        "kind": "repaired",
+        "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+      }
+    },
+    {
+      "name": "repairable-one-edit",
+      "category": "PERSON",
+      "hash": "4ov9mhqtc1vepqfa",
+      "epoch": "4ov",
+      "index": [
+        {
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        },
+        {
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+        },
+        {
+          "category": "PHONE",
+          "hash": "4ov3lglyfs7qftua",
+          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+        },
+        {
+          "category": "RRN",
+          "hash": "4ov3t471giz7l1ov",
+          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+        }
+      ],
+      "resolution": {
+        "kind": "repaired",
+        "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+      }
+    },
+    {
+      "name": "category-mismatch-blocks-repair",
+      "category": "EMAIL",
+      "hash": "4ov9mhqtc1vepqfa",
+      "epoch": "4ov",
+      "index": [
+        {
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        },
+        {
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+        },
+        {
+          "category": "PHONE",
+          "hash": "4ov3lglyfs7qftua",
+          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+        },
+        {
+          "category": "RRN",
+          "hash": "4ov3t471giz7l1ov",
+          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+        }
+      ],
+      "resolution": {
+        "kind": "unresolved",
+        "cause": "expired"
+      }
+    },
+    {
+      "name": "expired-same-epoch",
+      "category": "PERSON",
+      "hash": "4ovzzzzzzzzzzzzz",
+      "epoch": "4ov",
+      "index": [
+        {
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        },
+        {
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+        },
+        {
+          "category": "PHONE",
+          "hash": "4ov3lglyfs7qftua",
+          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+        },
+        {
+          "category": "RRN",
+          "hash": "4ov3t471giz7l1ov",
+          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+        }
+      ],
+      "resolution": {
+        "kind": "unresolved",
+        "cause": "expired"
+      }
+    },
+    {
+      "name": "foreign-other-epoch",
+      "category": "PERSON",
+      "hash": "aaazzzzzzzzzzzzz",
+      "epoch": "4ov",
+      "index": [
+        {
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        },
+        {
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+        },
+        {
+          "category": "PHONE",
+          "hash": "4ov3lglyfs7qftua",
+          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+        },
+        {
+          "category": "RRN",
+          "hash": "4ov3t471giz7l1ov",
+          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+        }
+      ],
+      "resolution": {
+        "kind": "unresolved",
+        "cause": "foreign"
+      }
+    },
+    {
+      "name": "ambiguous-two-candidates",
+      "category": "PERSON",
+      "hash": "aaabbbbbbbbbbbd",
+      "epoch": "4ov",
+      "index": [
+        {
+          "category": "PERSON",
+          "hash": "aaabbbbbbbbbbbb",
+          "token": "__OPF_PERSON__aaabbbbbbbbbbbb__"
+        },
+        {
+          "category": "PERSON",
+          "hash": "aaabbbbbbbbbbbc",
+          "token": "__OPF_PERSON__aaabbbbbbbbbbbc__"
+        }
+      ],
+      "resolution": {
+        "kind": "unresolved",
+        "cause": "ambiguous"
+      }
+    },
+    {
+      "name": "empty-index",
+      "category": "PERSON",
+      "hash": "4ovzzzzzzzzzzzzz",
+      "epoch": "4ov",
+      "index": [],
+      "resolution": {
+        "kind": "unresolved",
+        "cause": "expired"
+      }
+    }
+  ],
+  "is_inside_path": [
+    {
+      "text": "D:\\Git\\__OPF_PERSON__4ov9mhqtc1vepqf5__\\file.ts",
+      "start": 7,
+      "end": 39,
+      "inside_path": true
+    },
+    {
+      "text": "C:/Users/__OPF_PERSON__4ov9mhqtc1vepqf5__/doc.txt",
+      "start": 9,
+      "end": 41,
+      "inside_path": true
+    },
+    {
+      "text": "\\\\server\\share\\__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "start": 15,
+      "end": 47,
+      "inside_path": true
+    },
+    {
+      "text": "/home/__OPF_PERSON__4ov9mhqtc1vepqf5__/notes.md",
+      "start": 6,
+      "end": 38,
+      "inside_path": true
+    },
+    {
+      "text": "./src/__OPF_PERSON__4ov9mhqtc1vepqf5__/index.ts",
+      "start": 6,
+      "end": 38,
+      "inside_path": true
+    },
+    {
+      "text": "../__OPF_PERSON__4ov9mhqtc1vepqf5__/x",
+      "start": 3,
+      "end": 35,
+      "inside_path": true
+    },
+    {
+      "text": "https://example.com/__OPF_PERSON__4ov9mhqtc1vepqf5__/page",
+      "start": 20,
+      "end": 52,
+      "inside_path": true
+    },
+    {
+      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ please respond",
+      "start": 0,
+      "end": 32,
+      "inside_path": false
+    },
+    {
+      "text": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__, thanks",
+      "start": 8,
+      "end": 40,
+      "inside_path": false
+    },
+    {
+      "text": "a/__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "start": 2,
+      "end": 34,
+      "inside_path": false
+    },
+    {
+      "text": "a/b/__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "start": 4,
+      "end": 36,
+      "inside_path": true
+    },
+    {
+      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__/b/c",
+      "start": 0,
+      "end": 32,
+      "inside_path": true
+    },
+    {
+      "text": "prefix __OPF_PERSON__4ov9mhqtc1vepqf5__ suffix",
+      "start": 7,
+      "end": 39,
+      "inside_path": false
+    },
+    {
+      "text": "prefix﻿/a/b/__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "start": 12,
+      "end": 44,
+      "inside_path": true
+    }
+  ],
+  "restore": [
+    {
+      "name": "empty",
+      "text": "",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "",
+        "match_count": 0,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "no-tokens",
+      "text": "nothing to restore",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "nothing to restore",
+        "match_count": 0,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "strict-single",
+      "text": "Hello __OPF_PERSON__4ov9mhqtc1vepqf5__!",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "Hello 김철수!",
+        "match_count": 1,
+        "restored_count": 1,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "strict-multiple",
+      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ <__OPF_EMAIL__4ov1qksihef66la1__> __OPF_PHONE__4ov3lglyfs7qftua__",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "김철수 <alice@example.com> 010-1234-5678",
+        "match_count": 3,
+        "restored_count": 3,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "strict-repeated",
+      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and again __OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "김철수 and again 김철수",
+        "match_count": 2,
+        "restored_count": 2,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "lenient-case-folded",
+      "text": "see __OPF_person__4ov9mhqtc1vepqf5__ here",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see 김철수 here",
+        "match_count": 1,
+        "restored_count": 1,
+        "partial_match_count": 1,
+        "lenient_restored_count": 1,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "lenient-suffix-dropped",
+      "text": "see __OPF_PERSON__4ov9mhqtc1vepqf5 here",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see 김철수 here",
+        "match_count": 1,
+        "restored_count": 1,
+        "partial_match_count": 1,
+        "lenient_restored_count": 1,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "lenient-disabled",
+      "text": "see __OPF_person__4ov9mhqtc1vepqf5__ here",
+      "opts": {
+        "lenient": false,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see __OPF_person__4ov9mhqtc1vepqf5__ here",
+        "match_count": 0,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "repairable-one-edit",
+      "text": "see __OPF_PERSON__4ov9mhqtc1vepqfa__ here",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see 김철수 here",
+        "match_count": 1,
+        "restored_count": 1,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 1,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "repair-disabled",
+      "text": "see __OPF_PERSON__4ov9mhqtc1vepqfa__ here",
+      "opts": {
+        "lenient": null,
+        "repair": false,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see __OPF_PERSON__4ov9mhqtc1vepqfa__ here",
+        "match_count": 1,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 1,
+        "foreign_count": 0,
+        "dead_token_count": 1,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 1
+      }
+    },
+    {
+      "name": "expired-same-epoch",
+      "text": "see __OPF_PERSON__4ovzzzzzzzzzzzzz__ here",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see __OPF_PERSON__4ovzzzzzzzzzzzzz__ here",
+        "match_count": 1,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 1,
+        "foreign_count": 0,
+        "dead_token_count": 1,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 1
+      }
+    },
+    {
+      "name": "foreign-other-epoch",
+      "text": "see __OPF_PERSON__aaazzzzzzzzzzzzz__ here",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see __OPF_PERSON__aaazzzzzzzzzzzzz__ here",
+        "match_count": 1,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 1,
+        "foreign_count": 1,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 1
+      }
+    },
+    {
+      "name": "path-skip-miss-inside-path",
+      "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+        "match_count": 1,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 1,
+        "residual_token_count": 1
+      }
+    },
+    {
+      "name": "path-skip-disabled",
+      "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": false
+      },
+      "expected": {
+        "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+        "match_count": 1,
+        "restored_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 1,
+        "foreign_count": 0,
+        "dead_token_count": 1,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 1
+      }
+    },
+    {
+      "name": "vault-hit-inside-path-still-restores",
+      "text": "open D:\\Git\\__OPF_PERSON__4ov9mhqtc1vepqf5__\\file.ts now",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "open D:\\Git\\김철수\\file.ts now",
+        "match_count": 1,
+        "restored_count": 1,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "markdown-escaped",
+      "text": "see \\_\\_OPF\\_PERSON\\_\\_4ov9mhqtc1vepqf5\\_\\_ here",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "see 김철수 here",
+        "match_count": 1,
+        "restored_count": 1,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "korean-adjacent",
+      "text": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "김철수김철수입니다",
+        "match_count": 1,
+        "restored_count": 1,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 0,
+        "foreign_count": 0,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 0
+      }
+    },
+    {
+      "name": "mixed-hit-and-miss",
+      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ then __OPF_PERSON__aaazzzzzzzzzzzzz__",
+      "opts": {
+        "lenient": null,
+        "repair": null,
+        "skip_path_matches": null
+      },
+      "expected": {
+        "text": "김철수 then __OPF_PERSON__aaazzzzzzzzzzzzz__",
+        "match_count": 2,
+        "restored_count": 1,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 0,
+        "unknown_token_count": 1,
+        "foreign_count": 1,
+        "dead_token_count": 0,
+        "ambiguous_count": 0,
+        "path_skip_count": 0,
+        "residual_token_count": 1
+      }
+    }
+  ]
+}

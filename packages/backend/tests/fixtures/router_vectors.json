@@ -1,0 +1,270 @@
+{
+  "_generated_by": "scripts/gen-router-vectors.ts",
+  "_contract": "A route that flips from a masking target to a passthrough target is a PII leak, not a routing nit. Header sets must match exactly: a relayed content-length disagrees with the re-serialised masked body.",
+  "route_paths": {
+    "anthropicChat": "/v1/messages",
+    "openaiChat": "/v1/chat/completions",
+    "codexResponses": "/v1/responses"
+  },
+  "routes": [
+    {
+      "pathname": "/health",
+      "kind": "health",
+      "provider": null,
+      "upstream_path": null
+    },
+    {
+      "pathname": "/",
+      "kind": "not_found",
+      "provider": null,
+      "upstream_path": null
+    },
+    {
+      "pathname": "",
+      "kind": "not_found",
+      "provider": null,
+      "upstream_path": null
+    },
+    {
+      "pathname": "/unknown",
+      "kind": "not_found",
+      "provider": null,
+      "upstream_path": null
+    },
+    {
+      "pathname": "/anthropic",
+      "kind": "provider",
+      "provider": "anthropic",
+      "upstream_path": "/"
+    },
+    {
+      "pathname": "/anthropic/",
+      "kind": "provider",
+      "provider": "anthropic",
+      "upstream_path": "/"
+    },
+    {
+      "pathname": "/anthropic/v1/messages",
+      "kind": "provider",
+      "provider": "anthropic",
+      "upstream_path": "/v1/messages"
+    },
+    {
+      "pathname": "/anthropic/v1/messages/count_tokens",
+      "kind": "provider",
+      "provider": "anthropic",
+      "upstream_path": "/v1/messages/count_tokens"
+    },
+    {
+      "pathname": "/anthropic/v1/complete",
+      "kind": "provider",
+      "provider": "anthropic",
+      "upstream_path": "/v1/complete"
+    },
+    {
+      "pathname": "/anthropic/api/organizations",
+      "kind": "provider",
+      "provider": "passthrough_anthropic",
+      "upstream_path": "/api/organizations"
+    },
+    {
+      "pathname": "/anthropic/api/",
+      "kind": "provider",
+      "provider": "passthrough_anthropic",
+      "upstream_path": "/api/"
+    },
+    {
+      "pathname": "/anthropicx/v1/messages",
+      "kind": "not_found",
+      "provider": null,
+      "upstream_path": null
+    },
+    {
+      "pathname": "/openai",
+      "kind": "provider",
+      "provider": "passthrough_openai",
+      "upstream_path": "/"
+    },
+    {
+      "pathname": "/openai/",
+      "kind": "provider",
+      "provider": "passthrough_openai",
+      "upstream_path": "/"
+    },
+    {
+      "pathname": "/openai/v1/chat/completions",
+      "kind": "provider",
+      "provider": "openai",
+      "upstream_path": "/v1/chat/completions"
+    },
+    {
+      "pathname": "/openai/v1/embeddings",
+      "kind": "provider",
+      "provider": "passthrough_openai",
+      "upstream_path": "/v1/embeddings"
+    },
+    {
+      "pathname": "/openai/v1/models",
+      "kind": "provider",
+      "provider": "passthrough_openai",
+      "upstream_path": "/v1/models"
+    },
+    {
+      "pathname": "/codex",
+      "kind": "provider",
+      "provider": "passthrough_codex",
+      "upstream_path": "/"
+    },
+    {
+      "pathname": "/codex/v1/responses",
+      "kind": "provider",
+      "provider": "codex",
+      "upstream_path": "/v1/responses"
+    },
+    {
+      "pathname": "/codex/v1/models",
+      "kind": "provider",
+      "provider": "passthrough_codex",
+      "upstream_path": "/v1/models"
+    },
+    {
+      "pathname": "/CODEX/v1/responses",
+      "kind": "not_found",
+      "provider": null,
+      "upstream_path": null
+    },
+    {
+      "pathname": "/anthropic/v1/messages?beta=true",
+      "kind": "provider",
+      "provider": "anthropic",
+      "upstream_path": "/v1/messages?beta=true"
+    }
+  ],
+  "headers": {
+    "request_input": [
+      [
+        "authorization",
+        "Bearer sk-secret-value"
+      ],
+      [
+        "x-api-key",
+        "anthropic-secret"
+      ],
+      [
+        "anthropic-version",
+        "2023-06-01"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "1234"
+      ],
+      [
+        "host",
+        "localhost:8000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "transfer-encoding",
+        "chunked"
+      ],
+      [
+        "te",
+        "trailers"
+      ],
+      [
+        "upgrade",
+        "websocket"
+      ],
+      [
+        "proxy-authorization",
+        "Basic abc"
+      ],
+      [
+        "accept",
+        "text/event-stream"
+      ],
+      [
+        "x-pii-session",
+        "proj-a"
+      ]
+    ],
+    "request_forwardable": {
+      "accept": "text/event-stream",
+      "anthropic-version": "2023-06-01",
+      "authorization": "Bearer sk-secret-value",
+      "content-type": "application/json",
+      "x-api-key": "anthropic-secret",
+      "x-pii-session": "proj-a"
+    },
+    "response_input": [
+      [
+        "content-type",
+        "text/event-stream"
+      ],
+      [
+        "content-encoding",
+        "gzip"
+      ],
+      [
+        "content-length",
+        "999"
+      ],
+      [
+        "transfer-encoding",
+        "chunked"
+      ],
+      [
+        "connection",
+        "close"
+      ],
+      [
+        "set-cookie",
+        "sid=abc"
+      ],
+      [
+        "anthropic-request-id",
+        "req_123"
+      ]
+    ],
+    "response_forwardable": {
+      "anthropic-request-id": "req_123",
+      "content-type": "text/event-stream",
+      "set-cookie": "sid=abc"
+    },
+    "safe_log": {
+      "accept": "text/event-stream",
+      "anthropic-version": "2023-06-01",
+      "authorization": "<redacted>",
+      "connection": "keep-alive",
+      "content-length": "1234",
+      "content-type": "application/json",
+      "host": "localhost:8000",
+      "proxy-authorization": "<redacted>",
+      "te": "trailers",
+      "transfer-encoding": "chunked",
+      "upgrade": "websocket",
+      "x-api-key": "<redacted>",
+      "x-pii-session": "proj-a"
+    },
+    "sensitive": {
+      "authorization": true,
+      "Authorization": true,
+      "AUTHORIZATION": true,
+      "x-api-key": true,
+      "anthropic-api-key": true,
+      "openai-api-key": true,
+      "cookie": true,
+      "set-cookie": true,
+      "proxy-authorization": true,
+      "content-type": false,
+      "x-pii-session": false
+    }
+  }
+}
