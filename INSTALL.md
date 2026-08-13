@@ -200,6 +200,7 @@ Config lookup chain (highest priority first):
 | `ANTHROPIC_BASE_URL` | Set to proxy URL when proxy is running (Claude Code). |
 | `PII_REMOVER_PROXY_TRUST=1` | Trust proxy without URL check (Codex users typically need this). |
 | `PII_REMOVER_BYPASS=1` | Disable masking entirely (not recommended). |
+| `PII_PROXY_EXCLUDED_CATEGORIES` | Backend-side (set on the container, e.g. in `packages/backend/.env`). Comma-separated categories the proxy sends **unmasked**, e.g. `private_url`. Unset = mask everything detected. Detection is unaffected — the hook's fail-closed gate still counts them as PII. |
 
 ## Local development install
 

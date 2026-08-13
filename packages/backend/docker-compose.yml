@@ -14,6 +14,9 @@ services:
       OPF_PORT: "8000"
       OPF_LOG_LEVEL: info
       PII_PROXY_ENABLED: "${PII_PROXY_ENABLED:-1}"
+      # Comma-separated categories the proxy leaves untouched on the wire.
+      # Empty = mask everything detected.
+      PII_PROXY_EXCLUDED_CATEGORIES: "${PII_PROXY_EXCLUDED_CATEGORIES:-}"
       # Must match the host-side hook's key, or neither side can restore the
       # other's tokens. Unset = fresh key per start, nothing survives a restart.
       PII_REMOVER_TOKEN_KEY: "${PII_REMOVER_TOKEN_KEY:-}"

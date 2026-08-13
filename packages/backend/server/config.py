@@ -134,6 +134,19 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _env_category_set(name: str) -> frozenset[str]:
+    """Parse a comma-separated category list into a normalised set.
+
+    Empty / unset yields an empty set, i.e. "exclude nothing" — the
+    fail-closed default, since a typo in the variable must never silently
+    widen what reaches the LLM.
+    """
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return frozenset()
+    return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
+
+
 _SECONDS_A_LONG_LLM_STREAM_MAY_RUN = 600.0
 
 
@@ -148,6 +161,7 @@ class ProxySettings:
     buffer_window: int
     flush_on_close: bool
     timeout_seconds: float
+    excluded_categories: frozenset[str]
 
 
 @lru_cache(maxsize=1)
@@ -169,6 +183,7 @@ def get_proxy_settings() -> ProxySettings:
         buffer_window=_env_int("PII_PROXY_BUFFER_WINDOW", 64),
         flush_on_close=_env_bool("PII_PROXY_FLUSH_ON_CLOSE", True),
         timeout_seconds=_env_float("PII_PROXY_TIMEOUT_SECONDS", _SECONDS_A_LONG_LLM_STREAM_MAY_RUN),
+        excluded_categories=_env_category_set("PII_PROXY_EXCLUDED_CATEGORIES"),
     )
 
 

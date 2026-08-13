@@ -351,3 +351,93 @@ def test_proxy_traffic_defers_idle_unload(client: TestClient, upstream: _Upstrea
     client.post("/anthropic/v1/messages", json={"model": "m", "messages": []})
 
     assert client.app.state.last_request_at is not None  # type: ignore[attr-defined]
+
+
+# --------------------------------------------------------------------------
+# operator category opt-out (PII_PROXY_EXCLUDED_CATEGORIES)
+# --------------------------------------------------------------------------
+
+
+def test_excluded_category_reaches_upstream_verbatim(
+    client: TestClient, upstream: _Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PII_PROXY_EXCLUDED_CATEGORIES", "private_email")
+    get_proxy_settings.cache_clear()
+
+    upstream.responder = lambda request: httpx.Response(
+        200, json={"content": [{"type": "text", "text": "ok"}]}
+    )
+
+    response = client.post(
+        "/anthropic/v1/messages",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": f"{PERSON} at {EMAIL}"}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert EMAIL in upstream.last_body_text, "excluded category was masked anyway"
+    assert PERSON not in upstream.last_body_text, "non-excluded category leaked"
+    assert "__OPF_PERSON__" in upstream.last_body_text
+
+
+def test_no_exclusion_masks_every_category(client: TestClient, upstream: _Upstream) -> None:
+    get_proxy_settings.cache_clear()
+
+    upstream.responder = lambda request: httpx.Response(
+        200, json={"content": [{"type": "text", "text": "ok"}]}
+    )
+
+    response = client.post(
+        "/anthropic/v1/messages",
+        json={
+            "model": "m",
+            "messages": [{"role": "user", "content": f"{PERSON} at {EMAIL}"}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert EMAIL not in upstream.last_body_text
+    assert PERSON not in upstream.last_body_text
+
+
+def test_exclusion_does_not_leak_spans_swallowed_by_the_excluded_span(
+    app: FastAPI, upstream: _Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An over-extended private_url must not carry the email out with it.
+
+    OPF regularly emits one wide ``private_url`` span covering a trailing
+    email. Filtering after the merge drops that whole span and the email
+    reaches the LLM verbatim.
+    """
+    from server.opf_runner import RawSpan
+
+    class WideUrlRunner(FakeOpfRunner):
+        def _detect_raw(self, text: str):  # type: ignore[override]
+            end = text.index(EMAIL) + len(EMAIL)
+            return [RawSpan(start=0, end=end, label="private_url", score=0.68)]
+
+    app.state.opf_runner = WideUrlRunner()
+    monkeypatch.setenv("PII_PROXY_EXCLUDED_CATEGORIES", "private_url")
+    get_proxy_settings.cache_clear()
+
+    upstream.responder = lambda request: httpx.Response(
+        200, json={"content": [{"type": "text", "text": "ok"}]}
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/anthropic/v1/messages",
+            json={
+                "model": "m",
+                "messages": [
+                    {"role": "user", "content": f"see https://x.example.com then {EMAIL}"}
+                ],
+            },
+        )
+
+    assert response.status_code == 200
+    assert "https://x.example.com" in upstream.last_body_text, "url should pass through"
+    assert EMAIL not in upstream.last_body_text, "email leaked inside the excluded span"
+    assert "__OPF_EMAIL__" in upstream.last_body_text

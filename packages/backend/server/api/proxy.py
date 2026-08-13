@@ -107,6 +107,22 @@ def _detect_in_process(app: Any, text: str) -> list[Detection]:
     if kner is not None and redact_api._HANGUL_RE.search(text):
         person_spans = [s for s in kner.detect(text) if s.klue_tag == "PS"]
 
+    # MUST run before the merge: the merge keeps the widest overlapping span,
+    # so an over-extended OPF span (private_url swallowing an adjacent email)
+    # would drag the narrower detections out with it and leak them to the LLM.
+    # `/redact` and the hook's fail-closed gate still see every detection.
+    excluded = get_proxy_settings().excluded_categories
+    if excluded:
+        opf_result = opf_result.model_copy(
+            update={
+                "detections": [
+                    d for d in opf_result.detections if d.label.lower() not in excluded
+                ]
+            }
+        )
+        regex_spans = [s for s in regex_spans if s.category.lower() not in excluded]
+        person_spans = [s for s in person_spans if s.category.lower() not in excluded]
+
     merged = (
         redact_api._merge_spans_and_mask(text, opf_result, person_spans, regex_spans)
         if (regex_spans or person_spans)

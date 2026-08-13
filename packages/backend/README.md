@@ -101,6 +101,42 @@ before restoration, so the client never sees a half-token.
 | `PII_PROXY_CODEX_UPSTREAM` | `https://api.openai.com` | Upstream override |
 | `PII_PROXY_BUFFER_WINDOW` | `64` | SSE token-boundary lookback |
 | `PII_PROXY_TIMEOUT_SECONDS` | `600` | Upstream timeout; LLM streams run for minutes |
+| `PII_PROXY_EXCLUDED_CATEGORIES` | (unset) | Comma-separated categories the proxy sends **unmasked**. Unset = mask everything detected. See [Excluding a category](#excluding-a-category-from-masking). |
+
+### Excluding a category from masking
+
+Some categories are noise in a given deployment — a team whose prompts are full
+of internal URLs gets `private_url` tokens on every request and the model loses
+the paths it needs to reason about. `PII_PROXY_EXCLUDED_CATEGORIES` opts out per
+category:
+
+```yaml
+environment:
+  PII_PROXY_EXCLUDED_CATEGORIES: "private_url"
+```
+
+Or, without editing compose, in `packages/backend/.env`:
+
+```dotenv
+PII_PROXY_EXCLUDED_CATEGORIES=private_url
+```
+
+Scope: this narrows **only what the proxy rewrites on the wire**. `/redact` and
+the host-side hook's fail-closed gate still see every detection, so an excluded
+category still counts as PII for the block/allow decision — it is simply sent
+through in the clear.
+
+Values are the `/redact` labels: `private_person`, `private_email`,
+`private_phone`, `private_address`, `account_number`, `private_date`,
+`private_url`, `secret`, `rrn`, `biz_num`, `card`. Unknown names are ignored,
+and an unset or empty value excludes nothing — a typo can never silently widen
+what reaches the LLM.
+
+> **Adjacent PII is still masked.** OPF often emits one wide `private_url` span
+> that swallows a trailing email. The exclusion is applied before overlapping
+> spans are merged, so the narrower `private_email` detection survives and is
+> still tokenised. Verified by
+> `tests/test_proxy_api.py::test_exclusion_does_not_leak_spans_swallowed_by_the_excluded_span`.
 
 ### Two things that will bite you
 
