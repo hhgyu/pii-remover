@@ -21,7 +21,11 @@ environments that want it.
 
 **Category policy.** ``OPF_DISABLED_CATEGORIES`` drops whole categories before
 they reach the vault — the blunt escape hatch for anyone who wants
-``private_url`` (or any other category) off entirely.
+``private_url`` (or any other category) off entirely. It is the deeper of the
+two exclusion knobs: ``PII_PROXY_EXCLUDED_CATEGORIES``
+(:mod:`server.api.proxy`) only stops the proxy rewriting those spans, leaving
+the detection intact so the hook's fail-closed gate still counts them as PII.
+Disabling here removes the detection itself, gate included.
 
 The URL rules are mirrored in ``packages/core/src/detector/url-policy.ts`` and
 locked by ``tests/fixtures/url-policy.json``. Change one side, change both.

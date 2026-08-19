@@ -138,6 +138,28 @@ what reaches the LLM.
 > still tokenised. Verified by
 > `tests/test_proxy_api.py::test_exclusion_does_not_leak_spans_swallowed_by_the_excluded_span`.
 
+#### …versus `OPF_DISABLED_CATEGORIES`
+
+Two variables switch a category off, at different depths. Reach for the proxy
+one unless you specifically want detection itself to stop.
+
+| | `PII_PROXY_EXCLUDED_CATEGORIES` | `OPF_DISABLED_CATEGORIES` |
+| --- | --- | --- |
+| Acts on | What the proxy rewrites on the wire | Detection itself |
+| `/redact` response | Still reports the category | Never reports it |
+| Hook's fail-closed gate | Still blocks on it | Stops seeing it |
+| Unknown name | Ignored (excludes nothing) | Fails startup |
+
+The proxy variable keeps the category classified as PII and only declines to
+tokenise it, so the fail-closed gate is unaffected. `OPF_DISABLED_CATEGORIES`
+removes the detection outright — the right tool when a category is a pure false
+positive generator for you (and the reason `/redact` consumers such as image
+redaction stop paying for it), and the wrong one when you still want the gate to
+know that PII is present.
+
+Neither is the way to keep public URLs readable: `private_url` already leaves
+public links alone. See [Which URLs count as PII](#which-urls-count-as-pii).
+
 ### Two things that will bite you
 
 **Know what the published port exposes.** The bundled compose publishes
@@ -291,7 +313,7 @@ All settings are environment variables consumed by `server.config.Settings`:
 | `OPF_HF_CACHE_DIR`   | (unset)                | Override HF cache dir                    |
 | `OPF_BATCH_MAX`      | `32`                   | Max texts per `/redact/batch` request    |
 | `OPF_LOG_LEVEL`      | `info`                 | uvicorn / app log level                  |
-| `OPF_DISABLED_CATEGORIES` | (unset)           | Comma-separated categories to drop entirely, e.g. `private_url`. An unknown name fails startup rather than silently detecting nothing. |
+| `OPF_DISABLED_CATEGORIES` | (unset)           | Comma-separated categories to drop from detection entirely, e.g. `private_url`. An unknown name fails startup rather than silently detecting nothing. Deeper than `PII_PROXY_EXCLUDED_CATEGORIES` — compare them [here](#versus-opf_disabled_categories). |
 | `PII_URL_POLICY`     | `heuristic`            | `heuristic` \| `strict` — see below      |
 | `PII_PRIVATE_URL_HOSTS` | (unset)             | Comma-separated extra hosts to treat as private, e.g. `acme.com,git.acme.io`. Subdomains included; `*.acme.com` and `.acme.com` also accepted. |
 
