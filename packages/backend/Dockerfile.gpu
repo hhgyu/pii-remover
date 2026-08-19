@@ -27,7 +27,7 @@ ARG OPF_MODEL_ID=openai/privacy-filter
 ARG KNER_MODEL_ID=soddokayo/koelectra-base-klue-ner
 
 # ---------------------------------------------------------------------------
-# Stage 1a — OPF INT8 ONNX downloader (weights are device-agnostic)
+# Stage 1a — OPF FP32 ONNX downloader (weights are device-agnostic)
 # ---------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS opf-weights
 
@@ -56,11 +56,9 @@ from huggingface_hub import hf_hub_download
 import os
 import shutil
 
-target = "/models/opf-int8"
+target = "/models/opf-fp32"
 os.makedirs(target, exist_ok=True)
 files = [
-    "onnx/model_quantized.onnx",
-    "onnx/model_quantized.onnx_data",
     "onnx/model.onnx",
     "onnx/model.onnx_data",
     "onnx/model.onnx_data_1",
@@ -144,7 +142,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     OPF_HOST=0.0.0.0 \
     OPF_PORT=8000 \
     OPF_MODEL_ID=${OPF_MODEL_ID} \
-    OPF_ONNX_PATH=/models/opf-int8 \
+    OPF_ONNX_PATH=/models/opf-fp32 \
     OPF_VARIANT=fp32 \
     KNER_MODEL_ID=${KNER_MODEL_ID} \
     KNER_ONNX_PATH=/models/klue-ner-fp32 \
@@ -179,7 +177,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv
     && chmod -R a+rX /opt/python /opt/venv \
     && python -VV
 
-COPY --from=opf-weights --chown=app:app /models/opf-int8 /models/opf-int8
+COPY --from=opf-weights --chown=app:app /models/opf-fp32 /models/opf-fp32
 COPY --from=kner-export --chown=app:app /models/klue-ner-fp32 /models/klue-ner-fp32
 
 COPY --chown=app:app server/ ./server/

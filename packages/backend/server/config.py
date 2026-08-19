@@ -10,8 +10,9 @@ Environment variables (with defaults):
 - ``OPF_LOG_LEVEL`` (``info``): uvicorn / app log level.
 - ``OPF_MODEL_REVISION`` (unset): pin a specific HF revision/hash.
 - ``OPF_HF_CACHE_DIR`` (unset): override transformers/HF cache directory.
-- ``OPF_ONNX_PATH`` (``/models/opf-int8`` inside Docker, unset elsewhere):
-  directory containing OPF ONNX artifacts + tokenizer/config files.
+- ``OPF_ONNX_PATH`` (set inside Docker, unset elsewhere): directory containing
+  OPF ONNX artifacts + tokenizer/config files. The CPU images bake INT8 at
+  ``/models/opf-int8``; the GPU image bakes FP32 at ``/models/opf-fp32``.
 - ``OPF_VARIANT`` (``int8``): preferred ONNX variant (``int8`` | ``fp32``).
 - ``OPF_DISABLED_CATEGORIES`` (unset): comma-separated PII categories to drop
   before they reach the vault, e.g. ``private_url,private_date``.
