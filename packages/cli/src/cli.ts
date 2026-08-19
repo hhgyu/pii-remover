@@ -46,6 +46,7 @@ export interface ParsedFlags {
   categories?: string[];
   proxyUrl?: string;
   proxy?: boolean;
+  proxyOnly?: boolean;
   autoStart?: boolean;
   composeFile?: "cpu" | "gpu" | string;
   startTimeoutMs?: number;
@@ -66,6 +67,9 @@ export function parseFlags(argv: readonly string[]): ParsedFlags {
       if (typeof v === "string") out.proxyUrl = v;
     } else if (arg === "--proxy") {
       out.proxy = true;
+    } else if (arg === "--proxy-only") {
+      out.proxy = true;
+      out.proxyOnly = true;
     } else if (arg === "--scope" || arg === "-s") {
       const v = argv[++i];
       if (v === "global" || v === "project") out.scope = v;
@@ -149,6 +153,9 @@ export function helpText(): string {
     "                             An existing different base URL is never overwritten (warns instead).",
     "  --proxy-url <url>          install only: same as --proxy but with an explicit URL",
     "                             (remote/self-hosted proxy). Overrides --proxy.",
+    "  --proxy-only               install --target opencode only: implies --proxy and registers no",
+    "                             plugin, removing any this installer added before. Plugin and proxy",
+    "                             keep separate vaults, so running both leaves tokens unrestorable.",
     "  --auto-start               install only: write backend.auto_start=true (opt-in Docker spawn).",
     "                             Default: backend must be started manually. See ADR-0019.",
     "  --no-auto-start            install only: write backend.auto_start=false (explicit opt-out).",
@@ -276,6 +283,7 @@ export async function runCli(
           piiConfig,
         };
         if (effectiveProxyUrl !== undefined) opts.proxyUrl = effectiveProxyUrl;
+        if (flags.proxyOnly === true) opts.proxyOnly = true;
         if (installFs) opts.fs = installFs;
         r = await runOpenCodeInstall(opts);
       } else if (target === "codex") {

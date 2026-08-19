@@ -302,6 +302,12 @@ export interface OpenCodeInstallOptions {
   piiConfig?: PiiRemoverConfigSlice;
   resolvePluginFile?: (subpath: string) => string | null;
   proxyUrl?: string;
+  /**
+   * Register no plugin, and strip any this installer previously added.
+   * Exclusive by necessity, not preference: plugin and proxy hold separate
+   * vaults, so a token minted by one cannot be restored by the other.
+   */
+  proxyOnly?: boolean;
 }
 
 function defaultResolvePluginFile(subpath: string, projectDir?: string): string | null {
@@ -362,28 +368,37 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
 
   const otherPlugins = existingPlugins.filter((p) => !isPiiRemoverEntry(p));
 
-  let maskEntry: string;
+  const proxyOnly = opts.proxyOnly === true;
+  let maskEntry = "";
   let restoreEntry: string | null = null;
   let resolved = true;
+  let strippedPluginCount = 0;
+  let alreadyPresent: boolean;
 
-  const maskPath = resolver(OPENCODE_PLUGIN_MASK_SUBPATH);
-  const restorePath = resolver(OPENCODE_PLUGIN_RESTORE_SUBPATH);
-  if (maskPath && restorePath) {
-    maskEntry = fileUrlFor(maskPath);
-    restoreEntry = fileUrlFor(restorePath);
+  if (proxyOnly) {
+    strippedPluginCount = existingPlugins.length - otherPlugins.length;
+    alreadyPresent = strippedPluginCount === 0;
+    if (Array.isArray(parsed.plugin)) parsed.plugin = otherPlugins;
   } else {
-    resolved = false;
-    maskEntry = opts.pluginRef ?? OPENCODE_PLUGIN_PACKAGE;
+    const maskPath = resolver(OPENCODE_PLUGIN_MASK_SUBPATH);
+    const restorePath = resolver(OPENCODE_PLUGIN_RESTORE_SUBPATH);
+    if (maskPath && restorePath) {
+      maskEntry = fileUrlFor(maskPath);
+      restoreEntry = fileUrlFor(restorePath);
+    } else {
+      resolved = false;
+      maskEntry = opts.pluginRef ?? OPENCODE_PLUGIN_PACKAGE;
+    }
+
+    alreadyPresent =
+      existingPlugins.includes(maskEntry) &&
+      (restoreEntry === null || existingPlugins.includes(restoreEntry));
+
+    // ordering invariant: mask FIRST, other plugins MIDDLE, restore LAST
+    const plugins: string[] = [maskEntry, ...otherPlugins];
+    if (restoreEntry) plugins.push(restoreEntry);
+    parsed.plugin = plugins;
   }
-
-  const alreadyPresent =
-    existingPlugins.includes(maskEntry) &&
-    (restoreEntry === null || existingPlugins.includes(restoreEntry));
-
-  // ordering invariant: mask FIRST, other plugins MIDDLE, restore LAST
-  const plugins: string[] = [maskEntry, ...otherPlugins];
-  if (restoreEntry) plugins.push(restoreEntry);
-  parsed.plugin = plugins;
 
   let baseUrl = NO_PROXY_REQUESTED;
   if (opts.proxyUrl !== undefined) {
@@ -430,7 +445,18 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
       ``
     );
   }
-  if (resolved) {
+  if (proxyOnly) {
+    nextSteps.push(
+      `1) Proxy-only mode: no plugin registered in ${configPath}.`,
+      strippedPluginCount > 0
+        ? `   Removed ${strippedPluginCount} previously installed pii-remover plugin entr${strippedPluginCount === 1 ? "y" : "ies"}.`
+        : `   No pii-remover plugin entries were present.`,
+      `   Masking happens at the proxy. Running the plugin as well would break restoration:`,
+      `   the two keep separate vaults, so neither can restore the other's tokens.`,
+      ``,
+      `2) Restart OpenCode to drop the plugin.`,
+    );
+  } else if (resolved) {
     nextSteps.push(
       `1) Split-mode plugin registered in ${configPath}:`,
       `   - mask  (first): ${maskEntry}`,

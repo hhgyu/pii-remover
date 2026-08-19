@@ -31,6 +31,18 @@ function memFs(): InstallFs & { files: Map<string, string> } {
 }
 
 describe("parseFlags", () => {
+  test("--proxy-only implies --proxy", () => {
+    const f = parseFlags(["--target", "opencode", "--proxy-only"]);
+    expect(f.proxyOnly).toBe(true);
+    expect(f.proxy).toBe(true);
+  });
+
+  test("--proxy alone does not imply --proxy-only", () => {
+    const f = parseFlags(["--target", "opencode", "--proxy"]);
+    expect(f.proxy).toBe(true);
+    expect(f.proxyOnly).toBeUndefined();
+  });
+
   test("target + command-path", () => {
     const f = parseFlags(["--target", "claude-code", "--command-path", "/x/pii"]);
     expect(f.target).toBe("claude-code");

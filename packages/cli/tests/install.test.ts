@@ -587,6 +587,67 @@ describe("runOpenCodeInstall split-mode", () => {
     expect((parsed.plugin as string[])[0]).toMatch(/mask\.js$/);
   });
 
+  test("proxyOnly registers no plugin but still writes the baseURL", async () => {
+    const fs = memFs();
+    const url = "http://localhost:8000/anthropic/v1";
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: url,
+      proxyOnly: true,
+    });
+
+    const parsed = JSON.parse(fs.files.get(r.settings_path)!);
+    expect(parsed.provider.anthropic.options.baseURL).toBe(url);
+    expect(parsed.plugin).toBeUndefined();
+    expect(r.patched_json).not.toContain("mask.js");
+    expect(r.patched_json).not.toContain("restore.js");
+  });
+
+  test("proxyOnly strips plugin entries a previous install added, keeping foreign ones", async () => {
+    const configPath = path.join("/home/u", ".config", "opencode", "opencode.json");
+    const fs = memFs({
+      [configPath]: JSON.stringify({
+        plugin: [
+          "file:///abs/@pii-remover/opencode-plugin/dist/mask.js",
+          "someone-elses-plugin@1.2.3",
+          "file:///abs/@pii-remover/opencode-plugin/dist/restore.js",
+        ],
+      }),
+    });
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8000/anthropic/v1",
+      proxyOnly: true,
+    });
+
+    const parsed = JSON.parse(fs.files.get(r.settings_path)!);
+    expect(parsed.plugin).toEqual(["someone-elses-plugin@1.2.3"]);
+    expect(r.next_steps.join("\n")).toContain("Removed 2");
+  });
+
+  test("proxyOnly reports nothing removed when no plugin was installed", async () => {
+    const fs = memFs();
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8000/anthropic/v1",
+      proxyOnly: true,
+    });
+    expect(r.hook_already_present).toBe(true);
+    expect(r.next_steps.join("\n")).toContain("No pii-remover plugin entries were present");
+  });
+
   test("proxyUrl does not clobber a different existing baseURL and warns", async () => {
     const configPath = path.join("/home/u", ".config", "opencode", "opencode.json");
     const fs = memFs({
