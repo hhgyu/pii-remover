@@ -31,6 +31,7 @@ import numpy as np
 
 from .config import KoreanNerSettings, get_korean_ner_settings
 from .detection_policy import is_category_enabled
+from .onnx_providers import confirm_providers, preferred_providers
 
 log = logging.getLogger(__name__)
 
@@ -408,14 +409,13 @@ class KoreanNerRunner:
         if not config_path.is_file():
             raise FileNotFoundError(config_path)
 
-        providers = ["CPUExecutionProvider"]
-        if (
-            self._settings.device == "cuda"
-            and "CUDAExecutionProvider" in ort.get_available_providers()
-        ):
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-
+        providers = preferred_providers(
+            self._settings.device, ort.get_available_providers()
+        )
         self._session = ort.InferenceSession(str(model_path), providers=providers)
+        confirm_providers(
+            self._session.get_providers(), providers, component="Korean NER"
+        )
         self._tokenizer = PreTrainedTokenizerFast(  # type: ignore[unused-ignore, no-untyped-call]
             tokenizer_file=str(tokenizer_path)
         )

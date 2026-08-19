@@ -16,8 +16,10 @@
 # /root/.cache/huggingface keep pip/HF downloads in build-time cache only.
 
 # Ubuntu 24.04 rather than 22.04 so the base is current; CUDA deliberately stays
-# on 12.x because onnxruntime-gpu ships cu12 builds. Moving to a CUDA 13 tag
-# would need an ORT build to match, and raises the host driver floor again.
+# on 12.x, which pins onnxruntime-gpu to <1.27 in requirements-gpu.txt — 1.27
+# moved the default PyPI build to CUDA 13, and that wheel loads no CUDA provider
+# here. Moving to a CUDA 13 tag means lifting that bound too, and raises the
+# host driver floor again.
 ARG CUDA_IMAGE=nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04
 ARG PYTHON_VERSION=3.14
 ARG OPF_MODEL_ID=openai/privacy-filter

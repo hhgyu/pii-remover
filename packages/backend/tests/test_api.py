@@ -45,6 +45,7 @@ class FakeOpfRunner(OpfRunner):
     """A regex-driven OPF stand-in that never touches torch/transformers."""
 
     def __init__(self) -> None:
+        super().__init__()
         self._loaded = True
 
     @property
@@ -103,6 +104,8 @@ def test_health_reports_runner_state(client: TestClient) -> None:
     assert body["model"] == "openai/privacy-filter"
     assert body["device"] in ("cpu", "cuda", "mps")
     assert body["model_loaded"] is True
+    # `device` is requested, `providers` is obtained: the fake holds no session.
+    assert body["providers"] == []
 
 
 # --- /redact ------------------------------------------------------------------

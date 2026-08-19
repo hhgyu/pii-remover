@@ -126,6 +126,16 @@ class HealthResponse(BaseModel):
             "True once the OPF model weights and tokenizer are loaded in memory."
         ),
     )
+    providers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "ONNX Runtime execution providers the loaded OPF session actually "
+            "holds, most-preferred first. Empty while the model is unloaded. "
+            "``device`` above is what was *requested*; when a GPU image is "
+            "missing a matching CUDA runtime, ONNX Runtime falls back to "
+            "CPUExecutionProvider without failing, and only this field shows it."
+        ),
+    )
     idle_unloaded: bool = Field(
         default=False,
         description=(

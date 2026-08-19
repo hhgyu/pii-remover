@@ -5,5 +5,11 @@ transformers>=4.55
 huggingface_hub>=0.24
 pytesseract>=0.3.10,<1
 Pillow>=10.0,<12
-onnxruntime-gpu>=1.18,<2
+# Upper bound tracks the base image's CUDA major, not caution about the API.
+# onnxruntime-gpu 1.27+ is built against CUDA 13 on PyPI; on the CUDA 12.9 base
+# image its provider library cannot resolve libcublasLt.so.13, so ONNX Runtime
+# drops to the CPU provider without failing. 1.21-1.26 are built against CUDA
+# 12.8 and run on any CUDA 12.x. Raising this bound requires moving CUDA_IMAGE
+# in Dockerfile.gpu to a CUDA 13 tag, which also raises the host driver floor.
+onnxruntime-gpu>=1.21,<1.27
 onnx>=1.16,<2

@@ -39,6 +39,7 @@ async def health(request: Request) -> HealthResponse:
         model=settings.model_id,
         device=settings.device,
         model_loaded=model_loaded,
+        providers=list(runner.active_providers) if runner is not None else [],
         idle_unloaded=idle_unloaded,
         idle_timeout_seconds=max(0, int(settings.idle_timeout_seconds)),
         seconds_since_last_request=seconds_since,

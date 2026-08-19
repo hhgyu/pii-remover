@@ -23,6 +23,7 @@ import numpy as np
 
 from .config import Settings, get_settings
 from .detection_policy import should_keep_span
+from .onnx_providers import confirm_providers, preferred_providers
 from .schemas import Detection, OpfLabel, RedactResponse
 
 log = logging.getLogger(__name__)
@@ -322,6 +323,15 @@ class OpfRunner:
     def loaded_variant(self) -> str | None:
         return self._loaded_variant
 
+    @property
+    def active_providers(self) -> list[str]:
+        """Providers the live session actually holds, not the ones requested."""
+
+        if self._session is None:
+            return []
+        providers: list[str] = list(self._session.get_providers())
+        return providers
+
     def load(self) -> None:
         """Load the first available ONNX variant."""
 
@@ -501,14 +511,11 @@ class OpfRunner:
         if not config_path.is_file():
             raise FileNotFoundError(config_path)
 
-        providers = ["CPUExecutionProvider"]
-        if (
-            self._settings.device == "cuda"
-            and "CUDAExecutionProvider" in ort.get_available_providers()
-        ):
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-
+        providers = preferred_providers(
+            self._settings.device, ort.get_available_providers()
+        )
         self._session = ort.InferenceSession(str(model_path), providers=providers)
+        confirm_providers(self._session.get_providers(), providers, component="OPF")
         self._tokenizer = PreTrainedTokenizerFast(  # type: ignore[unused-ignore, no-untyped-call]
             tokenizer_file=str(tokenizer_path)
         )
