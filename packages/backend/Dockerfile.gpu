@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1.8
 # pii-remover OPF backend — CUDA image.
 #
-# Uses the official NVIDIA CUDA 12.1 runtime base, installs Python 3.11 +
-# ONNX Runtime dependencies, and pre-bakes OPF INT8 ONNX artifacts. Requires
-# the host to expose a GPU via the NVIDIA Container Toolkit for future CUDA EP
-# use; CPU EP remains a safe fallback.
+# Uses the official NVIDIA CUDA runtime base, installs Python + ONNX Runtime
+# dependencies, and pre-bakes FP32 ONNX artifacts for both models — the CPU
+# image's INT8 weights are a CPU optimisation that costs performance here (see
+# the Korean NER stage). Requires the host to expose a GPU via the NVIDIA
+# Container Toolkit; the CPU EP remains a safe fallback.
 #
 # See ADR-0008 for the build strategy and the GPU compose override at
 # packages/backend/docker-compose.gpu.yml for usage.
@@ -105,25 +106,22 @@ RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv
     uv pip install --extra-index-url https://download.pytorch.org/whl/cpu \
         -r requirements-kner-builder.txt
 
+# FP32, not INT8 as the CPU image builds. The dynamic-quantised operators have
+# no CUDA kernels, so ONNX Runtime partitions the graph and copies tensors back
+# and forth on every node it cannot place: measured on this image, KLUE-NER INT8
+# runs 15.34ms on CUDA against 6.05ms on the CPU provider, while OPF FP32 runs
+# 6.80ms on CUDA against 62.63ms on the CPU. Quantisation is a CPU optimisation;
+# shipping it to the GPU image buys a slower model and a larger download.
 RUN --mount=type=cache,target=/root/.cache/huggingface,sharing=locked \
     --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     python -c "\
-from optimum.onnxruntime import ORTModelForTokenClassification, ORTQuantizer; \
-from optimum.onnxruntime.configuration import AutoQuantizationConfig; \
+from optimum.onnxruntime import ORTModelForTokenClassification; \
 from transformers import AutoTokenizer; \
-import shutil, os; \
 mid = '${KNER_MODEL_ID}'; \
 tok = AutoTokenizer.from_pretrained(mid); \
 m = ORTModelForTokenClassification.from_pretrained(mid, export=True); \
 m.save_pretrained('/models/klue-ner-fp32'); \
-tok.save_pretrained('/models/klue-ner-fp32'); \
-q = ORTQuantizer.from_pretrained('/models/klue-ner-fp32'); \
-q.quantize(save_dir='/models/klue-ner-int8', \
-           quantization_config=AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=True)); \
-[shutil.copy('/models/klue-ner-fp32/' + f, '/models/klue-ner-int8/' + f) \
- for f in ('tokenizer.json','tokenizer_config.json','special_tokens_map.json','vocab.txt') \
- if os.path.exists('/models/klue-ner-fp32/' + f)]" \
-    && rm -rf /models/klue-ner-fp32
+tok.save_pretrained('/models/klue-ner-fp32')"
 
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime
@@ -149,7 +147,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     OPF_ONNX_PATH=/models/opf-int8 \
     OPF_VARIANT=fp32 \
     KNER_MODEL_ID=${KNER_MODEL_ID} \
-    KNER_ONNX_PATH=/models/klue-ner-int8 \
+    KNER_ONNX_PATH=/models/klue-ner-fp32 \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     NVIDIA_VISIBLE_DEVICES=all \
@@ -182,7 +180,7 @@ RUN --mount=from=ghcr.io/astral-sh/uv:latest,source=/uv,target=/usr/local/bin/uv
     && python -VV
 
 COPY --from=opf-weights --chown=app:app /models/opf-int8 /models/opf-int8
-COPY --from=kner-export --chown=app:app /models/klue-ner-int8 /models/klue-ner-int8
+COPY --from=kner-export --chown=app:app /models/klue-ner-fp32 /models/klue-ner-fp32
 
 COPY --chown=app:app server/ ./server/
 COPY --chown=app:app pyproject.toml ./pyproject.toml

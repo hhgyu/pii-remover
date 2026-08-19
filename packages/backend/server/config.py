@@ -33,12 +33,13 @@ Phase 7 (Korean NER, ADR-0007 v2):
 - ``KNER_MIN_CONFIDENCE`` (``0.3``): drop spans below this score.
 - ``KNER_PRELOAD`` (``0``): set to ``1`` to load weights at app startup
   instead of lazily on first request.
-- ``KNER_ONNX_PATH`` (``/models/klue-ner-int8`` inside Docker, unset elsewhere):
-  directory containing pre-baked ``model_quantized.onnx`` (INT8) or
-  ``model.onnx`` (FP32) plus the tokenizer files. Phase 7 PoC verdict C
-  (see scripts/POC-INT8.md) selects INT8 by default; falls back to FP32
-  if the INT8 file is missing and to PyTorch+HF download if neither
-  ONNX file is present.
+- ``KNER_ONNX_PATH`` (set inside Docker, unset elsewhere): directory containing
+  pre-baked ``model_quantized.onnx`` (INT8) or ``model.onnx`` (FP32) plus the
+  tokenizer files. INT8 is tried first, then FP32, then a PyTorch+HF download.
+  The CPU images bake INT8 per Phase 7 PoC verdict C (scripts/POC-INT8.md) and
+  point here at ``/models/klue-ner-int8``; the GPU image bakes FP32 at
+  ``/models/klue-ner-fp32``, because the quantised operators have no CUDA
+  kernels and run slower there than on the CPU provider.
 
 Centralised here so ``opf_runner`` and ``main`` share one source of truth.
 """
