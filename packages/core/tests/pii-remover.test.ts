@@ -442,7 +442,8 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       warn: silentWarn(),
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
-    const original = "Contact alice@example.com or visit https://example.com";
+    const original =
+      "Contact alice@example.com or visit https://wiki.acme.internal/runbook";
     const masked = await pii.mask(original);
     expect(masked.text).not.toBe(original);
     expect(masked.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);

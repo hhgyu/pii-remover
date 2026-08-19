@@ -13,6 +13,16 @@ Environment variables (with defaults):
 - ``OPF_ONNX_PATH`` (``/models/opf-int8`` inside Docker, unset elsewhere):
   directory containing OPF ONNX artifacts + tokenizer/config files.
 - ``OPF_VARIANT`` (``int8``): preferred ONNX variant (``int8`` | ``fp32``).
+- ``OPF_DISABLED_CATEGORIES`` (unset): comma-separated PII categories to drop
+  before they reach the vault, e.g. ``private_url,private_date``.
+
+Detection policy (see :mod:`server.detection_policy`):
+
+- ``PII_URL_POLICY`` (``heuristic``): ``heuristic`` masks only URLs that carry
+  credentials, resolve inside a network, or name a tenant workspace.
+  ``strict`` masks every URL, which is what the model alone used to do.
+- ``PII_PRIVATE_URL_HOSTS`` (unset): comma-separated extra hosts to treat as
+  private, e.g. ``acme.com,git.acme.io``. Subdomains are covered.
 
 Phase 7 (Korean NER, ADR-0007 v2):
 
@@ -38,10 +48,15 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, get_args
+
+from .schemas import PiiLabel
 
 Device = Literal["cpu", "cuda", "mps"]
 OpfVariant = Literal["int8", "fp32"]
+UrlPolicy = Literal["heuristic", "strict"]
+
+_PII_LABELS: frozenset[str] = frozenset(get_args(PiiLabel))
 
 
 def _env_str(name: str, default: str) -> str:
@@ -75,6 +90,38 @@ def _normalise_opf_variant(raw: str) -> OpfVariant:
     raise ValueError(f"OPF_VARIANT must be one of int8|fp32, got {raw!r}")
 
 
+def _normalise_url_policy(raw: str) -> UrlPolicy:
+    lowered = raw.strip().lower()
+    if lowered in ("heuristic", "strict"):
+        return lowered  # type: ignore[return-value]
+    raise ValueError(f"PII_URL_POLICY must be one of heuristic|strict, got {raw!r}")
+
+
+def _env_csv(name: str) -> tuple[str, ...]:
+    raw = os.environ.get(name)
+    if raw is None:
+        return ()
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _env_disabled_categories(name: str) -> frozenset[str]:
+    """Parse a comma-separated category list, rejecting unknown labels.
+
+    A typo here silently leaves PII flowing to the LLM, which is the one
+    failure mode this project cannot absorb quietly — so it fails startup
+    instead.
+    """
+
+    labels = {value.lower() for value in _env_csv(name)}
+    unknown = sorted(labels - _PII_LABELS)
+    if unknown:
+        raise ValueError(
+            f"{name} contains unknown categories {unknown}; "
+            f"valid categories are {sorted(_PII_LABELS)}"
+        )
+    return frozenset(labels)
+
+
 @dataclass(frozen=True)
 class Settings:
     """Immutable runtime configuration."""
@@ -91,6 +138,9 @@ class Settings:
     log_level: str
     idle_timeout_seconds: int
     idle_check_interval_seconds: int
+    url_policy: UrlPolicy
+    private_url_hosts: tuple[str, ...]
+    disabled_categories: frozenset[str]
 
 
 @lru_cache(maxsize=1)
@@ -114,6 +164,9 @@ def get_settings() -> Settings:
         log_level=_env_str("OPF_LOG_LEVEL", "info"),
         idle_timeout_seconds=_env_int("OPF_IDLE_TIMEOUT_SECONDS", 1800),
         idle_check_interval_seconds=_env_int("OPF_IDLE_CHECK_INTERVAL_SECONDS", 60),
+        url_policy=_normalise_url_policy(_env_str("PII_URL_POLICY", "heuristic")),
+        private_url_hosts=_env_csv("PII_PRIVATE_URL_HOSTS"),
+        disabled_categories=_env_disabled_categories("OPF_DISABLED_CATEGORIES"),
     )
 
 

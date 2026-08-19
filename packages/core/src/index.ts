@@ -111,6 +111,17 @@ export type { DetectorOptions } from "./detector/index.js";
 export { findSecrets, SECRET_PATTERNS } from "./detector/secret-scanner.js";
 export type { FindSecretsOptions } from "./detector/secret-scanner.js";
 export { findUsSsns, isValidSsn } from "./detector/regex/us-ssn.js";
+export {
+  isPrivateUrl,
+  hostMatches,
+  normaliseHostSuffix,
+  PRIVATE_HOST_SUFFIXES,
+  CREDENTIAL_QUERY_KEYS,
+} from "./detector/url-policy.js";
+export type {
+  UrlPolicy,
+  IsPrivateUrlOptions,
+} from "./detector/url-policy.js";
 
 export { HmacTokenizer, deriveHmacKey } from "./redaction/hmac.js";
 export { TypeRedactor } from "./redaction/redact.js";

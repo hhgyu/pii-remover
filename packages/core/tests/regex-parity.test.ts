@@ -40,6 +40,7 @@ const FIXTURE_PATH = join(HERE, "..", "..", "..", "tests", "fixtures", "regex-pa
 const PARITY_CATEGORIES: ReadonlyArray<PIICategory> = [
   "private_email",
   "private_phone",
+  "private_url",
   "rrn",
   "biz_num",
   "card",

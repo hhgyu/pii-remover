@@ -15,6 +15,11 @@ import {
 } from "../detector/regex/index.js";
 import { findKoreanNames } from "../detector/korean-heuristic/index.js";
 import { findSecrets } from "../detector/secret-scanner.js";
+import { isPrivateUrl } from "../detector/url-policy.js";
+import type {
+  IsPrivateUrlOptions,
+  UrlPolicy,
+} from "../detector/url-policy.js";
 
 const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 
@@ -55,6 +60,8 @@ export interface LocalRegexBackendOptions {
   enable_korean_pii?: boolean;
   strict_rrn_checksum?: boolean;
   detect_us_ssn?: boolean;
+  url_policy?: UrlPolicy;
+  private_url_hosts?: ReadonlyArray<string>;
 }
 
 export class LocalRegexBackend implements BackendClient {
@@ -64,6 +71,7 @@ export class LocalRegexBackend implements BackendClient {
   private readonly enableKorean: boolean;
   private readonly strictRrnChecksum: boolean;
   private readonly detectUsSsn: boolean;
+  private readonly urlPolicyOptions: IsPrivateUrlOptions;
 
   constructor(opts: LocalRegexBackendOptions = {}) {
     const requested = opts.enabledCategories ?? DEFAULT_ENABLED;
@@ -72,6 +80,10 @@ export class LocalRegexBackend implements BackendClient {
     this.enableKorean = opts.enable_korean_pii !== false;
     this.strictRrnChecksum = opts.strict_rrn_checksum !== false;
     this.detectUsSsn = opts.detect_us_ssn === true;
+    this.urlPolicyOptions = {
+      policy: opts.url_policy ?? "heuristic",
+      extraPrivateSuffixes: opts.private_url_hosts ?? [],
+    };
   }
 
   async detect(text: string, opts: DetectOpts): Promise<DetectionResult> {
@@ -116,6 +128,7 @@ export class LocalRegexBackend implements BackendClient {
       for (const m of text.matchAll(URL_REGEX)) {
         const start = m.index ?? 0;
         const cleaned = m[0].replace(/[.,;:!?)\]}>]+$/, "");
+        if (!isPrivateUrl(cleaned, this.urlPolicyOptions)) continue;
         all.push({
           start,
           end: start + cleaned.length,

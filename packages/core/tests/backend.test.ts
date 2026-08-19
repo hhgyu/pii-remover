@@ -14,14 +14,15 @@ describe("LocalRegexBackend — English-only PII (Phase 1)", () => {
     expect(r.detections[0]!.text).toBe("user@example.com");
   });
 
-  test("detects http/https URLs", async () => {
+  test("detects private http/https URLs and leaves public ones alone", async () => {
     const b = new LocalRegexBackend();
     const r = await b.detect(
       "see https://example.com/path?q=1 and http://api.test/x",
       opts
     );
     const urls = r.detections.filter((d) => d.category === "private_url");
-    expect(urls).toHaveLength(2);
+    expect(urls).toHaveLength(1);
+    expect(urls[0]!.text).toBe("http://api.test/x");
   });
 
   test("detects card number with valid LUHN", async () => {

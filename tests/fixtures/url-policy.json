@@ -1,0 +1,179 @@
+{
+  "$schema": "Cross-language URL policy parity fixture.",
+  "$invariant": "Python server.detection_policy.is_private_url and TS isPrivateUrl MUST return the same verdict for every case below, under the same options.",
+  "$semantics": "private=true means the URL is masked as PII. A URL is private only when it carries a credential, resolves inside a network, or names a tenant workspace — not because its domain is obscure.",
+  "cases": [
+    {
+      "name": "public github repo — the regression this fixture exists for",
+      "url": "https://github.com/GeunSam2/korail_KTX_macro_telegrambot",
+      "private": false
+    },
+    {
+      "name": "public github repo with hyphens",
+      "url": "https://github.com/yakisoba0728/korail-mobile-api",
+      "private": false
+    },
+    {
+      "name": "public github repo, short name",
+      "url": "https://github.com/ukkidokiyo/korail2",
+      "private": false
+    },
+    {
+      "name": "public github repo, handle looks like a person",
+      "url": "https://github.com/hostkimjang/korail-auto-waitlist",
+      "private": false
+    },
+    {
+      "name": "github pages site under a personal handle",
+      "url": "https://hostkimjang.github.io/docs/index.html",
+      "private": false
+    },
+    {
+      "name": "raw githubusercontent file",
+      "url": "https://raw.githubusercontent.com/openai/whisper/main/README.md",
+      "private": false
+    },
+    {
+      "name": "package registry",
+      "url": "https://pypi.org/project/httpx/",
+      "private": false
+    },
+    {
+      "name": "docs site",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/fetch",
+      "private": false
+    },
+    {
+      "name": "personal blog platform",
+      "url": "https://velog.io/@somebody/some-post",
+      "private": false
+    },
+    {
+      "name": "public page with a benign query string",
+      "url": "https://github.com/openai/whisper?tab=readme-ov-file#setup",
+      "private": false
+    },
+    {
+      "name": "public host on a non-standard port is still public",
+      "url": "https://docs.example.com:8443/guide",
+      "private": false
+    },
+    {
+      "name": "userinfo credentials",
+      "url": "https://alice:hunter2@example.com/repo.git",
+      "private": true
+    },
+    {
+      "name": "token in query, public host",
+      "url": "https://example.com/export?token=abc123",
+      "private": true
+    },
+    {
+      "name": "presigned S3 link",
+      "url": "https://acme-bucket.s3.amazonaws.com/backup.sql?X-Amz-Signature=deadbeef&X-Amz-Expires=900",
+      "private": true
+    },
+    {
+      "name": "api key in query",
+      "url": "https://api.example.com/v1/users?api_key=sk-live-1234",
+      "private": true
+    },
+    {
+      "name": "loopback address",
+      "url": "http://127.0.0.1:8000/redact",
+      "private": true
+    },
+    {
+      "name": "private network address",
+      "url": "http://10.0.14.22/grafana/d/abc",
+      "private": true
+    },
+    {
+      "name": "IPv6 literal",
+      "url": "http://[fd00::1]:9090/metrics",
+      "private": true
+    },
+    {
+      "name": "single-label intranet host",
+      "url": "http://jenkins/job/deploy/142/console",
+      "private": true
+    },
+    {
+      "name": "localhost with port",
+      "url": "http://localhost:3000/admin",
+      "private": true
+    },
+    {
+      "name": "internal TLD",
+      "url": "https://wiki.acme.internal/runbooks",
+      "private": true
+    },
+    {
+      "name": "corp TLD",
+      "url": "https://payroll.acme.corp/employees/4471",
+      "private": true
+    },
+    {
+      "name": "ngrok tunnel",
+      "url": "https://a1b2c3.ngrok-free.app/webhook",
+      "private": true
+    },
+    {
+      "name": "atlassian tenant",
+      "url": "https://acme.atlassian.net/browse/SEC-1183",
+      "private": true
+    },
+    {
+      "name": "sharepoint tenant",
+      "url": "https://acme.sharepoint.com/sites/hr/Shared%20Documents/salaries.xlsx",
+      "private": true
+    },
+    {
+      "name": "google docs document",
+      "url": "https://docs.google.com/document/d/1AbCdEf/edit",
+      "private": true
+    },
+    {
+      "name": "notion workspace page",
+      "url": "https://notion.so/acme/Onboarding-8f21",
+      "private": true
+    },
+    {
+      "name": "non-http scheme is not a URL detection concern",
+      "url": "ftp://files.example.com/pub/readme.txt",
+      "private": false
+    }
+  ],
+  "strict_policy_cases": [
+    {
+      "name": "strict masks an ordinary public repo",
+      "url": "https://github.com/openai/whisper",
+      "private": true
+    },
+    {
+      "name": "strict still ignores non-http schemes",
+      "url": "ftp://files.example.com/pub/readme.txt",
+      "private": false
+    }
+  ],
+  "extra_private_suffix_cases": [
+    {
+      "name": "operator-declared corporate domain",
+      "url": "https://admin.acme.com/users/1234",
+      "extra_private_suffixes": ["acme.com"],
+      "private": true
+    },
+    {
+      "name": "operator-declared domain written as a wildcard",
+      "url": "https://git.acme.io/team/repo",
+      "extra_private_suffixes": ["*.acme.io"],
+      "private": true
+    },
+    {
+      "name": "a sibling domain stays public",
+      "url": "https://github.com/acme/repo",
+      "extra_private_suffixes": ["acme.com"],
+      "private": false
+    }
+  ]
+}

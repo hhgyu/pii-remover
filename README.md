@@ -190,7 +190,7 @@ Backend-side; `OpfRunner.unload()` + `KoreanNerRunner.unload()` release ONNX ses
 | `private_address` | postal addresses | OPF |
 | `account_number` | account / ID numbers | OPF |
 | `private_date` | DOB | OPF |
-| `private_url` | private/internal URLs | OPF |
+| `private_url` | credential-bearing, intranet, or tenant-workspace URLs — public repo/doc links are **not** masked ([policy](./packages/backend/README.md#which-urls-count-as-pii)) | OPF |
 | `secret` | API keys (AWS, OpenAI, Anthropic, Google, Stripe, GitLab, SendGrid, DigitalOcean, Twilio, Shopify, Postman, Databricks, PyPI, Mailgun, Discord, Telegram, Slack), GitHub tokens (PAT/OAuth/fine-grained/refresh), PEM private keys, JWT, npm tokens, connection strings with passwords | OPF + regex |
 | `rrn` | Korean 주민등록번호 | weight `[2,3,4,5,6,7,8,9,2,3,4,5]` checksum |
 | `biz_num` | Korean 사업자등록번호 | weight `[1,3,7,1,3,7,1,3,5]` checksum |

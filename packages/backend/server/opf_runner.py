@@ -22,6 +22,7 @@ from typing import Any, cast
 import numpy as np
 
 from .config import Settings, get_settings
+from .detection_policy import should_keep_span
 from .schemas import Detection, OpfLabel, RedactResponse
 
 log = logging.getLogger(__name__)
@@ -435,6 +436,9 @@ class OpfRunner:
         pred_ids = _viterbi_decode(logits, self._id2label, self._viterbi_biases)
         pred_scores = _softmax(logits)
         spans = _decode_bioes(pred_ids, pred_scores, offsets, text, self._id2label)
+        # Filtering here rather than at the API layer keeps `redacted_text` and
+        # `detections` built from the same list; moving it out desyncs them.
+        spans = [s for s in spans if should_keep_span(s.label, text[s.start : s.end])]
         t3 = perf_counter() if profile else 0.0
         if profile:
             log.info(

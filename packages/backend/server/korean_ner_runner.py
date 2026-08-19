@@ -30,6 +30,7 @@ from typing import Any
 import numpy as np
 
 from .config import KoreanNerSettings, get_korean_ner_settings
+from .detection_policy import is_category_enabled
 
 log = logging.getLogger(__name__)
 
@@ -332,12 +333,16 @@ class KoreanNerRunner:
         logits = np.asarray(outputs[0])[0]
         pred_ids = logits.argmax(axis=-1)
         pred_scores = _softmax(logits)
-        spans = _filter_min_confidence(
-            _filter_short_person_spans(
-                _decode_bio(pred_ids, pred_scores, offsets, text, self._id2label),
-            ),
-            threshold,
-        )
+        spans = [
+            s
+            for s in _filter_min_confidence(
+                _filter_short_person_spans(
+                    _decode_bio(pred_ids, pred_scores, offsets, text, self._id2label),
+                ),
+                threshold,
+            )
+            if s.category is None or is_category_enabled(s.category)
+        ]
         t3 = perf_counter() if profile else 0.0
         if profile:
             log.info(

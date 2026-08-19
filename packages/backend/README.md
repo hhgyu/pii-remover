@@ -291,6 +291,40 @@ All settings are environment variables consumed by `server.config.Settings`:
 | `OPF_HF_CACHE_DIR`   | (unset)                | Override HF cache dir                    |
 | `OPF_BATCH_MAX`      | `32`                   | Max texts per `/redact/batch` request    |
 | `OPF_LOG_LEVEL`      | `info`                 | uvicorn / app log level                  |
+| `OPF_DISABLED_CATEGORIES` | (unset)           | Comma-separated categories to drop entirely, e.g. `private_url`. An unknown name fails startup rather than silently detecting nothing. |
+| `PII_URL_POLICY`     | `heuristic`            | `heuristic` \| `strict` — see below      |
+| `PII_PRIVATE_URL_HOSTS` | (unset)             | Comma-separated extra hosts to treat as private, e.g. `acme.com,git.acme.io`. Subdomains included; `*.acme.com` and `.acme.com` also accepted. |
+
+### Which URLs count as PII
+
+The OPF model labels ordinary public links — GitHub repositories, package
+registries, documentation — as `private_url`, sometimes at a confidence as low
+as 0.15. Masking those breaks the assistant: it is handed `[OPF:PRIVATE_URL]`
+instead of the page it was asked to read.
+
+`private_url` means *private* URL, and privacy is not a property of how famous
+a domain is — it is whether a stranger can open the link. Under the default
+`heuristic` policy a URL is masked only when one of these holds:
+
+- **it carries a credential** — `https://user:pass@host/…`, or a query
+  parameter like `token`, `api_key`, `secret`, `sig`, `X-Amz-Signature`
+  (a presigned S3 link is on a very public domain and still private);
+- **its host is not on the public internet** — an IP literal, a single-label
+  host (`http://jenkins/job/…`), `localhost`, an `.internal` / `.corp` / `.lan`
+  suffix, or a tunnel (`*.ngrok-free.app`, `*.trycloudflare.com`);
+- **its host names a tenant workspace** — `*.atlassian.net`,
+  `*.sharepoint.com`, `*.okta.com`, `docs.google.com`, `notion.so` and friends,
+  where the content behind the link needs an account.
+
+Everything else passes through untouched.
+
+The trade-off is explicit: an internal URL on an ordinary public-looking domain
+(`https://admin.acme.com/users/1234`) is **not** masked by default, because
+nothing about it looks non-public from the outside. Add such domains with
+`PII_PRIVATE_URL_HOSTS=acme.com`, or set `PII_URL_POLICY=strict` to mask every
+URL as before. The rules live in `server/detection_policy.py`, mirrored in
+`packages/core/src/detector/url-policy.ts` and pinned by
+`tests/fixtures/url-policy.json`.
 
 ## Local development
 

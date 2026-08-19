@@ -142,7 +142,7 @@ export PII_REMOVER_PROXY_TRUST=1
 | `private_address` | 서울특별시 ... | OPF |
 | `account_number` | 계좌/ID 번호 | OPF |
 | `private_date` | DOB | OPF |
-| `private_url` | 사내 URL | OPF |
+| `private_url` | 자격증명이 담긴 URL, 사내망 주소, 테넌트 워크스페이스 — 공개 저장소·문서 링크는 마스킹하지 **않음** ([정책](./packages/backend/README.md#which-urls-count-as-pii)) | OPF |
 | `secret` | API 키 (AWS, OpenAI, Anthropic, Google, Stripe, GitLab, SendGrid, DigitalOcean, Twilio, Shopify, Postman, Databricks, PyPI, Mailgun, Discord, Telegram, Slack), GitHub 토큰 (PAT/OAuth/fine-grained/refresh), PEM 개인키, JWT, npm 토큰, 비밀번호 포함 연결문자열 | OPF + regex |
 | `rrn` | 주민등록번호 | 가중치 `[2,3,4,5,6,7,8,9,2,3,4,5]` 체크섬 |
 | `biz_num` | 사업자등록번호 | 가중치 `[1,3,7,1,3,7,1,3,5]` 체크섬 |

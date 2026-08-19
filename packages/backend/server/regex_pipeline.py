@@ -9,10 +9,19 @@ the OPF token-classification model.
 The OPF model can produce false positives on noisy OCR output, so
 Phase 6 image redaction uses only regex/checksum detectors. English PII
 categories owned exclusively by OPF (``private_person``,
-``private_address``, ``private_url``, ``secret``, ``private_date``,
-``account_number``) are deferred to a later phase (see ADR-0009 §Phase 7
-KLUE-NER integration). Korean given-name heuristics are *intentionally*
-excluded here per the Phase 6 plan to avoid OCR-driven false positives.
+``private_address``, ``secret``, ``private_date``, ``account_number``)
+are deferred to a later phase (see ADR-0009 §Phase 7 KLUE-NER
+integration). Korean given-name heuristics are *intentionally* excluded
+here per the Phase 6 plan to avoid OCR-driven false positives.
+
+``private_url`` is the exception, and it is here out of necessity. OPF's
+recall on URLs is erratic — measured at 0.993 on ``wiki.acme.internal``,
+0.340 on a public GitHub repo, and *nothing at all* on
+``acme.atlassian.net`` or ``docs.google.com``. Since
+:mod:`server.detection_policy` decides which URLs are private, it needs a
+detector that reliably finds every URL to decide about; leaving that to the
+model meant tenant-workspace links silently reached the LLM. This mirrors
+``URL_REGEX`` in ``packages/core/src/backend/local-regex.ts``.
 """
 
 from __future__ import annotations
@@ -21,12 +30,15 @@ import re
 from dataclasses import dataclass
 from typing import Final, Literal
 
+from .detection_policy import enabled_categories, should_mask_url
+
 #: Categories detectable by the regex pipeline. Subset of the broader
 #: ``server.schemas.PiiCategory`` Literal — values are intentionally the
 #: same strings so a successful match is assignable to ``PiiCategory``.
 RegexCategory = Literal[
     "private_email",
     "private_phone",
+    "private_url",
     "rrn",
     "biz_num",
     "card",
@@ -36,6 +48,7 @@ ALL_REGEX_CATEGORIES: Final[frozenset[str]] = frozenset(
     {
         "private_email",
         "private_phone",
+        "private_url",
         "rrn",
         "biz_num",
         "card",
@@ -62,6 +75,14 @@ class RegexSpan:
 _EMAIL_RE: Final[re.Pattern[str]] = re.compile(
     r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"
 )
+
+#: URL shape aligned with ``URL_REGEX`` in
+#: ``packages/core/src/backend/local-regex.ts``. Deliberately greedy — the
+#: trailing sentence punctuation a writer leaves on a link is stripped by
+#: :data:`_URL_TRAILING_RE` afterwards, exactly as the TS side does.
+_URL_RE: Final[re.Pattern[str]] = re.compile(r"\bhttps?://[^\s<>\"'`)]+")
+
+_URL_TRAILING_RE: Final[re.Pattern[str]] = re.compile(r"[.,;:!?)\]}>]+$")
 
 #: Korean mobile-phone pattern from ``packages/core/.../korean-phone.ts``.
 _KR_PHONE_RE: Final[re.Pattern[str]] = re.compile(
@@ -143,7 +164,7 @@ def find_pii_spans(
     :func:`server.opf_runner._mask_text`).
     """
 
-    active: frozenset[str] = (
+    active: frozenset[str] = enabled_categories(
         categories if categories is not None else ALL_REGEX_CATEGORIES
     )
     spans: list[RegexSpan] = []
@@ -157,6 +178,21 @@ def find_pii_spans(
                     category="private_email",
                     confidence=0.99,
                     text=m.group(0),
+                )
+            )
+
+    if "private_url" in active:
+        for m in _URL_RE.finditer(text):
+            cleaned = _URL_TRAILING_RE.sub("", m.group(0))
+            if not cleaned or not should_mask_url(cleaned):
+                continue
+            spans.append(
+                RegexSpan(
+                    start=m.start(),
+                    end=m.start() + len(cleaned),
+                    category="private_url",
+                    confidence=0.95,
+                    text=cleaned,
                 )
             )
 
@@ -218,9 +254,10 @@ def find_pii_spans(
             )
 
     # Sort by (start, -end) so the longest span at a given start wins. The
-    # priority order (rrn > biz_num > card > phone > email) is encoded
+    # priority order (rrn > biz_num > card > url > phone > email) is encoded
     # by the order in which spans are added; Python's sort is stable so ties
-    # preserve that order.
+    # preserve that order. A URL that embeds an email or a phone number wins
+    # on position alone — it starts to the left of whatever it contains.
     spans.sort(key=lambda s: (s.start, -s.end))
     return _dedupe_overlapping(spans)
 

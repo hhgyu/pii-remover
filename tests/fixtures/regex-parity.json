@@ -124,6 +124,46 @@
       "name": "email TLD followed by word char — rejected by \\b",
       "text": "fail abc@def.co1more end",
       "expected": []
+    },
+    {
+      "name": "private URL in prose",
+      "text": "runbook at https://wiki.acme.internal/runbooks today",
+      "expected": [
+        { "category": "private_url", "text": "https://wiki.acme.internal/runbooks", "start": 11, "end": 46 }
+      ]
+    },
+    {
+      "name": "public repo URL — no detection",
+      "text": "see https://github.com/openai/whisper for setup",
+      "expected": []
+    },
+    {
+      "name": "private URL with trailing period — punctuation stripped",
+      "text": "visit https://wiki.acme.internal/runbooks.",
+      "expected": [
+        { "category": "private_url", "text": "https://wiki.acme.internal/runbooks", "start": 6, "end": 41 }
+      ]
+    },
+    {
+      "name": "credentialed URL swallows the email inside it",
+      "text": "clone https://alice:hunter2@example.com/repo.git now",
+      "expected": [
+        { "category": "private_url", "text": "https://alice:hunter2@example.com/repo.git", "start": 6, "end": 48 }
+      ]
+    },
+    {
+      "name": "tenant workspace URL",
+      "text": "ticket https://acme.atlassian.net/browse/SEC-1183",
+      "expected": [
+        { "category": "private_url", "text": "https://acme.atlassian.net/browse/SEC-1183", "start": 7, "end": 49 }
+      ]
+    },
+    {
+      "name": "presigned link on a public host",
+      "text": "grab https://acme.s3.amazonaws.com/db.sql?X-Amz-Signature=deadbeef now",
+      "expected": [
+        { "category": "private_url", "text": "https://acme.s3.amazonaws.com/db.sql?X-Amz-Signature=deadbeef", "start": 5, "end": 66 }
+      ]
     }
   ]
 }
