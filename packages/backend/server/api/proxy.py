@@ -146,7 +146,17 @@ def get_session_pool(app: Any) -> ProxySessionPool:
         resolution = resolve_token_key()
         if resolution.warning:
             log.warning("%s", resolution.warning)
-        log.info("proxy token key resolved from %s", resolution.source)
+        if resolution.source == "env":
+            log.info("proxy token key resolved from the environment")
+        else:
+            log.warning(
+                "proxy token key resolved from %s, not PII_REMOVER_TOKEN_KEY. "
+                "The key lives on the container filesystem and is lost when the "
+                "container is recreated, so tokens minted now become "
+                "unrestorable and will not match a host-side hook. Set "
+                "PII_REMOVER_TOKEN_KEY to pin it.",
+                resolution.source,
+            )
         pool = ProxySessionPool(
             detect=lambda text: _detect_in_process(app, text),
             token_key=resolution.key,
