@@ -18,7 +18,7 @@ describe("runHealthCommand", () => {
       stdout: (s) => out.push(s),
       stderr: (s) => err.push(s),
       env: { ANTHROPIC_BASE_URL: "http://localhost:8765/anthropic/v1" },
-      fetchFn: mockFetch({ ok: true, version: "0.0.1" }),
+      fetchFn: mockFetch({ ok: true, version: "0.0.2" }),
     });
     expect(r.exitCode).toBe(0);
     expect(out.join("")).toContain("\"ok\":true");

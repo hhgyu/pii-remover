@@ -1,6 +1,6 @@
 {
   "name": "@pii-remover/shared-types",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Reserved placeholder for cross-package shared types (currently empty; see @pii-remover/core for canonical types)",
   "license": "Apache-2.0",

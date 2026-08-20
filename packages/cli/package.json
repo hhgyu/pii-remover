@@ -1,6 +1,6 @@
 {
   "name": "@pii-remover/cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "PII Remover CLI — UserPromptSubmit hook installer + detect/health utilities for Claude Code, OpenCode, and OpenAI Codex CLI. Detection + fail-closed gate; actual masking is delegated to @pii-remover/proxy.",
   "license": "Apache-2.0",
   "type": "module",

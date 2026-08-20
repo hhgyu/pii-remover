@@ -1,6 +1,6 @@
 {
   "name": "@pii-remover/proxy",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Reference implementation of the PII masking proxy. The shipped runtime is the Python port in packages/backend; this package is retained, unpublished, as the source of truth for the golden vectors that prove the port correct (scripts/gen-*-vectors.ts) and for the eval harness's streaming mutator.",
   "license": "Apache-2.0",
   "private": true,

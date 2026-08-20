@@ -55,7 +55,7 @@ export function parseArgs(argv: readonly string[]): CliOptions {
       process.stderr.write(usage());
       process.exit(0);
     } else if (arg === "--version" || arg === "-v") {
-      process.stderr.write(`pii-remover-mcp 0.0.1\n`);
+      process.stderr.write(`pii-remover-mcp 0.0.2\n`);
       process.exit(0);
     } else {
       throw new Error(`Unknown argument: ${arg}`);

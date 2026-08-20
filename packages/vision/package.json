@@ -1,6 +1,6 @@
 {
   "name": "@pii-remover/vision",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Thin HTTP client for the @pii-remover/backend /redact/image endpoint (Phase 6, ADR-0009). All heavy lifting (OCR, masking) runs server-side in Python.",
   "license": "Apache-2.0",
   "type": "module",
