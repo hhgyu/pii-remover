@@ -1,0 +1,26 @@
+name: ci
+
+# The only workflow that runs the whole TypeScript workspace. The per-package
+# builds filter by `paths`, so a PR touching just packages/proxy used to run
+# nothing at all, and npm-publish (tags only) was the first place a broken test
+# could surface -- during a release. Runners have no detection backend, so a
+# test that reaches for localhost:8000 fails here, on the PR that introduces it.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    uses: ./.github/workflows/reusable-bun-checks.yml
+    with:
+      verify-versions: true
+      verify-vectors: true
