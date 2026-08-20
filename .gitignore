@@ -1,3 +1,9 @@
+### Agent scratch state
+# Coding-agent session/continuation state. Not project content, and the root
+# package.json `version` script runs `git add -A`, so anything left here is
+# swept into the release commit (that is how it landed in 2f211fe).
+.omo/
+
 ### Node
 # Dependencies
 node_modules/
