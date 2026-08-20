@@ -3,6 +3,11 @@
   "version": "0.0.3",
   "description": "MCP (Model Context Protocol) server exposing @pii-remover/core sanitize/desanitize/analyze tools",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hhgyu/pii-remover.git",
+    "directory": "packages/mcp-server"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

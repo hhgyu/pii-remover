@@ -3,6 +3,11 @@
   "version": "0.0.3",
   "description": "OpenCode plugin: routes tool input through @pii-remover/core for PII masking (Phase 1: masking only)",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hhgyu/pii-remover.git",
+    "directory": "packages/opencode-plugin"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

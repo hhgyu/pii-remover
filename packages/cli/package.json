@@ -3,6 +3,11 @@
   "version": "0.0.3",
   "description": "PII Remover CLI — UserPromptSubmit hook installer + detect/health utilities for Claude Code, OpenCode, and OpenAI Codex CLI. Detection + fail-closed gate; actual masking is delegated to @pii-remover/proxy.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hhgyu/pii-remover.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

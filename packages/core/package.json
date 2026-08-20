@@ -3,6 +3,11 @@
   "version": "0.0.3",
   "description": "Host-agnostic core: detector, vault, restorer, backend strategy",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hhgyu/pii-remover.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -3,6 +3,11 @@
   "version": "0.0.3",
   "description": "Thin HTTP client for the @pii-remover/backend /redact/image endpoint (Phase 6, ADR-0009). All heavy lifting (OCR, masking) runs server-side in Python.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hhgyu/pii-remover.git",
+    "directory": "packages/vision"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
