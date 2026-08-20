@@ -1,6 +1,6 @@
 {
   "name": "@pii-remover/opencode-plugin",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "OpenCode plugin: routes tool input through @pii-remover/core for PII masking (Phase 1: masking only)",
   "license": "Apache-2.0",
   "repository": {

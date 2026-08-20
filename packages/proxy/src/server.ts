@@ -71,7 +71,7 @@ export interface ProxyServer {
   stop(): Promise<void>;
 }
 
-const VERSION = "0.0.3";
+const VERSION = "0.0.4";
 
 export async function startProxy(
   opts: StartProxyOptions = {}

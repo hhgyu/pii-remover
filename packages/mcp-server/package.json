@@ -1,6 +1,6 @@
 {
   "name": "@pii-remover/mcp-server",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "MCP (Model Context Protocol) server exposing @pii-remover/core sanitize/desanitize/analyze tools",
   "license": "Apache-2.0",
   "repository": {
