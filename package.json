@@ -1,6 +1,6 @@
 {
   "name": "pii-remover",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "PII auto-masking/restoration plugin for OpenCode and Claude Code",
   "license": "Apache-2.0",

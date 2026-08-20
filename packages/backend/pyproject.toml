@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pii-remover-backend"
-version = "0.0.2"
+version = "0.0.3"
 description = "FastAPI HTTP backend wrapping openai/privacy-filter for the pii-remover project (gh0stkey OPF API compatible)."
 readme = "README.md"
 requires-python = ">=3.14"
