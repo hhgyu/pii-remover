@@ -51,10 +51,13 @@ docker compose up --build   # 초회 ~5-10분 (모델 weights 다운로드)
 
 **Claude Code**:
 ```bash
-npx @pii-remover/cli install --target claude-code
+npx @pii-remover/cli install --target claude-code --proxy
 docker compose -f packages/backend/docker-compose.yml up -d
-export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
 ```
+
+`--proxy`가 `~/.claude/settings.json`의 `env.ANTHROPIC_BASE_URL`을 써넣고, Claude Code는
+세션 시작 시 `env` 키를 전부 프로세스 환경으로 내보냅니다 — 매 실행마다 `export` 할 필요가
+없습니다. 이미 설정된 base URL(사내 게이트웨이 등)은 덮어쓰지 않고 경고만 냅니다.
 
 **OpenCode** (단일 plugin 라인이면 끝):
 ```jsonc
@@ -66,10 +69,17 @@ export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
 
 **OpenAI Codex CLI**:
 ```bash
-npx @pii-remover/cli install --target codex --proxy-url http://localhost:8000/codex/v1
+npx @pii-remover/cli install --target codex --proxy
 docker compose -f packages/backend/docker-compose.yml up -d
-export PII_REMOVER_PROXY_TRUST=1
+echo 'export PII_REMOVER_PROXY_TRUST=1' >> ~/.zshrc   # 1회만, 아래 설명 참고
 ```
+
+`--proxy`가 `~/.codex/config.toml`에 `openai_base_url = "http://localhost:8000/codex/v1"`을
+써넣어 라우팅은 영구 적용됩니다. hook의 fail-closed 게이트는 별개로, "프록시가 구성됐는지"를
+**프로세스 환경변수**로 판단하는데 Codex에는 base URL을 노출하는 환경변수가 없습니다
+([`detectProxy`](./packages/cli/src/protocol/proxy-detection.ts)). 그래서
+`PII_REMOVER_PROXY_TRUST=1`은 셸 프로파일에 넣어둬야 합니다 — 최초 1회이고, 실행마다 다시
+export 하는 게 아닙니다.
 
 자세한 설치 가이드는 [`INSTALL.md`](./INSTALL.md).
 

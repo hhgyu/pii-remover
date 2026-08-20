@@ -51,10 +51,14 @@ docker compose up --build   # ~5-10 min the first time (model weights)
 
 **Claude Code**:
 ```bash
-npx @pii-remover/cli install --target claude-code
+npx @pii-remover/cli install --target claude-code --proxy
 docker compose -f packages/backend/docker-compose.yml up -d
-export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1
 ```
+
+`--proxy` writes `env.ANTHROPIC_BASE_URL` into `~/.claude/settings.json`, and
+Claude Code exports every `env` key at session start — so there is nothing to
+`export` before each run. A base URL you (or a corporate gateway) already set is
+never overwritten; the installer warns and leaves it alone.
 
 **OpenCode**:
 ```bash
@@ -68,10 +72,18 @@ Re-running is idempotent and survives hand-edits to the array.
 
 **OpenAI Codex CLI**:
 ```bash
-npx @pii-remover/cli install --target codex --proxy-url http://localhost:8000/codex/v1
+npx @pii-remover/cli install --target codex --proxy
 docker compose -f packages/backend/docker-compose.yml up -d
-export PII_REMOVER_PROXY_TRUST=1
+echo 'export PII_REMOVER_PROXY_TRUST=1' >> ~/.zshrc   # one-time, see below
 ```
+
+`--proxy` writes `openai_base_url = "http://localhost:8000/codex/v1"` into
+`~/.codex/config.toml`, so routing is persistent. The hook's fail-closed gate is
+separate: it decides "is a proxy configured?" from the process environment, and
+Codex exposes no base-URL env var for it to inspect
+([`detectProxy`](./packages/cli/src/protocol/proxy-detection.ts)). So
+`PII_REMOVER_PROXY_TRUST=1` has to live in your shell profile — added once, not
+re-exported per run.
 
 See [`INSTALL.md`](./INSTALL.md) for the full installation guide.
 
