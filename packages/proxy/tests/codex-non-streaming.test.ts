@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { LocalRegexBackend, PIIRemover } from "@pii-remover/core";
+import {
+  LocalRegexBackend,
+  PIIRemover,
+  SingleStrategy,
+} from "@pii-remover/core";
 import {
   restoreCodexResponsesResponse,
   transformCodexResponsesRequest,
@@ -8,7 +12,7 @@ import {
 async function makeRemover() {
   return PIIRemover.init({
     sessionId: `codex-${Math.random().toString(36).slice(2)}`,
-    backends: [new LocalRegexBackend()],
+    strategy: new SingleStrategy(new LocalRegexBackend()),
     warn: () => {},
   });
 }

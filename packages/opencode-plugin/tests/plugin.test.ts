@@ -1124,7 +1124,7 @@ describe("PiiRemoverPlugin — top-level factory", () => {
       },
     };
     const factory = configurePiiRemoverPlugin({
-      backends: [captureBackend],
+      backends: [new LocalRegexBackend(), captureBackend],
       warn: silentWarn(),
       healthCheck: false,
       experimental: false,

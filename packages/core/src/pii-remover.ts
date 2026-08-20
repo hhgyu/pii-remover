@@ -56,6 +56,11 @@ export interface PIIRemoverInitOptions {
   config?: PiiRemoverConfig;
   configPath?: string;
   strategy?: BackendStrategy;
+  /**
+   * Replaces the entire config-derived backend list — local-regex, personal-data,
+   * custom-pattern and the remote endpoint are all skipped when this is set.
+   * Mutually exclusive with `backend.type = "tiered"`, which throws instead.
+   */
   backends?: readonly BackendClient[];
   env?: NodeJS.ProcessEnv;
   warn?: (message: string) => void;
@@ -145,7 +150,7 @@ export class PIIRemover {
     const vault = new VaultManager(vaultOpts);
     const built = opts.strategy
       ? { strategy: opts.strategy, name: "custom" }
-      : buildDefaultStrategy(config, opts.backends);
+      : buildDefaultStrategy(config, opts.backends, warn);
     const detector = new Detector({
       strategy: built.strategy,
       defaultCategories: config.detection.enabled_categories,
@@ -454,22 +459,25 @@ interface BuiltStrategy {
 
 function buildDefaultStrategy(
   config: PiiRemoverConfig,
-  extraBackends?: readonly BackendClient[]
+  extraBackends?: readonly BackendClient[],
+  warn?: (message: string) => void
 ): BuiltStrategy {
   if (config.backend.type === "tiered") {
     return buildTieredStrategy(config, extraBackends);
   }
   const backends: BackendClient[] = [];
-  backends.push(buildLocalRegexBackend(config));
-  const personalBackend = buildPersonalDataBackend(config);
-  if (personalBackend) backends.push(personalBackend);
-  const customBackend = buildCustomPatternBackend(config);
-  if (customBackend) backends.push(customBackend);
-  if (config.backend.endpoint) {
-    backends.push(buildRemoteBackend(config.backend));
-  }
   if (extraBackends && extraBackends.length > 0) {
+    warnOnDiscardedBackendConfig(config, warn);
     backends.push(...extraBackends);
+  } else {
+    backends.push(buildLocalRegexBackend(config));
+    const personalBackend = buildPersonalDataBackend(config);
+    if (personalBackend) backends.push(personalBackend);
+    const customBackend = buildCustomPatternBackend(config);
+    if (customBackend) backends.push(customBackend);
+    if (config.backend.endpoint) {
+      backends.push(buildRemoteBackend(config.backend));
+    }
   }
   const name = backends.map((b) => b.name).join("+");
   const strategy: BackendStrategy =
@@ -477,6 +485,21 @@ function buildDefaultStrategy(
       ? new SingleStrategy(backends[0]!)
       : new MergeStrategy(backends);
   return { strategy, name };
+}
+
+function warnOnDiscardedBackendConfig(
+  config: PiiRemoverConfig,
+  warn?: (message: string) => void
+): void {
+  if (!warn) return;
+  const discarded: string[] = [];
+  if (config.backend.endpoint) discarded.push("backend.endpoint");
+  if (buildPersonalDataBackend(config)) discarded.push("personal_data");
+  if (buildCustomPatternBackend(config)) discarded.push("detection.custom_patterns");
+  if (discarded.length === 0) return;
+  warn(
+    `PII Remover: init({ backends }) replaces the config-derived backend list, so ${discarded.join(", ")} ${discarded.length === 1 ? "is" : "are"} not in effect`
+  );
 }
 
 function buildLocalRegexBackend(config: PiiRemoverConfig): LocalRegexBackend {

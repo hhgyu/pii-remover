@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { PIIRemover } from "@pii-remover/core";
+import {
+  DEFAULT_CONFIG,
+  PIIRemover,
+  type PiiRemoverConfig,
+} from "@pii-remover/core";
+
+function localOnlyConfig(): PiiRemoverConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    backend: { ...DEFAULT_CONFIG.backend, endpoint: "" },
+  };
+}
 
 import { transformAnthropicRequest } from "../src/providers/anthropic.js";
 import { transformOpenAIRequest } from "../src/providers/openai.js";
@@ -9,7 +20,7 @@ import type {
 } from "../src/providers/types.js";
 
 async function makeRemover(): Promise<PIIRemover> {
-  return PIIRemover.init({ env: {} });
+  return PIIRemover.init({ env: {}, config: localOnlyConfig() });
 }
 
 // The transform injects a system message carrying the placeholder note, so

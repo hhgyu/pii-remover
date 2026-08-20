@@ -18,7 +18,7 @@ function silentWarn(): (msg: string) => void {
 async function makeRemover(): Promise<PIIRemover> {
   return PIIRemover.init({
     sessionId: `restore-${Math.random().toString(36).slice(2)}`,
-    backends: [new LocalRegexBackend()],
+    strategy: new SingleStrategy(new LocalRegexBackend()),
     warn: silentWarn(),
   });
 }

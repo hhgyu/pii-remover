@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { PIIRemover } from "@pii-remover/core";
+import {
+  DEFAULT_CONFIG,
+  PIIRemover,
+  type PiiRemoverConfig,
+} from "@pii-remover/core";
+
+function localOnlyConfig(): PiiRemoverConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    backend: { ...DEFAULT_CONFIG.backend, endpoint: "" },
+  };
+}
 
 import { runDetectCommand } from "../src/commands/detect.js";
 
@@ -12,7 +23,7 @@ describe("runDetectCommand", () => {
       stdout: (s) => out.push(s),
       stderr: (s) => err.push(s),
       env: {},
-      initPiiRemover: (opts) => PIIRemover.init(opts ?? {}),
+      initPiiRemover: (opts) => PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
     });
     expect(r.exitCode).toBe(0);
     expect(r.detections).toBeGreaterThanOrEqual(1);
@@ -31,7 +42,7 @@ describe("runDetectCommand", () => {
       stdout: (s) => out.push(s),
       stderr: (s) => err.push(s),
       env: {},
-      initPiiRemover: (opts) => PIIRemover.init(opts ?? {}),
+      initPiiRemover: (opts) => PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
     });
     expect(r.exitCode).toBe(0);
     expect(r.detections).toBe(0);

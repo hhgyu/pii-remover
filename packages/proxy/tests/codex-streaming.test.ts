@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { LocalRegexBackend, PIIRemover } from "@pii-remover/core";
+import {
+  LocalRegexBackend,
+  PIIRemover,
+  SingleStrategy,
+} from "@pii-remover/core";
 
 import { CodexSseTransformer } from "../src/stream/codex-sse.js";
 
 async function makeRemover() {
   return PIIRemover.init({
     sessionId: `codex-stream-${Math.random().toString(36).slice(2)}`,
-    backends: [new LocalRegexBackend()],
+    strategy: new SingleStrategy(new LocalRegexBackend()),
     warn: () => {},
   });
 }

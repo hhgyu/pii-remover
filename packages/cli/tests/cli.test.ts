@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { PIIRemover } from "@pii-remover/core";
+import {
+  DEFAULT_CONFIG,
+  PIIRemover,
+  type PiiRemoverConfig,
+} from "@pii-remover/core";
+
+function localOnlyConfig(): PiiRemoverConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    backend: { ...DEFAULT_CONFIG.backend, endpoint: "" },
+  };
+}
 
 import { helpText, parseFlags, runCli } from "../src/cli.js";
 import type { InstallFs } from "../src/commands/install.js";
@@ -271,7 +282,7 @@ describe("runCli — help text mentions new lifecycle flags", () => {
       ["detect", "--text", "Hello user@example.com"],
       {
         ...io,
-        initPiiRemover: (opts) => PIIRemover.init(opts ?? {}),
+        initPiiRemover: (opts) => PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
       }
     );
     expect(code).toBe(0);
@@ -299,7 +310,7 @@ describe("runCli — help text mentions new lifecycle flags", () => {
       ...io,
       stdin: () => Promise.resolve(stdinJson),
       env: {},
-      initPiiRemover: (opts) => PIIRemover.init(opts ?? {}),
+      initPiiRemover: (opts) => PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
     });
     expect(code).toBe(0);
     expect(io.out.join("")).toBe("");
@@ -319,7 +330,7 @@ describe("runCli — help text mentions new lifecycle flags", () => {
       ...io,
       stdin: () => Promise.resolve(stdinJson),
       env: {},
-      initPiiRemover: (opts) => PIIRemover.init(opts ?? {}),
+      initPiiRemover: (opts) => PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
     });
     expect(code).toBe(0);
     const parsed = JSON.parse(io.out.join("").trim());

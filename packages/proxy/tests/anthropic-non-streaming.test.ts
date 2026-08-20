@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
   LocalRegexBackend,
   PIIRemover,
+  SingleStrategy,
 } from "@pii-remover/core";
 import {
   restoreAnthropicResponse,
@@ -15,7 +16,7 @@ const TOKEN_RE = /__OPF_[A-Z_]+__[a-z0-9]{16}__/;
 async function makeRemover() {
   return PIIRemover.init({
     sessionId: `anthropic-${Math.random().toString(36).slice(2)}`,
-    backends: [new LocalRegexBackend()],
+    strategy: new SingleStrategy(new LocalRegexBackend()),
     warn: () => {},
   });
 }
@@ -232,7 +233,7 @@ describe("startProxy — Anthropic round-trip via mock upstream", () => {
     };
     proxy = await startProxy({
       port: 0,
-      backends: [new LocalRegexBackend()],
+      strategy: new SingleStrategy(new LocalRegexBackend()),
       fetch_impl: fakeUpstream,
     });
   });

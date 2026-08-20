@@ -1,7 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { PIIRemover } from "@pii-remover/core";
+import {
+  DEFAULT_CONFIG,
+  PIIRemover,
+  type PiiRemoverConfig,
+} from "@pii-remover/core";
 
 import { runHookCommand } from "../src/commands/hook.js";
+
+function localOnlyConfig(): PiiRemoverConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    backend: { ...DEFAULT_CONFIG.backend, endpoint: "" },
+  };
+}
 
 function ioFromStdin(payload: object, env: NodeJS.ProcessEnv = {}) {
   const out: string[] = [];
@@ -14,7 +25,7 @@ function ioFromStdin(payload: object, env: NodeJS.ProcessEnv = {}) {
     out,
     err,
     initPiiRemover: (opts: Parameters<typeof PIIRemover.init>[0]) =>
-      PIIRemover.init(opts ?? {}),
+      PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
   };
 }
 

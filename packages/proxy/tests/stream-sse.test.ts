@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { LocalRegexBackend, PIIRemover } from "@pii-remover/core";
+import {
+  LocalRegexBackend,
+  PIIRemover,
+  SingleStrategy,
+} from "@pii-remover/core";
 
 import { AnthropicSseTransformer } from "../src/stream/anthropic-sse.js";
 import { OpenAISseTransformer } from "../src/stream/openai-sse.js";
@@ -9,7 +13,7 @@ import { SseLineParser, serializeSseEvent } from "../src/stream/sse-parser.js";
 async function makeRemover() {
   return PIIRemover.init({
     sessionId: `sse-${Math.random().toString(36).slice(2)}`,
-    backends: [new LocalRegexBackend()],
+    strategy: new SingleStrategy(new LocalRegexBackend()),
     warn: () => {},
   });
 }

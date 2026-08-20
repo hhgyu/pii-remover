@@ -13,6 +13,7 @@ import {
   AuditEmitter,
   LocalRegexBackend,
   PIIRemover,
+  SingleStrategy,
   type AuditEntry,
 } from "@pii-remover/core";
 
@@ -34,7 +35,7 @@ async function makeHarness(label: string): Promise<Harness> {
   const entries: AuditEntry[] = [];
   const remover = await PIIRemover.init({
     sessionId: `sse-reqid-${label}`,
-    backends: [new LocalRegexBackend()],
+    strategy: new SingleStrategy(new LocalRegexBackend()),
     warn: () => {},
     audit: new AuditEmitter({ enabled: true, stream: (e) => entries.push(e) }),
   });

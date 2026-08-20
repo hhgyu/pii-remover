@@ -14,6 +14,7 @@ import {
   LocalRegexBackend,
   OPF_PLACEHOLDER_SYSTEM_NOTE,
   PIIRemover,
+  SingleStrategy,
 } from "@pii-remover/core";
 
 import { transformAnthropicRequest } from "../src/providers/anthropic.js";
@@ -23,7 +24,7 @@ import { transformOpenAIRequest } from "../src/providers/openai.js";
 async function makeRemover(label: string): Promise<PIIRemover> {
   return PIIRemover.init({
     sessionId: `note-${label}`,
-    backends: [new LocalRegexBackend()],
+    strategy: new SingleStrategy(new LocalRegexBackend()),
     env: {},
     warn: () => {},
   });
