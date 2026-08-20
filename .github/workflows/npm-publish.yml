@@ -65,11 +65,15 @@ jobs:
           set -e
           # Dependency order:
           #   1) core (base, no internal deps)
-          #   2) cli / proxy / opencode-plugin / vision / mcp-server (all depend on core only)
+          #   2) cli / opencode-plugin / vision / mcp-server (all depend on core only)
+          #
+          # packages/proxy is deliberately absent: it is `private: true` since
+          # the runtime moved to the Python backend, and it is kept only as the
+          # golden-vector source of truth. Listing it here would abort the whole
+          # loop under `set -e` before the packages after it get published.
           packages=(
             "packages/core"
             "packages/cli"
-            "packages/proxy"
             "packages/opencode-plugin"
             "packages/vision"
             "packages/mcp-server"

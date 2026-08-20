@@ -9,13 +9,15 @@
 | `@pii-remover/core` | npm registry |
 | `@pii-remover/cli` | npm registry |
 | `@pii-remover/mcp-server` | npm registry |
-| `@pii-remover/proxy` | npm registry |
 | `@pii-remover/opencode-plugin` | npm registry |
 | `@pii-remover/vision` | npm registry |
+| `@pii-remover/proxy` | **private** (publish 안 함 — 런타임은 `packages/backend`의 Python 포트로 이관, 골든 벡터 source of truth로만 유지) |
 | `@pii-remover/shared-types` | **private** (publish 안 함 — 의존 패키지에 타입만 인라인) |
 | `@pii-remover/backend` | **GHCR (Docker)** — `backend-build.yml`에서 처리, npm 아님 |
 
-6개 npm 패키지 모두 `publishConfig: { access: "public", provenance: true }` 설정 — 첫 publish 시 자동 공개 + provenance attestation 첨부.
+5개 npm 패키지 모두 `publishConfig: { access: "public", provenance: true }` 설정 — 첫 publish 시 자동 공개 + provenance attestation 첨부.
+
+> ⚠️ `private: true` 패키지를 publish 목록에 넣으면 `npm publish`가 즉시 실패하고, `npm-publish.yml`의 publish 루프는 `set -e`라 그 뒤 패키지들이 아예 올라가지 않는다. 목록에 패키지를 추가할 때는 `private` 여부를 먼저 확인할 것.
 
 ## 워크플로 (정상 릴리즈 흐름)
 
@@ -38,7 +40,7 @@ git push && git push --tags
 
 | Workflow | 동작 |
 |---|---|
-| `.github/workflows/npm-publish.yml` | 6개 npm 패키지 dependency 순서로 publish + provenance attestation |
+| `.github/workflows/npm-publish.yml` | 5개 npm 패키지 dependency 순서로 publish + provenance attestation |
 | `.github/workflows/mcp-server-build.yml` | 4-platform 단일 바이너리 빌드 + GitHub Release 자동 첨부 |
 | `.github/workflows/backend-build.yml` | Docker 이미지 빌드 + GHCR push |
 
@@ -46,7 +48,7 @@ git push && git push --tags
 
 > ⚠️ Trusted Publisher는 **이미 publish된 패키지**에만 등록 가능. 따라서 첫 publish는 manual auth 또는 `NPM_TOKEN` 폴백을 한 번 거친다(아래 [§첫 publish (Chicken-and-Egg)](#첫-publish-chicken-and-egg)).
 
-각 6개 npm 패키지에 대해 반복:
+각 5개 npm 패키지에 대해 반복:
 
 1. <https://www.npmjs.com/> 로그인 → 패키지 페이지 (예: `https://www.npmjs.com/package/@pii-remover/mcp-server`)
 2. **Settings** 탭 → **Trusted Publishers** 섹션
@@ -80,13 +82,14 @@ git status                  # diff 없어야 함
 bun run typecheck && bun test && bun run build
 
 # 4) dry-run으로 tarball 확인 (bun이 빠르므로 dry-run만 bun 사용해도 무방)
-cd packages/core && npm publish --dry-run && cd -
-# ... 6개 모두 dry-run
+for pkg in core cli opencode-plugin vision mcp-server; do
+  (cd packages/$pkg && npm publish --dry-run --access public)
+done
 
-# 5) 실 publish (의존성 순서)
+# 5) 실 publish (의존성 순서 — proxy는 private이므로 제외)
 #    --provenance: GitHub Actions 외부에서는 attestation 생성 불가하므로
 #                  로컬 publish 시에는 생략 (CI에서 재 publish 하면 첨부됨).
-for pkg in core cli proxy opencode-plugin vision mcp-server; do
+for pkg in core cli opencode-plugin vision mcp-server; do
   (cd packages/$pkg && npm publish --access public)
 done
 
@@ -122,8 +125,8 @@ publish job (test 후):
   1. checkout + bun (build·dependency 설치용) + Node 20 (npm CLI v11.5+)
   2. bun install --frozen-lockfile
   3. bun run build (dist 생성)
-  4. 6개 패키지 dependency 순서로 publish:
-       core → cli → proxy → opencode-plugin → vision → mcp-server
+  4. 5개 패키지 dependency 순서로 publish:
+       core → cli → opencode-plugin → vision → mcp-server
      - 명령: npm publish --provenance --access public
      - 이미 등록된 version은 skip (npm view로 사전 체크, 재실행 가능)
      - workflow_dispatch + dry_run=true 면 --dry-run flag 추가
@@ -144,7 +147,7 @@ Bun이 OIDC + provenance를 머지하면 publish step만 다시 평가. 그 전�
 
 `scripts/sync-versions.mjs`가 동기화하는 17개 파일:
 
-- 7 `package.json` (root + 6 publishable + shared-types)
+- 7 `package.json` (5 publishable + `proxy` + `shared-types`; root은 source of truth라 갱신 대상이 아님)
 - `packages/backend/pyproject.toml`
 - `packages/backend/server/__init__.py`
 - 5 TypeScript source const (`mcp-server/src/server.ts`, `cli.ts`, `proxy/src/server.ts`, `cli.ts`, `cli/src/constants.ts`)
@@ -168,12 +171,12 @@ Bun이 OIDC + provenance를 머지하면 publish step만 다시 평가. 그 전�
 
 ## 검증된 사전 작업
 
-- [x] 6개 publishable package에 `publishConfig` (access: public + provenance: true)
+- [x] 5개 publishable package에 `publishConfig` (access: public + provenance: true)
 - [x] `scripts/sync-versions.mjs` — root version 변경 시 17개 파일 자동 동기
 - [x] `npm-publish.yml` workflow — OIDC 기반 자동 publish
 - [x] `mcp-server-build.yml` workflow — 4-platform 단일 바이너리 빌드 + Release attach
-- [ ] **6개 패키지 npm registry 첫 publish** (사용자 작업, 위 [§첫 publish](#첫-publish-chicken-and-egg))
-- [ ] **6개 패키지에 Trusted Publisher 등록** (사용자 작업, npm.com 측 1회 설정)
+- [ ] **5개 패키지 npm registry 첫 publish** (사용자 작업, 위 [§첫 publish](#첫-publish-chicken-and-egg))
+- [ ] **5개 패키지에 Trusted Publisher 등록** (사용자 작업, npm.com 측 1회 설정)
 
 ## 관련 문서
 
