@@ -2,27 +2,27 @@
   "_generated_by": "scripts/gen-stream-vectors.ts",
   "_contract": "Python must reproduce the per-push release schedule exactly, not merely the concatenated total. Releasing early and catching up still sums to the same string while showing the user a half-token.",
   "constants": {
-    "DEFAULT_BUFFER_WINDOW": 66,
-    "MAX_TOKEN_LENGTH": 33
+    "DEFAULT_BUFFER_WINDOW": 64,
+    "MAX_TOKEN_LENGTH": 32
   },
   "tokens": {
-    "PERSON": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-    "EMAIL": "__OPF_EMAIL__4ov1qksihef66la1__",
-    "BIZNUM": "__OPF_BIZNUM__4ov7hegadq6zgzon__"
+    "PERSON": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+    "EMAIL": "{{OPF:EMAIL:4ov1qksihef66la1}}",
+    "BIZNUM": "{{OPF:BIZNUM:4ov7hegadq6zgzon}}"
   },
   "boundaries": [
     {
       "buffer": "",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "",
       "window_size": 64,
       "boundary": 0
     },
     {
       "buffer": "",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "",
       "window_size": 16,
       "boundary": 0
     },
@@ -33,7 +33,7 @@
     },
     {
       "buffer": "plain text with no token",
-      "window_size": 66,
+      "window_size": 64,
       "boundary": 24
     },
     {
@@ -52,548 +52,548 @@
       "boundary": 24
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 66,
-      "boundary": 32
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
       "window_size": 64,
-      "boundary": 32
+      "boundary": 31
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 16,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 8,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ trailing",
-      "window_size": 66,
-      "boundary": 41
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ trailing",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
       "window_size": 64,
-      "boundary": 41
+      "boundary": 31
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ trailing",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
       "window_size": 16,
-      "boundary": 41
+      "boundary": 31
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ trailing",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
       "window_size": 8,
-      "boundary": 41
+      "boundary": 31
     },
     {
-      "buffer": "leading __OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 66,
-      "boundary": 40
-    },
-    {
-      "buffer": "leading __OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} trailing",
       "window_size": 64,
       "boundary": 40
     },
     {
-      "buffer": "leading __OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} trailing",
+      "window_size": 64,
+      "boundary": 40
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} trailing",
+      "window_size": 16,
+      "boundary": 40
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} trailing",
+      "window_size": 8,
+      "boundary": 40
+    },
+    {
+      "buffer": "leading {{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 64,
+      "boundary": 39
+    },
+    {
+      "buffer": "leading {{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 64,
+      "boundary": 39
+    },
+    {
+      "buffer": "leading {{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 16,
+      "boundary": 39
+    },
+    {
+      "buffer": "leading {{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 8,
+      "boundary": 39
+    },
+    {
+      "buffer": "_",
+      "window_size": 64,
+      "boundary": 1
+    },
+    {
+      "buffer": "_",
+      "window_size": 64,
+      "boundary": 1
+    },
+    {
+      "buffer": "_",
+      "window_size": 16,
+      "boundary": 1
+    },
+    {
+      "buffer": "_",
+      "window_size": 8,
+      "boundary": 1
+    },
+    {
+      "buffer": "__",
+      "window_size": 64,
+      "boundary": 2
+    },
+    {
+      "buffer": "__",
+      "window_size": 64,
+      "boundary": 2
+    },
+    {
+      "buffer": "__",
+      "window_size": 16,
+      "boundary": 2
+    },
+    {
+      "buffer": "__",
+      "window_size": 8,
+      "boundary": 2
+    },
+    {
+      "buffer": "__O",
+      "window_size": 64,
+      "boundary": 3
+    },
+    {
+      "buffer": "__O",
+      "window_size": 64,
+      "boundary": 3
+    },
+    {
+      "buffer": "__O",
+      "window_size": 16,
+      "boundary": 3
+    },
+    {
+      "buffer": "__O",
+      "window_size": 8,
+      "boundary": 3
+    },
+    {
+      "buffer": "__OP",
+      "window_size": 64,
+      "boundary": 4
+    },
+    {
+      "buffer": "__OP",
+      "window_size": 64,
+      "boundary": 4
+    },
+    {
+      "buffer": "__OP",
+      "window_size": 16,
+      "boundary": 4
+    },
+    {
+      "buffer": "__OP",
+      "window_size": 8,
+      "boundary": 4
+    },
+    {
+      "buffer": "__OPF",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "__OPF",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "__OPF",
+      "window_size": 16,
+      "boundary": 5
+    },
+    {
+      "buffer": "__OPF",
+      "window_size": 8,
+      "boundary": 5
+    },
+    {
+      "buffer": "{{OPF:",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:",
+      "window_size": 16,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:",
+      "window_size": 8,
+      "boundary": 0
+    },
+    {
+      "buffer": "text _",
+      "window_size": 64,
+      "boundary": 6
+    },
+    {
+      "buffer": "text _",
+      "window_size": 64,
+      "boundary": 6
+    },
+    {
+      "buffer": "text _",
+      "window_size": 16,
+      "boundary": 6
+    },
+    {
+      "buffer": "text _",
+      "window_size": 8,
+      "boundary": 6
+    },
+    {
+      "buffer": "text {{OPF:",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "text {{OPF:",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "text {{OPF:",
+      "window_size": 16,
+      "boundary": 5
+    },
+    {
+      "buffer": "text {{OPF:",
+      "window_size": 8,
+      "boundary": 5
+    },
+    {
+      "buffer": "{{OPF:P",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:P",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:P",
+      "window_size": 16,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:P",
+      "window_size": 8,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON",
+      "window_size": 16,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON",
+      "window_size": 8,
+      "boundary": 12
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 16,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 8,
+      "boundary": 13
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 16,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:",
+      "window_size": 8,
+      "boundary": 13
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov",
+      "window_size": 16,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov",
+      "window_size": 8,
+      "boundary": 16
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+      "window_size": 64,
+      "boundary": 0
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+      "window_size": 16,
+      "boundary": 29
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+      "window_size": 8,
+      "boundary": 29
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5_",
+      "window_size": 64,
+      "boundary": 30
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5_",
+      "window_size": 64,
+      "boundary": 30
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5_",
+      "window_size": 16,
+      "boundary": 30
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5_",
+      "window_size": 8,
+      "boundary": 30
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 64,
+      "boundary": 31
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 64,
+      "boundary": 31
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 16,
+      "boundary": 31
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "window_size": 8,
+      "boundary": 31
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 64,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 64,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 16,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 8,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n\n",
+      "window_size": 64,
+      "boundary": 33
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n\n",
+      "window_size": 64,
+      "boundary": 33
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n\n",
+      "window_size": 16,
+      "boundary": 33
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n\n",
+      "window_size": 8,
+      "boundary": 33
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 64,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 64,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 16,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+      "window_size": 8,
+      "boundary": 32
+    },
+    {
+      "buffer": "{{OPF:PERS\n",
+      "window_size": 64,
+      "boundary": 11
+    },
+    {
+      "buffer": "{{OPF:PERS\n",
+      "window_size": 64,
+      "boundary": 11
+    },
+    {
+      "buffer": "{{OPF:PERS\n",
+      "window_size": 16,
+      "boundary": 11
+    },
+    {
+      "buffer": "{{OPF:PERS\n",
+      "window_size": 8,
+      "boundary": 11
+    },
+    {
+      "buffer": "{{OPF:\n",
+      "window_size": 64,
+      "boundary": 7
+    },
+    {
+      "buffer": "{{OPF:\n",
+      "window_size": 64,
+      "boundary": 7
+    },
+    {
+      "buffer": "{{OPF:\n",
+      "window_size": 16,
+      "boundary": 7
+    },
+    {
+      "buffer": "{{OPF:\n",
+      "window_size": 8,
+      "boundary": 7
+    },
+    {
+      "buffer": "text\n",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "text\n",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "text\n",
+      "window_size": 16,
+      "boundary": 5
+    },
+    {
+      "buffer": "text\n",
+      "window_size": 8,
+      "boundary": 5
+    },
+    {
+      "buffer": "text\n{{OPF:",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "text\n{{OPF:",
+      "window_size": 64,
+      "boundary": 5
+    },
+    {
+      "buffer": "text\n{{OPF:",
+      "window_size": 16,
+      "boundary": 5
+    },
+    {
+      "buffer": "text\n{{OPF:",
+      "window_size": 8,
+      "boundary": 5
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} after\n",
+      "window_size": 64,
+      "boundary": 38
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} after\n",
+      "window_size": 64,
+      "boundary": 38
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} after\n",
       "window_size": 16,
       "boundary": 38
     },
     {
-      "buffer": "leading __OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} after\n",
       "window_size": 8,
       "boundary": 38
     },
     {
-      "buffer": "_",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "_",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "_",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "_",
-      "window_size": 8,
-      "boundary": 0
-    },
-    {
-      "buffer": "__",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__",
-      "window_size": 8,
-      "boundary": 0
-    },
-    {
-      "buffer": "__O",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__O",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__O",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__O",
-      "window_size": 8,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OP",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OP",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OP",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OP",
-      "window_size": 8,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF",
-      "window_size": 8,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_",
-      "window_size": 8,
-      "boundary": 0
-    },
-    {
-      "buffer": "text _",
-      "window_size": 66,
-      "boundary": 5
-    },
-    {
-      "buffer": "text _",
-      "window_size": 64,
-      "boundary": 5
-    },
-    {
-      "buffer": "text _",
-      "window_size": 16,
-      "boundary": 5
-    },
-    {
-      "buffer": "text _",
-      "window_size": 8,
-      "boundary": 5
-    },
-    {
-      "buffer": "text __OPF_",
-      "window_size": 66,
-      "boundary": 5
-    },
-    {
-      "buffer": "text __OPF_",
-      "window_size": 64,
-      "boundary": 5
-    },
-    {
-      "buffer": "text __OPF_",
-      "window_size": 16,
-      "boundary": 5
-    },
-    {
-      "buffer": "text __OPF_",
-      "window_size": 8,
-      "boundary": 5
-    },
-    {
-      "buffer": "__OPF_P",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_P",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_P",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_P",
-      "window_size": 8,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON",
-      "window_size": 8,
-      "boundary": 12
-    },
-    {
-      "buffer": "__OPF_PERSON_",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON_",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON_",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON_",
-      "window_size": 8,
-      "boundary": 12
-    },
-    {
-      "buffer": "__OPF_PERSON__",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__",
-      "window_size": 16,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__",
-      "window_size": 8,
-      "boundary": 12
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov",
-      "window_size": 16,
-      "boundary": 17
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov",
-      "window_size": 8,
-      "boundary": 17
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5",
-      "window_size": 16,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5",
-      "window_size": 8,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5_",
-      "window_size": 66,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5_",
-      "window_size": 64,
-      "boundary": 0
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5_",
-      "window_size": 16,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5_",
-      "window_size": 8,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 66,
-      "boundary": 32
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 64,
-      "boundary": 32
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 16,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "window_size": 8,
-      "boundary": 30
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 66,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 64,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 16,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 8,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n\n",
-      "window_size": 66,
-      "boundary": 34
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n\n",
-      "window_size": 64,
-      "boundary": 34
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n\n",
-      "window_size": 16,
-      "boundary": 34
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n\n",
-      "window_size": 8,
-      "boundary": 34
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 66,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 64,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 16,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-      "window_size": 8,
-      "boundary": 33
-    },
-    {
-      "buffer": "__OPF_PERS\n",
-      "window_size": 66,
-      "boundary": 11
-    },
-    {
-      "buffer": "__OPF_PERS\n",
-      "window_size": 64,
-      "boundary": 11
-    },
-    {
-      "buffer": "__OPF_PERS\n",
-      "window_size": 16,
-      "boundary": 11
-    },
-    {
-      "buffer": "__OPF_PERS\n",
-      "window_size": 8,
-      "boundary": 11
-    },
-    {
-      "buffer": "__OPF_\n",
-      "window_size": 66,
-      "boundary": 7
-    },
-    {
-      "buffer": "__OPF_\n",
-      "window_size": 64,
-      "boundary": 7
-    },
-    {
-      "buffer": "__OPF_\n",
-      "window_size": 16,
-      "boundary": 7
-    },
-    {
-      "buffer": "__OPF_\n",
-      "window_size": 8,
-      "boundary": 7
-    },
-    {
-      "buffer": "text\n",
-      "window_size": 66,
-      "boundary": 5
-    },
-    {
-      "buffer": "text\n",
-      "window_size": 64,
-      "boundary": 5
-    },
-    {
-      "buffer": "text\n",
-      "window_size": 16,
-      "boundary": 5
-    },
-    {
-      "buffer": "text\n",
-      "window_size": 8,
-      "boundary": 5
-    },
-    {
-      "buffer": "text\n__OPF_",
-      "window_size": 66,
-      "boundary": 5
-    },
-    {
-      "buffer": "text\n__OPF_",
-      "window_size": 64,
-      "boundary": 5
-    },
-    {
-      "buffer": "text\n__OPF_",
-      "window_size": 16,
-      "boundary": 5
-    },
-    {
-      "buffer": "text\n__OPF_",
-      "window_size": 8,
-      "boundary": 5
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ after\n",
-      "window_size": 66,
-      "boundary": 39
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ after\n",
-      "window_size": 64,
-      "boundary": 39
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ after\n",
-      "window_size": 16,
-      "boundary": 39
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ after\n",
-      "window_size": 8,
-      "boundary": 39
-    },
-    {
       "buffer": "snake_case_identifier",
-      "window_size": 66,
+      "window_size": 64,
       "boundary": 21
     },
     {
@@ -613,123 +613,122 @@
     },
     {
       "buffer": "___",
-      "window_size": 66,
-      "boundary": 1
+      "window_size": 64,
+      "boundary": 3
     },
     {
       "buffer": "___",
       "window_size": 64,
-      "boundary": 1
+      "boundary": 3
     },
     {
       "buffer": "___",
       "window_size": 16,
-      "boundary": 1
+      "boundary": 3
     },
     {
       "buffer": "___",
       "window_size": 8,
-      "boundary": 1
-    },
-    {
-      "buffer": "a__OPF",
-      "window_size": 66,
-      "boundary": 1
+      "boundary": 3
     },
     {
       "buffer": "a__OPF",
       "window_size": 64,
-      "boundary": 1
+      "boundary": 6
+    },
+    {
+      "buffer": "a__OPF",
+      "window_size": 64,
+      "boundary": 6
     },
     {
       "buffer": "a__OPF",
       "window_size": 16,
-      "boundary": 1
+      "boundary": 6
     },
     {
       "buffer": "a__OPF",
       "window_size": 8,
-      "boundary": 1
+      "boundary": 6
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMA",
-      "window_size": 66,
-      "boundary": 37
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMA",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMA",
       "window_size": 64,
-      "boundary": 37
+      "boundary": 36
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMA",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMA",
+      "window_size": 64,
+      "boundary": 36
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMA",
       "window_size": 16,
-      "boundary": 37
+      "boundary": 36
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMA",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMA",
       "window_size": 8,
-      "boundary": 46
+      "boundary": 45
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5____OPF_EMAIL__4ov1qksihef66la1__",
-      "window_size": 66,
-      "boundary": 63
-    },
-    {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5____OPF_EMAIL__4ov1qksihef66la1__",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}{{OPF:EMAIL:4ov1qksihef66la1}}",
       "window_size": 64,
-      "boundary": 63
+      "boundary": 61
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5____OPF_EMAIL__4ov1qksihef66la1__",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}{{OPF:EMAIL:4ov1qksihef66la1}}",
+      "window_size": 64,
+      "boundary": 61
+    },
+    {
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}{{OPF:EMAIL:4ov1qksihef66la1}}",
       "window_size": 16,
       "boundary": 61
     },
     {
-      "buffer": "__OPF_PERSON__4ov9mhqtc1vepqf5____OPF_EMAIL__4ov1qksihef66la1__",
+      "buffer": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}{{OPF:EMAIL:4ov1qksihef66la1}}",
       "window_size": 8,
       "boundary": 61
     },
     {
-      "buffer": "__OPF_BIZNUM__4ov7hegadq6zgzon__",
-      "window_size": 66,
-      "boundary": 32
-    },
-    {
-      "buffer": "__OPF_BIZNUM__4ov7hegadq6zgzon__",
+      "buffer": "{{OPF:BIZNUM:4ov7hegadq6zgzon}}",
       "window_size": 64,
-      "boundary": 32
+      "boundary": 31
     },
     {
-      "buffer": "__OPF_BIZNUM__4ov7hegadq6zgzon__",
+      "buffer": "{{OPF:BIZNUM:4ov7hegadq6zgzon}}",
+      "window_size": 64,
+      "boundary": 31
+    },
+    {
+      "buffer": "{{OPF:BIZNUM:4ov7hegadq6zgzon}}",
       "window_size": 16,
-      "boundary": 30
+      "boundary": 31
     },
     {
-      "buffer": "__OPF_BIZNUM__4ov7hegadq6zgzon__",
+      "buffer": "{{OPF:BIZNUM:4ov7hegadq6zgzon}}",
       "window_size": 8,
-      "boundary": 30
+      "boundary": 31
     }
   ],
   "sequences": [
     {
       "name": "token-only-split1",
       "chunks": [
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "P",
         "E",
         "R",
         "S",
         "O",
         "N",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -746,8 +745,8 @@
         "q",
         "f",
         "5",
-        "_",
-        "_"
+        "}",
+        "}"
       ],
       "buffer_window": null,
       "expected": {
@@ -782,33 +781,32 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
         "lossless": true
       }
     },
     {
       "name": "token-only-split2",
       "chunks": [
-        "__",
+        "{{",
         "OP",
-        "F_",
+        "F:",
         "PE",
         "RS",
         "ON",
-        "__",
-        "4o",
-        "v9",
-        "mh",
-        "qt",
-        "c1",
-        "ve",
-        "pq",
-        "f5",
-        "__"
+        ":4",
+        "ov",
+        "9m",
+        "hq",
+        "tc",
+        "1v",
+        "ep",
+        "qf",
+        "5}",
+        "}"
       ],
       "buffer_window": null,
       "expected": {
@@ -828,27 +826,27 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
         "lossless": true
       }
     },
     {
       "name": "token-only-split3",
       "chunks": [
-        "__O",
-        "PF_",
+        "{{O",
+        "PF:",
         "PER",
         "SON",
-        "__4",
-        "ov9",
-        "mhq",
-        "tc1",
-        "vep",
-        "qf5",
-        "__"
+        ":4o",
+        "v9m",
+        "hqt",
+        "c1v",
+        "epq",
+        "f5}",
+        "}"
       ],
       "buffer_window": null,
       "expected": {
@@ -863,23 +861,23 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
         "lossless": true
       }
     },
     {
       "name": "token-only-split5",
       "chunks": [
-        "__OPF",
-        "_PERS",
-        "ON__4",
-        "ov9mh",
-        "qtc1v",
-        "epqf5",
-        "__"
+        "{{OPF",
+        ":PERS",
+        "ON:4o",
+        "v9mhq",
+        "tc1ve",
+        "pqf5}",
+        "}"
       ],
       "buffer_window": null,
       "expected": {
@@ -890,21 +888,21 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
         "lossless": true
       }
     },
     {
       "name": "token-only-split7",
       "chunks": [
-        "__OPF_P",
-        "ERSON__",
-        "4ov9mhq",
-        "tc1vepq",
-        "f5__"
+        "{{OPF:P",
+        "ERSON:4",
+        "ov9mhqt",
+        "c1vepqf",
+        "5}}"
       ],
       "buffer_window": null,
       "expected": {
@@ -913,10 +911,10 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
         "lossless": true
       }
     },
@@ -931,20 +929,19 @@
         "c",
         "t",
         " ",
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "P",
         "E",
         "R",
         "S",
         "O",
         "N",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -961,8 +958,8 @@
         "q",
         "f",
         "5",
-        "_",
-        "_",
+        "}",
+        "}",
         " ",
         "t",
         "o",
@@ -1012,8 +1009,7 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           " ",
           "t",
           "o",
@@ -1023,7 +1019,7 @@
           "."
         ],
         "flush": "",
-        "total": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+        "total": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} today.",
         "lossless": true
       }
     },
@@ -1034,26 +1030,25 @@
         "nt",
         "ac",
         "t ",
-        "__",
+        "{{",
         "OP",
-        "F_",
+        "F:",
         "PE",
         "RS",
         "ON",
-        "__",
-        "4o",
-        "v9",
-        "mh",
-        "qt",
-        "c1",
-        "ve",
-        "pq",
-        "f5",
-        "__",
-        " t",
-        "od",
-        "ay",
-        "."
+        ":4",
+        "ov",
+        "9m",
+        "hq",
+        "tc",
+        "1v",
+        "ep",
+        "qf",
+        "5}",
+        "} ",
+        "to",
+        "da",
+        "y."
       ],
       "buffer_window": null,
       "expected": {
@@ -1077,14 +1072,13 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          " t",
-          "od",
-          "ay",
-          "."
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} ",
+          "to",
+          "da",
+          "y."
         ],
         "flush": "",
-        "total": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+        "total": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} today.",
         "lossless": true
       }
     },
@@ -1093,20 +1087,20 @@
       "chunks": [
         "Con",
         "tac",
-        "t _",
-        "_OP",
-        "F_P",
+        "t {",
+        "{OP",
+        "F:P",
         "ERS",
-        "ON_",
-        "_4o",
-        "v9m",
-        "hqt",
-        "c1v",
-        "epq",
-        "f5_",
-        "_ t",
-        "oda",
-        "y."
+        "ON:",
+        "4ov",
+        "9mh",
+        "qtc",
+        "1ve",
+        "pqf",
+        "5}}",
+        " to",
+        "day",
+        "."
       ],
       "buffer_window": null,
       "expected": {
@@ -1123,13 +1117,13 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ t",
-          "oda",
-          "y."
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          " to",
+          "day",
+          "."
         ],
         "flush": "",
-        "total": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+        "total": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} today.",
         "lossless": true
       }
     },
@@ -1137,15 +1131,15 @@
       "name": "token-in-sentence-split5",
       "chunks": [
         "Conta",
-        "ct __",
-        "OPF_P",
+        "ct {{",
+        "OPF:P",
         "ERSON",
-        "__4ov",
-        "9mhqt",
-        "c1vep",
-        "qf5__",
-        " toda",
-        "y."
+        ":4ov9",
+        "mhqtc",
+        "1vepq",
+        "f5}} ",
+        "today",
+        "."
       ],
       "buffer_window": null,
       "expected": {
@@ -1157,12 +1151,12 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          " toda",
-          "y."
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} ",
+          "today",
+          "."
         ],
         "flush": "",
-        "total": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+        "total": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} today.",
         "lossless": true
       }
     },
@@ -1170,12 +1164,12 @@
       "name": "token-in-sentence-split7",
       "chunks": [
         "Contact",
-        " __OPF_",
-        "PERSON_",
-        "_4ov9mh",
-        "qtc1vep",
-        "qf5__ t",
-        "oday."
+        " {{OPF:",
+        "PERSON:",
+        "4ov9mhq",
+        "tc1vepq",
+        "f5}} to",
+        "day."
       ],
       "buffer_window": null,
       "expected": {
@@ -1185,31 +1179,30 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ t",
-          "oday."
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} to",
+          "day."
         ],
         "flush": "",
-        "total": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+        "total": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} today.",
         "lossless": true
       }
     },
     {
       "name": "two-tokens-split1",
       "chunks": [
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "P",
         "E",
         "R",
         "S",
         "O",
         "N",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -1226,26 +1219,25 @@
         "q",
         "f",
         "5",
-        "_",
-        "_",
+        "}",
+        "}",
         " ",
         "a",
         "n",
         "d",
         " ",
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "E",
         "M",
         "A",
         "I",
         "L",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -1262,8 +1254,8 @@
         "l",
         "a",
         "1",
-        "_",
-        "_",
+        "}",
+        "}",
         " ",
         "b",
         "o",
@@ -1304,8 +1296,7 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           " ",
           "a",
           "n",
@@ -1340,8 +1331,7 @@
           "",
           "",
           "",
-          "",
-          "__OPF_EMAIL__4ov1qksihef66la1__",
+          "{{OPF:EMAIL:4ov1qksihef66la1}}",
           " ",
           "b",
           "o",
@@ -1350,38 +1340,37 @@
           "."
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMAIL__4ov1qksihef66la1__ both.",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMAIL:4ov1qksihef66la1}} both.",
         "lossless": true
       }
     },
     {
       "name": "two-tokens-split2",
       "chunks": [
-        "__",
+        "{{",
         "OP",
-        "F_",
+        "F:",
         "PE",
         "RS",
         "ON",
-        "__",
-        "4o",
-        "v9",
-        "mh",
-        "qt",
-        "c1",
-        "ve",
-        "pq",
-        "f5",
-        "__",
-        " a",
-        "nd",
-        " _",
-        "_O",
-        "PF",
-        "_E",
-        "MA",
-        "IL",
-        "__",
+        ":4",
+        "ov",
+        "9m",
+        "hq",
+        "tc",
+        "1v",
+        "ep",
+        "qf",
+        "5}",
+        "} ",
+        "an",
+        "d ",
+        "{{",
+        "OP",
+        "F:",
+        "EM",
+        "AI",
+        "L:",
         "4o",
         "v1",
         "qk",
@@ -1390,7 +1379,7 @@
         "f6",
         "6l",
         "a1",
-        "__",
+        "}}",
         " b",
         "ot",
         "h."
@@ -1413,10 +1402,9 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          " a",
-          "nd",
-          " ",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} ",
+          "an",
+          "d ",
           "",
           "",
           "",
@@ -1431,43 +1419,94 @@
           "",
           "",
           "",
-          "__OPF_EMAIL__4ov1qksihef66la1__",
+          "{{OPF:EMAIL:4ov1qksihef66la1}}",
           " b",
           "ot",
           "h."
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMAIL__4ov1qksihef66la1__ both.",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMAIL:4ov1qksihef66la1}} both.",
         "lossless": true
       }
     },
     {
       "name": "two-tokens-split3",
       "chunks": [
-        "__O",
-        "PF_",
+        "{{O",
+        "PF:",
         "PER",
         "SON",
-        "__4",
-        "ov9",
-        "mhq",
-        "tc1",
-        "vep",
-        "qf5",
-        "__ ",
-        "and",
-        " __",
-        "OPF",
-        "_EM",
-        "AIL",
-        "__4",
-        "ov1",
-        "qks",
-        "ihe",
-        "f66",
-        "la1",
-        "__ ",
-        "bot",
+        ":4o",
+        "v9m",
+        "hqt",
+        "c1v",
+        "epq",
+        "f5}",
+        "} a",
+        "nd ",
+        "{{O",
+        "PF:",
+        "EMA",
+        "IL:",
+        "4ov",
+        "1qk",
+        "sih",
+        "ef6",
+        "6la",
+        "1}}",
+        " bo",
+        "th."
+      ],
+      "buffer_window": null,
+      "expected": {
+        "pushes": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} a",
+          "nd ",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "{{OPF:EMAIL:4ov1qksihef66la1}}",
+          " bo",
+          "th."
+        ],
+        "flush": "",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMAIL:4ov1qksihef66la1}} both.",
+        "lossless": true
+      }
+    },
+    {
+      "name": "two-tokens-split5",
+      "chunks": [
+        "{{OPF",
+        ":PERS",
+        "ON:4o",
+        "v9mhq",
+        "tc1ve",
+        "pqf5}",
+        "} and",
+        " {{OP",
+        "F:EMA",
+        "IL:4o",
+        "v1qks",
+        "ihef6",
+        "6la1}",
+        "} bot",
         "h."
       ],
       "buffer_window": null,
@@ -1479,88 +1518,35 @@
           "",
           "",
           "",
-          "",
-          "",
-          "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ ",
-          "and",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and",
           " ",
           "",
           "",
           "",
           "",
           "",
-          "",
-          "",
-          "",
-          "",
-          "__OPF_EMAIL__4ov1qksihef66la1__ ",
-          "bot",
+          "{{OPF:EMAIL:4ov1qksihef66la1}} bot",
           "h."
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMAIL__4ov1qksihef66la1__ both.",
-        "lossless": true
-      }
-    },
-    {
-      "name": "two-tokens-split5",
-      "chunks": [
-        "__OPF",
-        "_PERS",
-        "ON__4",
-        "ov9mh",
-        "qtc1v",
-        "epqf5",
-        "__ an",
-        "d __O",
-        "PF_EM",
-        "AIL__",
-        "4ov1q",
-        "ksihe",
-        "f66la",
-        "1__ b",
-        "oth."
-      ],
-      "buffer_window": null,
-      "expected": {
-        "pushes": [
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ an",
-          "d ",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "__OPF_EMAIL__4ov1qksihef66la1__ b",
-          "oth."
-        ],
-        "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMAIL__4ov1qksihef66la1__ both.",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMAIL:4ov1qksihef66la1}} both.",
         "lossless": true
       }
     },
     {
       "name": "two-tokens-split7",
       "chunks": [
-        "__OPF_P",
-        "ERSON__",
-        "4ov9mhq",
-        "tc1vepq",
-        "f5__ an",
-        "d __OPF",
-        "_EMAIL_",
-        "_4ov1qk",
-        "sihef66",
-        "la1__ b",
-        "oth."
+        "{{OPF:P",
+        "ERSON:4",
+        "ov9mhqt",
+        "c1vepqf",
+        "5}} and",
+        " {{OPF:",
+        "EMAIL:4",
+        "ov1qksi",
+        "hef66la",
+        "1}} bot",
+        "h."
       ],
       "buffer_window": null,
       "expected": {
@@ -1569,36 +1555,35 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ an",
-          "d ",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and",
+          " ",
           "",
           "",
           "",
-          "__OPF_EMAIL__4ov1qksihef66la1__ b",
-          "oth."
+          "{{OPF:EMAIL:4ov1qksihef66la1}} bot",
+          "h."
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMAIL__4ov1qksihef66la1__ both.",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMAIL:4ov1qksihef66la1}} both.",
         "lossless": true
       }
     },
     {
       "name": "token-then-newline-split1",
       "chunks": [
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "P",
         "E",
         "R",
         "S",
         "O",
         "N",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -1615,8 +1600,8 @@
         "q",
         "f",
         "5",
-        "_",
-        "_",
+        "}",
+        "}",
         "\n"
       ],
       "buffer_window": null,
@@ -1652,35 +1637,33 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           "\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
         "lossless": true
       }
     },
     {
       "name": "token-then-newline-split2",
       "chunks": [
-        "__",
+        "{{",
         "OP",
-        "F_",
+        "F:",
         "PE",
         "RS",
         "ON",
-        "__",
-        "4o",
-        "v9",
-        "mh",
-        "qt",
-        "c1",
-        "ve",
-        "pq",
-        "f5",
-        "__",
-        "\n"
+        ":4",
+        "ov",
+        "9m",
+        "hq",
+        "tc",
+        "1v",
+        "ep",
+        "qf",
+        "5}",
+        "}\n"
       ],
       "buffer_window": null,
       "expected": {
@@ -1700,28 +1683,27 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "\n"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
         "lossless": true
       }
     },
     {
       "name": "token-then-newline-split3",
       "chunks": [
-        "__O",
-        "PF_",
+        "{{O",
+        "PF:",
         "PER",
         "SON",
-        "__4",
-        "ov9",
-        "mhq",
-        "tc1",
-        "vep",
-        "qf5",
-        "__\n"
+        ":4o",
+        "v9m",
+        "hqt",
+        "c1v",
+        "epq",
+        "f5}",
+        "}\n"
       ],
       "buffer_window": null,
       "expected": {
@@ -1736,23 +1718,23 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__\n"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
         "lossless": true
       }
     },
     {
       "name": "token-then-newline-split5",
       "chunks": [
-        "__OPF",
-        "_PERS",
-        "ON__4",
-        "ov9mh",
-        "qtc1v",
-        "epqf5",
-        "__\n"
+        "{{OPF",
+        ":PERS",
+        "ON:4o",
+        "v9mhq",
+        "tc1ve",
+        "pqf5}",
+        "}\n"
       ],
       "buffer_window": null,
       "expected": {
@@ -1763,21 +1745,21 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__\n"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
         "lossless": true
       }
     },
     {
       "name": "token-then-newline-split7",
       "chunks": [
-        "__OPF_P",
-        "ERSON__",
-        "4ov9mhq",
-        "tc1vepq",
-        "f5__\n"
+        "{{OPF:P",
+        "ERSON:4",
+        "ov9mhqt",
+        "c1vepqf",
+        "5}}\n"
       ],
       "buffer_window": null,
       "expected": {
@@ -1786,30 +1768,29 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__\n"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
         "lossless": true
       }
     },
     {
       "name": "newline-between-split1",
       "chunks": [
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "P",
         "E",
         "R",
         "S",
         "O",
         "N",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -1826,22 +1807,21 @@
         "q",
         "f",
         "5",
-        "_",
-        "_",
+        "}",
+        "}",
         "\n",
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "E",
         "M",
         "A",
         "I",
         "L",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -1858,8 +1838,8 @@
         "l",
         "a",
         "1",
-        "_",
-        "_",
+        "}",
+        "}",
         "\n"
       ],
       "buffer_window": null,
@@ -1895,8 +1875,7 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           "\n",
           "",
           "",
@@ -1927,41 +1906,39 @@
           "",
           "",
           "",
-          "",
-          "__OPF_EMAIL__4ov1qksihef66la1__",
+          "{{OPF:EMAIL:4ov1qksihef66la1}}",
           "\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n__OPF_EMAIL__4ov1qksihef66la1__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n{{OPF:EMAIL:4ov1qksihef66la1}}\n",
         "lossless": true
       }
     },
     {
       "name": "newline-between-split2",
       "chunks": [
-        "__",
+        "{{",
         "OP",
-        "F_",
+        "F:",
         "PE",
         "RS",
         "ON",
-        "__",
-        "4o",
-        "v9",
-        "mh",
-        "qt",
-        "c1",
-        "ve",
-        "pq",
-        "f5",
-        "__",
-        "\n_",
-        "_O",
-        "PF",
-        "_E",
-        "MA",
-        "IL",
-        "__",
+        ":4",
+        "ov",
+        "9m",
+        "hq",
+        "tc",
+        "1v",
+        "ep",
+        "qf",
+        "5}",
+        "}\n",
+        "{{",
+        "OP",
+        "F:",
+        "EM",
+        "AI",
+        "L:",
         "4o",
         "v1",
         "qk",
@@ -1970,7 +1947,7 @@
         "f6",
         "6l",
         "a1",
-        "__",
+        "}}",
         "\n"
       ],
       "buffer_window": null,
@@ -1991,8 +1968,7 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "\n",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
           "",
           "",
           "",
@@ -2007,39 +1983,38 @@
           "",
           "",
           "",
-          "__OPF_EMAIL__4ov1qksihef66la1__",
+          "{{OPF:EMAIL:4ov1qksihef66la1}}",
           "\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n__OPF_EMAIL__4ov1qksihef66la1__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n{{OPF:EMAIL:4ov1qksihef66la1}}\n",
         "lossless": true
       }
     },
     {
       "name": "newline-between-split3",
       "chunks": [
-        "__O",
-        "PF_",
+        "{{O",
+        "PF:",
         "PER",
         "SON",
-        "__4",
-        "ov9",
-        "mhq",
-        "tc1",
-        "vep",
-        "qf5",
-        "__\n",
-        "__O",
-        "PF_",
-        "EMA",
-        "IL_",
-        "_4o",
-        "v1q",
-        "ksi",
-        "hef",
-        "66l",
-        "a1_",
-        "_\n"
+        ":4o",
+        "v9m",
+        "hqt",
+        "c1v",
+        "epq",
+        "f5}",
+        "}\n{",
+        "{OP",
+        "F:E",
+        "MAI",
+        "L:4",
+        "ov1",
+        "qks",
+        "ihe",
+        "f66",
+        "la1",
+        "}}\n"
       ],
       "buffer_window": null,
       "expected": {
@@ -2054,7 +2029,7 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
           "",
           "",
           "",
@@ -2064,30 +2039,29 @@
           "",
           "",
           "",
-          "",
-          "__OPF_EMAIL__4ov1qksihef66la1__\n"
+          "{{OPF:EMAIL:4ov1qksihef66la1}}\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n__OPF_EMAIL__4ov1qksihef66la1__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n{{OPF:EMAIL:4ov1qksihef66la1}}\n",
         "lossless": true
       }
     },
     {
       "name": "newline-between-split5",
       "chunks": [
-        "__OPF",
-        "_PERS",
-        "ON__4",
-        "ov9mh",
-        "qtc1v",
-        "epqf5",
-        "__\n__",
-        "OPF_E",
-        "MAIL_",
-        "_4ov1",
-        "qksih",
-        "ef66l",
-        "a1__\n"
+        "{{OPF",
+        ":PERS",
+        "ON:4o",
+        "v9mhq",
+        "tc1ve",
+        "pqf5}",
+        "}\n{{O",
+        "PF:EM",
+        "AIL:4",
+        "ov1qk",
+        "sihef",
+        "66la1",
+        "}}\n"
       ],
       "buffer_window": null,
       "expected": {
@@ -2098,32 +2072,31 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
           "",
           "",
           "",
           "",
           "",
-          "__OPF_EMAIL__4ov1qksihef66la1__\n"
+          "{{OPF:EMAIL:4ov1qksihef66la1}}\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n__OPF_EMAIL__4ov1qksihef66la1__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n{{OPF:EMAIL:4ov1qksihef66la1}}\n",
         "lossless": true
       }
     },
     {
       "name": "newline-between-split7",
       "chunks": [
-        "__OPF_P",
-        "ERSON__",
-        "4ov9mhq",
-        "tc1vepq",
-        "f5__\n__",
-        "OPF_EMA",
-        "IL__4ov",
-        "1qksihe",
-        "f66la1_",
-        "_\n"
+        "{{OPF:P",
+        "ERSON:4",
+        "ov9mhqt",
+        "c1vepqf",
+        "5}}\n{{O",
+        "PF:EMAI",
+        "L:4ov1q",
+        "ksihef6",
+        "6la1}}\n"
       ],
       "buffer_window": null,
       "expected": {
@@ -2132,15 +2105,14 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
           "",
           "",
           "",
-          "",
-          "__OPF_EMAIL__4ov1qksihef66la1__\n"
+          "{{OPF:EMAIL:4ov1qksihef66la1}}\n"
         ],
         "flush": "",
-        "total": "__OPF_PERSON__4ov9mhqtc1vepqf5__\n__OPF_EMAIL__4ov1qksihef66la1__\n",
+        "total": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n{{OPF:EMAIL:4ov1qksihef66la1}}\n",
         "lossless": true
       }
     },
@@ -2369,20 +2341,19 @@
         "s",
         "e",
         " ",
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "P",
         "E",
         "R",
         "S",
         "O",
         "N",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -2399,8 +2370,8 @@
         "q",
         "f",
         "5",
-        "_",
-        "_",
+        "}",
+        "}",
         " ",
         "_",
         "_",
@@ -2426,8 +2397,8 @@
           "a",
           "k",
           "e",
-          "",
-          "_c",
+          "_",
+          "c",
           "a",
           "s",
           "e",
@@ -2462,27 +2433,26 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           " ",
-          "",
-          "",
-          "__n",
+          "_",
+          "_",
+          "n",
           "o",
           "t",
-          "",
-          "_a",
-          "",
-          "_t",
+          "_",
+          "a",
+          "_",
+          "t",
           "o",
           "k",
           "e",
           "n",
-          "",
-          ""
+          "_",
+          "_"
         ],
-        "flush": "__",
-        "total": "snake_case __OPF_PERSON__4ov9mhqtc1vepqf5__ __not_a_token__",
+        "flush": "",
+        "total": "snake_case {{OPF:PERSON:4ov9mhqtc1vepqf5}} __not_a_token__",
         "lossless": true
       }
     },
@@ -2494,39 +2464,38 @@
         "e_",
         "ca",
         "se",
-        " _",
-        "_O",
+        " {",
+        "{O",
         "PF",
-        "_P",
+        ":P",
         "ER",
         "SO",
-        "N_",
-        "_4",
-        "ov",
-        "9m",
-        "hq",
-        "tc",
-        "1v",
-        "ep",
-        "qf",
-        "5_",
-        "_ ",
-        "__",
-        "no",
-        "t_",
-        "a_",
-        "to",
-        "ke",
-        "n_",
-        "_"
+        "N:",
+        "4o",
+        "v9",
+        "mh",
+        "qt",
+        "c1",
+        "ve",
+        "pq",
+        "f5",
+        "}}",
+        " _",
+        "_n",
+        "ot",
+        "_a",
+        "_t",
+        "ok",
+        "en",
+        "__"
       ],
       "buffer_window": null,
       "expected": {
         "pushes": [
           "sn",
           "ak",
-          "e",
-          "_ca",
+          "e_",
+          "ca",
           "se",
           " ",
           "",
@@ -2543,19 +2512,18 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ ",
-          "",
-          "__no",
-          "t",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          " _",
+          "_n",
+          "ot",
           "_a",
-          "_to",
-          "ke",
-          "n",
-          ""
+          "_t",
+          "ok",
+          "en",
+          "__"
         ],
-        "flush": "__",
-        "total": "snake_case __OPF_PERSON__4ov9mhqtc1vepqf5__ __not_a_token__",
+        "flush": "",
+        "total": "snake_case {{OPF:PERSON:4ov9mhqtc1vepqf5}} __not_a_token__",
         "lossless": true
       }
     },
@@ -2565,30 +2533,30 @@
         "sna",
         "ke_",
         "cas",
-        "e _",
-        "_OP",
-        "F_P",
+        "e {",
+        "{OP",
+        "F:P",
         "ERS",
-        "ON_",
-        "_4o",
-        "v9m",
-        "hqt",
-        "c1v",
-        "epq",
-        "f5_",
-        "_ _",
-        "_no",
-        "t_a",
-        "_to",
-        "ken",
-        "__"
+        "ON:",
+        "4ov",
+        "9mh",
+        "qtc",
+        "1ve",
+        "pqf",
+        "5}}",
+        " __",
+        "not",
+        "_a_",
+        "tok",
+        "en_",
+        "_"
       ],
       "buffer_window": null,
       "expected": {
         "pushes": [
           "sna",
-          "ke",
-          "_cas",
+          "ke_",
+          "cas",
           "e ",
           "",
           "",
@@ -2599,16 +2567,16 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ ",
-          "__no",
-          "t_a",
-          "_to",
-          "ken",
-          ""
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          " __",
+          "not",
+          "_a_",
+          "tok",
+          "en_",
+          "_"
         ],
-        "flush": "__",
-        "total": "snake_case __OPF_PERSON__4ov9mhqtc1vepqf5__ __not_a_token__",
+        "flush": "",
+        "total": "snake_case {{OPF:PERSON:4ov9mhqtc1vepqf5}} __not_a_token__",
         "lossless": true
       }
     },
@@ -2617,16 +2585,16 @@
       "chunks": [
         "snake",
         "_case",
-        " __OP",
-        "F_PER",
-        "SON__",
-        "4ov9m",
-        "hqtc1",
-        "vepqf",
-        "5__ _",
-        "_not_",
-        "a_tok",
-        "en__"
+        " {{OP",
+        "F:PER",
+        "SON:4",
+        "ov9mh",
+        "qtc1v",
+        "epqf5",
+        "}} __",
+        "not_a",
+        "_toke",
+        "n__"
       ],
       "buffer_window": null,
       "expected": {
@@ -2639,13 +2607,13 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ ",
-          "__not",
-          "_a_tok",
-          "en"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}} __",
+          "not_a",
+          "_toke",
+          "n__"
         ],
-        "flush": "__",
-        "total": "snake_case __OPF_PERSON__4ov9mhqtc1vepqf5__ __not_a_token__",
+        "flush": "",
+        "total": "snake_case {{OPF:PERSON:4ov9mhqtc1vepqf5}} __not_a_token__",
         "lossless": true
       }
     },
@@ -2653,14 +2621,14 @@
       "name": "underscore-noise-split7",
       "chunks": [
         "snake_c",
-        "ase __O",
-        "PF_PERS",
-        "ON__4ov",
-        "9mhqtc1",
-        "vepqf5_",
-        "_ __not",
-        "_a_toke",
-        "n__"
+        "ase {{O",
+        "PF:PERS",
+        "ON:4ov9",
+        "mhqtc1v",
+        "epqf5}}",
+        " __not_",
+        "a_token",
+        "__"
       ],
       "buffer_window": null,
       "expected": {
@@ -2670,13 +2638,13 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__ __not",
-          "_a_toke",
-          "n"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          " __not_",
+          "a_token",
+          "__"
         ],
-        "flush": "__",
-        "total": "snake_case __OPF_PERSON__4ov9mhqtc1vepqf5__ __not_a_token__",
+        "flush": "",
+        "total": "snake_case {{OPF:PERSON:4ov9mhqtc1vepqf5}} __not_a_token__",
         "lossless": true
       }
     },
@@ -2686,20 +2654,19 @@
         "김",
         "철",
         "수",
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "P",
         "E",
         "R",
         "S",
         "O",
         "N",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -2716,8 +2683,8 @@
         "q",
         "f",
         "5",
-        "_",
-        "_",
+        "}",
+        "}",
         "입",
         "니",
         "다"
@@ -2758,14 +2725,13 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           "입",
           "니",
           "다"
         ],
         "flush": "",
-        "total": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
+        "total": "김철수{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다",
         "lossless": true
       }
     },
@@ -2773,24 +2739,24 @@
       "name": "hangul-adjacent-split2",
       "chunks": [
         "김철",
-        "수_",
-        "_O",
+        "수{",
+        "{O",
         "PF",
-        "_P",
+        ":P",
         "ER",
         "SO",
-        "N_",
-        "_4",
-        "ov",
-        "9m",
-        "hq",
-        "tc",
-        "1v",
-        "ep",
-        "qf",
-        "5_",
-        "_입",
-        "니다"
+        "N:",
+        "4o",
+        "v9",
+        "mh",
+        "qt",
+        "c1",
+        "ve",
+        "pq",
+        "f5",
+        "}}",
+        "입니",
+        "다"
       ],
       "buffer_window": null,
       "expected": {
@@ -2811,12 +2777,12 @@
           "",
           "",
           "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__입",
-          "니다"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "입니",
+          "다"
         ],
         "flush": "",
-        "total": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
+        "total": "김철수{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다",
         "lossless": true
       }
     },
@@ -2824,17 +2790,51 @@
       "name": "hangul-adjacent-split3",
       "chunks": [
         "김철수",
-        "__O",
-        "PF_",
+        "{{O",
+        "PF:",
         "PER",
         "SON",
-        "__4",
-        "ov9",
-        "mhq",
-        "tc1",
-        "vep",
-        "qf5",
-        "__입",
+        ":4o",
+        "v9m",
+        "hqt",
+        "c1v",
+        "epq",
+        "f5}",
+        "}입니",
+        "다"
+      ],
+      "buffer_window": null,
+      "expected": {
+        "pushes": [
+          "김철수",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니",
+          "다"
+        ],
+        "flush": "",
+        "total": "김철수{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다",
+        "lossless": true
+      }
+    },
+    {
+      "name": "hangul-adjacent-split5",
+      "chunks": [
+        "김철수{{",
+        "OPF:P",
+        "ERSON",
+        ":4ov9",
+        "mhqtc",
+        "1vepq",
+        "f5}}입",
         "니다"
       ],
       "buffer_window": null,
@@ -2846,57 +2846,23 @@
           "",
           "",
           "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__입",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}입",
           "니다"
         ],
         "flush": "",
-        "total": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
-        "lossless": true
-      }
-    },
-    {
-      "name": "hangul-adjacent-split5",
-      "chunks": [
-        "김철수__",
-        "OPF_P",
-        "ERSON",
-        "__4ov",
-        "9mhqt",
-        "c1vep",
-        "qf5__",
-        "입니다"
-      ],
-      "buffer_window": null,
-      "expected": {
-        "pushes": [
-          "김철수",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "입니다"
-        ],
-        "flush": "",
-        "total": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
+        "total": "김철수{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다",
         "lossless": true
       }
     },
     {
       "name": "hangul-adjacent-split7",
       "chunks": [
-        "김철수__OP",
-        "F_PERSO",
-        "N__4ov9",
-        "mhqtc1v",
-        "epqf5__",
-        "입니다"
+        "김철수{{OP",
+        "F:PERSO",
+        "N:4ov9m",
+        "hqtc1ve",
+        "pqf5}}입",
+        "니다"
       ],
       "buffer_window": null,
       "expected": {
@@ -2905,11 +2871,11 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "입니다"
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}입",
+          "니다"
         ],
         "flush": "",
-        "total": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
+        "total": "김철수{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다",
         "lossless": true
       }
     },
@@ -2920,20 +2886,19 @@
         "업",
         "자",
         " ",
-        "_",
-        "_",
+        "{",
+        "{",
         "O",
         "P",
         "F",
-        "_",
+        ":",
         "B",
         "I",
         "Z",
         "N",
         "U",
         "M",
-        "_",
-        "_",
+        ":",
         "4",
         "o",
         "v",
@@ -2950,8 +2915,8 @@
         "z",
         "o",
         "n",
-        "_",
-        "_",
+        "}",
+        "}",
         " ",
         "확",
         "인"
@@ -2993,14 +2958,13 @@
           "",
           "",
           "",
-          "",
-          "__OPF_BIZNUM__4ov7hegadq6zgzon__",
+          "{{OPF:BIZNUM:4ov7hegadq6zgzon}}",
           " ",
           "확",
           "인"
         ],
         "flush": "",
-        "total": "사업자 __OPF_BIZNUM__4ov7hegadq6zgzon__ 확인",
+        "total": "사업자 {{OPF:BIZNUM:4ov7hegadq6zgzon}} 확인",
         "lossless": true
       }
     },
@@ -3009,24 +2973,23 @@
       "chunks": [
         "사업",
         "자 ",
-        "__",
+        "{{",
         "OP",
-        "F_",
+        "F:",
         "BI",
         "ZN",
         "UM",
-        "__",
-        "4o",
-        "v7",
-        "he",
-        "ga",
-        "dq",
-        "6z",
-        "gz",
-        "on",
-        "__",
-        " 확",
-        "인"
+        ":4",
+        "ov",
+        "7h",
+        "eg",
+        "ad",
+        "q6",
+        "zg",
+        "zo",
+        "n}",
+        "} ",
+        "확인"
       ],
       "buffer_window": null,
       "expected": {
@@ -3048,12 +3011,11 @@
           "",
           "",
           "",
-          "__OPF_BIZNUM__4ov7hegadq6zgzon__",
-          " 확",
-          "인"
+          "{{OPF:BIZNUM:4ov7hegadq6zgzon}} ",
+          "확인"
         ],
         "flush": "",
-        "total": "사업자 __OPF_BIZNUM__4ov7hegadq6zgzon__ 확인",
+        "total": "사업자 {{OPF:BIZNUM:4ov7hegadq6zgzon}} 확인",
         "lossless": true
       }
     },
@@ -3061,18 +3023,18 @@
       "name": "biznum-delimiter-split3",
       "chunks": [
         "사업자",
-        " __",
+        " {{",
         "OPF",
-        "_BI",
+        ":BI",
         "ZNU",
-        "M__",
-        "4ov",
-        "7he",
-        "gad",
-        "q6z",
-        "gzo",
-        "n__",
-        " 확인"
+        "M:4",
+        "ov7",
+        "heg",
+        "adq",
+        "6zg",
+        "zon",
+        "}} ",
+        "확인"
       ],
       "buffer_window": null,
       "expected": {
@@ -3088,25 +3050,25 @@
           "",
           "",
           "",
-          "__OPF_BIZNUM__4ov7hegadq6zgzon__",
-          " 확인"
+          "{{OPF:BIZNUM:4ov7hegadq6zgzon}} ",
+          "확인"
         ],
         "flush": "",
-        "total": "사업자 __OPF_BIZNUM__4ov7hegadq6zgzon__ 확인",
+        "total": "사업자 {{OPF:BIZNUM:4ov7hegadq6zgzon}} 확인",
         "lossless": true
       }
     },
     {
       "name": "biznum-delimiter-split5",
       "chunks": [
-        "사업자 _",
-        "_OPF_",
+        "사업자 {",
+        "{OPF:",
         "BIZNU",
-        "M__4o",
-        "v7heg",
-        "adq6z",
-        "gzon_",
-        "_ 확인"
+        "M:4ov",
+        "7hega",
+        "dq6zg",
+        "zon}}",
+        " 확인"
       ],
       "buffer_window": null,
       "expected": {
@@ -3117,23 +3079,23 @@
           "",
           "",
           "",
-          "",
-          "__OPF_BIZNUM__4ov7hegadq6zgzon__ 확인"
+          "{{OPF:BIZNUM:4ov7hegadq6zgzon}}",
+          " 확인"
         ],
         "flush": "",
-        "total": "사업자 __OPF_BIZNUM__4ov7hegadq6zgzon__ 확인",
+        "total": "사업자 {{OPF:BIZNUM:4ov7hegadq6zgzon}} 확인",
         "lossless": true
       }
     },
     {
       "name": "biznum-delimiter-split7",
       "chunks": [
-        "사업자 __O",
-        "PF_BIZN",
-        "UM__4ov",
-        "7hegadq",
-        "6zgzon_",
-        "_ 확인"
+        "사업자 {{O",
+        "PF:BIZN",
+        "UM:4ov7",
+        "hegadq6",
+        "zgzon}}",
+        " 확인"
       ],
       "buffer_window": null,
       "expected": {
@@ -3142,11 +3104,11 @@
           "",
           "",
           "",
-          "",
-          "__OPF_BIZNUM__4ov7hegadq6zgzon__ 확인"
+          "{{OPF:BIZNUM:4ov7hegadq6zgzon}}",
+          " 확인"
         ],
         "flush": "",
-        "total": "사업자 __OPF_BIZNUM__4ov7hegadq6zgzon__ 확인",
+        "total": "사업자 {{OPF:BIZNUM:4ov7hegadq6zgzon}} 확인",
         "lossless": true
       }
     },
@@ -3155,20 +3117,20 @@
       "chunks": [
         "Con",
         "tac",
-        "t _",
-        "_OP",
-        "F_P",
+        "t {",
+        "{OP",
+        "F:P",
         "ERS",
-        "ON_",
-        "_4o",
-        "v9m",
-        "hqt",
-        "c1v",
-        "epq",
-        "f5_",
-        "_ t",
-        "oda",
-        "y."
+        "ON:",
+        "4ov",
+        "9mh",
+        "qtc",
+        "1ve",
+        "pqf",
+        "5}}",
+        " to",
+        "day",
+        "."
       ],
       "buffer_window": 8,
       "expected": {
@@ -3178,20 +3140,20 @@
           "t ",
           "",
           "",
-          "__OPF_PERS",
-          "ON",
-          "__4o",
-          "v9m",
-          "hqt",
-          "c1v",
-          "epq",
-          "f5",
-          "__ t",
-          "oda",
-          "y."
+          "{{OPF:PERS",
+          "ON:",
+          "4ov",
+          "9mh",
+          "qtc",
+          "1ve",
+          "pqf",
+          "5}}",
+          " to",
+          "day",
+          "."
         ],
         "flush": "",
-        "total": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+        "total": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} today.",
         "lossless": true
       }
     },
@@ -3200,9 +3162,9 @@
       "chunks": [
         "Contact ",
         "",
-        "__OPF_PERS",
+        "{{OPF:PERS",
         "",
-        "ON__4ov9mhqtc1vepqf5__",
+        "ON:4ov9mhqtc1vepqf5}}",
         "",
         " done"
       ],
@@ -3213,12 +3175,12 @@
           "",
           "",
           "",
-          "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           "",
           " done"
         ],
         "flush": "",
-        "total": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ done",
+        "total": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} done",
         "lossless": true
       }
     }

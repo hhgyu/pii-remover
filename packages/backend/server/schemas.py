@@ -75,7 +75,7 @@ class RedactResponse(BaseModel):
 
     ``redacted_text`` substitutes each detected span with a placeholder of the
     form ``[OPF:<LABEL>]``. The TypeScript core re-tokenises into the
-    ``__OPF_<CATEGORY>_<INDEX>__`` form (ADR-0002) with a vault index — this
+    ``{{OPF:<CATEGORY>:<INDEX>__`` form (ADR-0002) with a vault index — this
     server is intentionally stateless and does not track indices.
     """
 

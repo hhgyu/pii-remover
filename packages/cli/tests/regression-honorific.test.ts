@@ -67,7 +67,7 @@ describe("님 honorific regression (handoff Q from 2026-05-12)", () => {
     expect(r.decision).toBe("block");
     const parsed = JSON.parse(out.join("").trim());
     expect(parsed.decision).toBe("block");
-    expect(parsed.reason).toContain("__OPF_PERSON_");
+    expect(parsed.reason).toContain("{{OPF:PERSON:");
     expect(parsed.reason).not.toContain("김철수");
   });
 
@@ -95,7 +95,7 @@ describe("님 honorific regression (handoff Q from 2026-05-12)", () => {
     expect(r.decision).toBe("allow_warn");
     const parsed = JSON.parse(out.join("").trim());
     const ctx = parsed.hookSpecificOutput.additionalContext as string;
-    expect(ctx).toContain("__OPF_PERSON_");
+    expect(ctx).toContain("{{OPF:PERSON:");
     expect(ctx).toContain("님 반갑습니다");
     expect(ctx).not.toContain("김철수");
   });

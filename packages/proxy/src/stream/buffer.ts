@@ -1,6 +1,8 @@
 import {
   MAX_TOKEN_LENGTH,
+  TOKEN_DELIMITER,
   TOKEN_PREFIX,
+  TOKEN_SUFFIX,
   TOKEN_HASH_LENGTH,
 } from "@pii-remover/core";
 
@@ -16,15 +18,26 @@ export interface StreamBuffer {
 }
 
 // Must stay >= MAX_TOKEN_LENGTH, else the lookback misses an in-progress
-// token's `__OPF_` start and the tail is released raw. Doubled for headroom.
+// token's `{{OPF:` start and the tail is released raw. Doubled for headroom.
 export const DEFAULT_BUFFER_WINDOW = MAX_TOKEN_LENGTH * 2;
 
-const PREFIX_REGEX_SOURCE = Array.from(TOKEN_PREFIX)
-  .map((c) => c.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&"))
-  .join("");
+function escapeRegex(literal: string): string {
+  return literal.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+}
+
+const PREFIX_REGEX_SOURCE = escapeRegex(TOKEN_PREFIX);
+const DELIMITER_REGEX_SOURCE = escapeRegex(TOKEN_DELIMITER);
+const SUFFIX_REGEX_SOURCE = escapeRegex(TOKEN_SUFFIX);
+
+// Every proper prefix of the closing suffix, longest first. Alternation is
+// order-sensitive: a shorter branch first would match "}" and release the
+// second brace raw.
+const PARTIAL_SUFFIX_GROUP = Array.from(TOKEN_SUFFIX)
+  .map((_, i) => escapeRegex(TOKEN_SUFFIX.slice(0, TOKEN_SUFFIX.length - i)))
+  .join("|");
 
 // The bound is inclusive: a buffer ending at exactly the COMPLETE prefix
-// ("__OPF_") must also be held back. The other alternative in
+// ("{{OPF:") must also be held back. The other alternative in
 // UNSAFE_TOKEN_TAIL_REGEX needs at least one category character after the
 // prefix, so stopping at length-1 left a gap where only the trailing "_" was
 // held and "__OPF" was released — splitting the token across two restore calls
@@ -32,25 +45,22 @@ const PREFIX_REGEX_SOURCE = Array.from(TOKEN_PREFIX)
 function buildUnsafePrefixGroup(): string {
   const parts: string[] = [];
   for (let i = 1; i <= TOKEN_PREFIX.length; i++) {
-    const slice = TOKEN_PREFIX.slice(0, i)
-      .split("")
-      .map((c) => c.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&"))
-      .join("");
-    parts.push(slice);
+    parts.push(escapeRegex(TOKEN_PREFIX.slice(0, i)));
   }
   return parts.join("|");
 }
 
 export const COMPLETE_TOKEN_AT_END_REGEX = new RegExp(
-  `${PREFIX_REGEX_SOURCE}[A-Z][A-Z0-9_]*?__[a-z0-9]{${TOKEN_HASH_LENGTH}}__$`,
+  `${PREFIX_REGEX_SOURCE}[A-Z][A-Z0-9_]*${DELIMITER_REGEX_SOURCE}[a-z0-9]{${TOKEN_HASH_LENGTH}}${SUFFIX_REGEX_SOURCE}$`,
   "i"
 );
 
 // Incomplete token tail held back until the rest of the stream arrives:
 // the prefix may be partial, or category/delimiter/hash may still be in
-// progress (hash up to TOKEN_HASH_LENGTH chars, then trailing "__").
+// progress (hash up to TOKEN_HASH_LENGTH chars, then a partial closing "}}").
 export const UNSAFE_TOKEN_TAIL_REGEX = new RegExp(
-  `(?:${buildUnsafePrefixGroup()}|${PREFIX_REGEX_SOURCE}[A-Z][A-Z0-9_]*?(?:_?_?[a-z0-9]{0,${TOKEN_HASH_LENGTH}}_?_?)?)$`,
+  `(?:${buildUnsafePrefixGroup()}|${PREFIX_REGEX_SOURCE}[A-Z][A-Z0-9_]*` +
+    `(?:${DELIMITER_REGEX_SOURCE}?[a-z0-9]{0,${TOKEN_HASH_LENGTH}}(?:${PARTIAL_SUFFIX_GROUP})?)?)$`,
   "i"
 );
 

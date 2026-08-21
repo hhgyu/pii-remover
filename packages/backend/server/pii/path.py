@@ -1,13 +1,13 @@
 """Filesystem-path detection — port of ``core/src/restorer/path.ts``.
 
 Restoring a token that sits inside a path rewrites the path. When the model
-composes ``D:\\Git\\__OPF_PERSON__<hash>__Plugin`` out of masked context, putting
+composes ``D:\\Git\\{{OPF:PERSON:<hash>}}Plugin`` out of masked context, putting
 the real name back produces a path that does not exist; leaving the token alone
 at least fails visibly.
 
 Deliberately conservative: it suppresses restoration only when the token is
 clearly part of a path, so ordinary output like
-``__OPF_EMAIL__<hash>__ please respond`` is never blocked.
+``{{OPF:EMAIL:<hash>}} please respond`` is never blocked.
 """
 
 from __future__ import annotations

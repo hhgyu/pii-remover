@@ -16,7 +16,7 @@ import type { Mutator } from "../types.js";
  *  1. byte fidelity — the released chunks concatenate back to the input;
  *  2. restorability — no token straddles two released chunks. The proxy calls
  *     `restore()` once per released chunk, so a straddling token reaches the
- *     user as a raw `__OPF_…` string even though no byte was lost.
+ *     user as a raw `{{OPF:…` string even though no byte was lost.
  */
 
 /** Safe chunks the buffer releases for `deltas`, in order, flush included. */

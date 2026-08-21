@@ -37,7 +37,7 @@ function fakeBackend(detections: DetectionResult["detections"] = []): BackendCli
   };
 }
 
-const EMAIL_TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+const EMAIL_TOKEN_RE = /{{OPF:EMAIL:[a-z0-9]{16}}}/;
 
 async function buildRemover(opts: {
   sessionId?: string;
@@ -111,7 +111,7 @@ describe("createPluginHooks — tool.execute.before", () => {
     output);
     const args = output.args as { file_path: string; content: string };
     expect(args.file_path).toBe("/home/alice/work/repo/main.ts");
-    expect(args.content).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__ please$/);
+    expect(args.content).toMatch(/^contact {{OPF:EMAIL:[a-z0-9]{16}}} please$/);
     remover.dispose();
   });
 
@@ -132,8 +132,8 @@ describe("createPluginHooks — tool.execute.before", () => {
     await hooks["tool.execute.before"]!({ tool: "task", sessionID: "s", callID: "c1" },
     output);
     const msgs = (output.args as { messages: { text: string }[] }).messages;
-    expect(msgs[0]!.text).toMatch(/^email __OPF_EMAIL__[a-z0-9]{16}__ please$/);
-    expect(msgs[1]!.text).toMatch(/^or __OPF_EMAIL__[a-z0-9]{16}__$/);
+    expect(msgs[0]!.text).toMatch(/^email {{OPF:EMAIL:[a-z0-9]{16}}} please$/);
+    expect(msgs[1]!.text).toMatch(/^or {{OPF:EMAIL:[a-z0-9]{16}}}$/);
     expect(msgs[0]!.text.match(EMAIL_TOKEN_RE)![0]).not.toBe(msgs[1]!.text.match(EMAIL_TOKEN_RE)![0]);
     remover.dispose();
   });
@@ -171,8 +171,8 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
     const masked = await remover.mask(
       "김철수님 010-1234-5678 정보로 진행할까요?"
     );
-    expect(masked.text).toContain("__OPF_PERSON_");
-    expect(masked.text).toContain("__OPF_PHONE_");
+    expect(masked.text).toContain("{{OPF:PERSON:");
+    expect(masked.text).toContain("{{OPF:PHONE:");
 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const output = {
@@ -198,7 +198,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
     }).questions[0];
     expect(q?.question).toContain("김철수");
     expect(q?.question).toContain("010-1234-5678");
-    expect(q?.question).not.toContain("__OPF_PERSON_");
+    expect(q?.question).not.toContain("{{OPF:PERSON:");
     expect(q?.options?.[0]?.description).toContain("김철수");
     remover.dispose();
   });
@@ -206,7 +206,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
   test("MCP-prefixed `omo_question` restores tokens (suffix match)", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("연락처 alice@example.com 입니다");
-    expect(masked.text).toContain("__OPF_EMAIL_");
+    expect(masked.text).toContain("{{OPF:EMAIL:");
 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const output = { args: { question: masked.text } };
@@ -218,7 +218,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
       "alice@example.com"
     );
     expect((output.args as { question: string }).question).not.toContain(
-      "__OPF_EMAIL_"
+      "{{OPF:EMAIL:"
     );
     remover.dispose();
   });
@@ -228,7 +228,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
     const masked = await remover.mask(
       "alice@example.com 에게 회신할 것 - 010-1234-5678 확인"
     );
-    expect(masked.text).toContain("__OPF_EMAIL_");
+    expect(masked.text).toContain("{{OPF:EMAIL:");
 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const output = {
@@ -243,15 +243,15 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
     }).todos[0];
     expect(t?.content).toContain("alice@example.com");
     expect(t?.content).toContain("010-1234-5678");
-    expect(t?.content).not.toContain("__OPF_EMAIL_");
-    expect(t?.content).not.toContain("__OPF_PHONE_");
+    expect(t?.content).not.toContain("{{OPF:EMAIL:");
+    expect(t?.content).not.toContain("{{OPF:PHONE:");
     remover.dispose();
   });
 
   test("`todowrite` CAN be opted out via displayTools.excludeNames", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("alice@example.com 회신");
-    expect(masked.text).toContain("__OPF_EMAIL_");
+    expect(masked.text).toContain("{{OPF:EMAIL:");
 
     const hooks = createPluginHooks(remover, {
       warn: silentWarn(),
@@ -271,7 +271,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
     const t = (output.args as {
       todos: Array<{ content: string }>;
     }).todos[0];
-    expect(t?.content).toContain("__OPF_EMAIL_");
+    expect(t?.content).toContain("{{OPF:EMAIL:");
     expect(t?.content).not.toContain("alice@example.com");
     remover.dispose();
   });
@@ -279,7 +279,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
   test("MCP `omo_todowrite` matches (suffix)", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("alice@example.com 회신");
-    expect(masked.text).toContain("__OPF_EMAIL_");
+    expect(masked.text).toContain("{{OPF:EMAIL:");
 
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const output = { args: { todos: [{ content: masked.text }] } };
@@ -304,7 +304,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
       output
     );
     expect((output.args as { content: string }).content).toContain(
-      "__OPF_EMAIL_"
+      "{{OPF:EMAIL:"
     );
     expect((output.args as { content: string }).content).not.toContain(
       "alice@example.com"
@@ -325,7 +325,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
       output
     );
     expect((output.args as { content: string }).content).toContain(
-      "__OPF_EMAIL_"
+      "{{OPF:EMAIL:"
     );
     remover.dispose();
   });
@@ -333,7 +333,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
   test("upper-case MCP variant `Server_QUESTION` matches (case-insensitive)", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("연락처 alice@example.com 입니다");
-    expect(masked.text).toContain("__OPF_EMAIL_");
+    expect(masked.text).toContain("{{OPF:EMAIL:");
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const output = { args: { question: masked.text } };
     await hooks["tool.execute.before"]!(
@@ -344,7 +344,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
       "alice@example.com"
     );
     expect((output.args as { question: string }).question).not.toContain(
-      "__OPF_EMAIL_"
+      "{{OPF:EMAIL:"
     );
     remover.dispose();
   });
@@ -361,7 +361,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
       output
     );
     expect((output.args as { question: string }).question).toContain(
-      "__OPF_EMAIL_"
+      "{{OPF:EMAIL:"
     );
     expect((output.args as { question: string }).question).not.toContain(
       "alice@example.com"
@@ -372,7 +372,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
   test("experimental:false + allowWithoutBoundaryMask:true RESTORES display-tool args (proxy responsibility)", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("Contact alice@example.com please");
-    expect(masked.text).toContain("__OPF_EMAIL_");
+    expect(masked.text).toContain("{{OPF:EMAIL:");
     const hooks = createPluginHooks(remover, {
       warn: silentWarn(),
       experimental: false,
@@ -387,7 +387,7 @@ describe("createPluginHooks — tool.execute.before with display tools", () => {
       "alice@example.com"
     );
     expect((output.args as { question: string }).question).not.toContain(
-      "__OPF_EMAIL_"
+      "{{OPF:EMAIL:"
     );
     remover.dispose();
   });
@@ -496,8 +496,8 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     const text = output.messages[0]?.parts?.[0]?.text ?? "";
     expect(text).not.toContain("김철수");
     expect(text).not.toContain("010-1234-5678");
-    expect(text).toContain("__OPF_PERSON_");
-    expect(text).toContain("__OPF_PHONE_");
+    expect(text).toContain("{{OPF:PERSON:");
+    expect(text).toContain("{{OPF:PHONE:");
     remover.dispose();
   });
 
@@ -518,7 +518,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     const text = output.messages[0]?.parts?.[0]?.text ?? "";
     expect(text).not.toContain("김철수");
     expect(text).not.toContain("010-1234-5678");
-    expect(text).toContain("__OPF_PERSON_");
+    expect(text).toContain("{{OPF:PERSON:");
     remover.dispose();
   });
 
@@ -541,7 +541,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     await hooks["experimental.chat.messages.transform"]?.({}, output);
     const text = output.messages[0]?.parts?.[0]?.text ?? "";
     expect(text).not.toContain("alice@example.com");
-    expect(text).toContain("__OPF_EMAIL_");
+    expect(text).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -600,12 +600,12 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     const q = part?.state?.input?.questions?.[0];
     expect(q?.question).not.toContain("김철수");
     expect(q?.question).not.toContain("010-1234-5678");
-    expect(q?.question).toContain("__OPF_PERSON_");
-    expect(q?.question).toContain("__OPF_PHONE_");
+    expect(q?.question).toContain("{{OPF:PERSON:");
+    expect(q?.question).toContain("{{OPF:PHONE:");
     expect(q?.options?.[0]?.description).not.toContain("김철수");
-    expect(q?.options?.[0]?.description).toContain("__OPF_PERSON_");
+    expect(q?.options?.[0]?.description).toContain("{{OPF:PERSON:");
     expect(part?.state?.output).not.toContain("김철수");
-    expect(part?.state?.output).toContain("__OPF_PERSON_");
+    expect(part?.state?.output).toContain("{{OPF:PERSON:");
     expect(part?.state?.title).not.toContain("김철수");
     remover.dispose();
   });
@@ -634,9 +634,9 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
       | undefined
       | { prompt?: string; description?: string };
     expect(part?.prompt).not.toContain("김철수");
-    expect(part?.prompt).toContain("__OPF_PERSON_");
+    expect(part?.prompt).toContain("{{OPF:PERSON:");
     expect(part?.description).not.toContain("alice@example.com");
-    expect(part?.description).toContain("__OPF_EMAIL_");
+    expect(part?.description).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -668,8 +668,8 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     const value = part?.source?.text?.value ?? "";
     expect(value).not.toContain("alice@example.com");
     expect(value).not.toContain("010-1234-5678");
-    expect(value).toContain("__OPF_EMAIL_");
-    expect(value).toContain("__OPF_PHONE_");
+    expect(value).toContain("{{OPF:EMAIL:");
+    expect(value).toContain("{{OPF:PHONE:");
     remover.dispose();
   });
 
@@ -694,7 +694,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
       | undefined
       | { source?: { value?: string } };
     expect(part?.source?.value).not.toContain("alice@example.com");
-    expect(part?.source?.value).toContain("__OPF_EMAIL_");
+    expect(part?.source?.value).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -728,9 +728,9 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
         };
     expect(part?.type).toBe("note");
     expect(part?.comment).not.toContain("alice@example.com");
-    expect(part?.comment).toContain("__OPF_EMAIL_");
+    expect(part?.comment).toContain("{{OPF:EMAIL:");
     expect(part?.nested?.detail).not.toContain("김철수");
-    expect(part?.nested?.detail).toContain("__OPF_PERSON_");
+    expect(part?.nested?.detail).toContain("{{OPF:PERSON:");
     remover.dispose();
   });
 
@@ -766,7 +766,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     expect(part?.tool).toBe("some_tool_name_long_enough_too");
     expect(part?.state?.status).toBe("completed");
     expect(part?.state?.output).not.toContain("alice@example.com");
-    expect(part?.state?.output).toContain("__OPF_EMAIL_");
+    expect(part?.state?.output).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -804,11 +804,11 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
       };
     }).state;
     expect(state?.output?.content[0]?.text).not.toContain("alice@example.com");
-    expect(state?.output?.content[0]?.text).toContain("__OPF_EMAIL_");
+    expect(state?.output?.content[0]?.text).toContain("{{OPF:EMAIL:");
     expect(state?.output?.structuredContent.email).not.toContain(
       "alice@example.com"
     );
-    expect(state?.output?.structuredContent.email).toContain("__OPF_EMAIL_");
+    expect(state?.output?.structuredContent.email).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -837,7 +837,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
       state?: { metadata?: { note: string } };
     }).state?.metadata;
     expect(meta?.note).not.toContain("dev@example.com");
-    expect(meta?.note).toContain("__OPF_EMAIL_");
+    expect(meta?.note).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -883,7 +883,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     expect(inp?.profile_url).toBe("alice@example.com long form here");
     // Non-path fields are still masked.
     expect(inp?.unrelated).not.toContain("010-1234-5678");
-    expect(inp?.unrelated).toContain("__OPF_PHONE_");
+    expect(inp?.unrelated).toContain("{{OPF:PHONE:");
     remover.dispose();
   });
 
@@ -934,7 +934,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
       ?.state?.input;
     expect(typeof inp).toBe("string");
     expect(inp as string).not.toContain("alice@example.com");
-    expect(inp as string).toContain("__OPF_EMAIL_");
+    expect(inp as string).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -976,7 +976,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
           parts: [
             {
               type: "compaction",
-              text: "User shared __OPF_EMAIL__0123456789abcdef__ and __OPF_PERSON__fedcba9876543210__ for the project.",
+              text: "User shared {{OPF:EMAIL:0123456789abcdef}} and {{OPF:PERSON:fedcba9876543210}} for the project.",
             },
           ],
         },
@@ -1001,11 +1001,11 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
               type: "tool",
               state: {
                 status: "completed",
-                input: { filePath: "D:\\Git\\__OPF_PERSON__0123456789abcdef__-tools\\x.ts" },
+                input: { filePath: "D:\\Git\\{{OPF:PERSON:0123456789abcdef}}-tools\\x.ts" },
                 output: "done",
               },
             },
-            { type: "text", text: "stale __OPF_EMAIL__ffffffffffffffff__ reference" },
+            { type: "text", text: "stale {{OPF:EMAIL:ffffffffffffffff}} reference" },
           ],
         },
       ],
@@ -1019,7 +1019,7 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     );
     const textPart = output.messages[0]!.parts[1] as { text: string };
     expect(textPart.text).toContain("[UNRESTORABLE:EMAIL/foreign]");
-    expect(textPart.text).not.toContain("__OPF_EMAIL__ffffffffffffffff__");
+    expect(textPart.text).not.toContain("{{OPF:EMAIL:ffffffffffffffff}}");
     remover.dispose();
   });
 
@@ -1029,8 +1029,8 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
     const typed =
-      "what is __OPF_PERSON__0123456789abcdef__? " +
-      "docs say the shape is __OPF_<CATEGORY>__<HASH>__";
+      "what is {{OPF:PERSON:0123456789abcdef}}? " +
+      "docs say the shape is {{OPF:<CATEGORY>:<HASH>}}";
     const output = {
       messages: [
         { info: { role: "user" }, parts: [{ type: "text", text: typed }] },
@@ -1103,7 +1103,7 @@ describe("createPluginHooks — experimental.chat.system.transform", () => {
     );
     expect(output.system[0]).toBe("You are a helpful assistant.");
     expect(output.system.length).toBe(2);
-    expect(output.system[1]).toContain("__OPF_");
+    expect(output.system[1]).toContain("{{OPF:");
     expect(output.system[1]).toContain("privacy-preserving");
     remover.dispose();
   });
@@ -1138,7 +1138,7 @@ describe("PiiRemoverPlugin — top-level factory", () => {
     await hooks["tool.execute.before"]!({ tool: "write", sessionID: "s", callID: "c" },
     output);
     expect(typeof derived).toBe("string");
-    expect((output.args as { msg: string }).msg).toContain("__OPF_EMAIL_");
+    expect((output.args as { msg: string }).msg).toContain("{{OPF:EMAIL:");
   });
 
   test("returns a Hooks-shaped object with event + tool.execute.before", async () => {

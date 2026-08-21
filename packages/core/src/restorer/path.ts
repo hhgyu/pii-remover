@@ -5,7 +5,7 @@
  * evidence (drive-letter, UNC, POSIX absolute/relative, URL scheme, or
  * multiple separators). Intentionally conservative: it only suppresses
  * restoration when the token is clearly part of a path, so legitimate model
- * output like `"__OPF_EMAIL__<hash>__please respond"` is never blocked.
+ * output like `"{{OPF:EMAIL:<hash>}}please respond"` is never blocked.
  */
 export function isInsidePath(text: string, start: number, end: number): boolean {
   let spanStart = start;

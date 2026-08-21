@@ -13,11 +13,11 @@
  *  - For RESTORATION, NO field is skipped. Vault tokens demonstrably end
  *    up inside path-shaped fields (the LLM echoes masked paths back in
  *    `filePath` / `workdir` args), and restoring is a no-op on strings
- *    without an `__OPF_` substring, so skipping has no upside.
+ *    without an `{{OPF:` substring, so skipping has no upside.
  *  - Strings whose trimmed length is <= `MIN_MASK_LENGTH` (8) are skipped
  *    during masking (statistically unlikely to carry PII). Restoration
  *    uses a 0-length minimum because vault tokens themselves can be
- *    short and any string containing `__OPF_` is a candidate.
+ *    short and any string containing `{{OPF:` is a candidate.
  *  - Cycles are tolerated via a `WeakSet`; revisited objects/arrays are
  *    returned unchanged.
  *
@@ -175,7 +175,7 @@ export async function maskTextFields(
  * Recursively restores vault tokens in every string leaf in `args`.
  * Unlike `maskTextFields`, NO field is skipped by default and no value
  * heuristic applies: vault tokens land inside path-shaped fields when the
- * LLM echoes masked paths back (`filePath: "D:\\__OPF_PERSON_1__\\x"`),
+ * LLM echoes masked paths back (`filePath: "D:\\{{OPF:PERSON_1:\\x"`),
  * and restoring a token-free string is a no-op (see `Restorer.restore`).
  * An explicit `options.skipFields` is still honored for callers that must
  * keep specific fields untouched.

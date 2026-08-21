@@ -300,7 +300,7 @@ describe("runCli — help text mentions new lifecycle flags", () => {
       }
     );
     expect(code).toBe(0);
-    expect(io.out.join("")).toContain("__OPF_EMAIL_");
+    expect(io.out.join("")).toContain("{{OPF:EMAIL:");
   });
 
   test("detect missing --text -> 64", async () => {

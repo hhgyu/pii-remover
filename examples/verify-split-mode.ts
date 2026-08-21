@@ -58,7 +58,7 @@ async function main() {
   );
   console.log(`[5] Restored: ${result.output}`);
 
-  const maskOk = masked !== piiText && masked.includes("__OPF_");
+  const maskOk = masked !== piiText && masked.includes("{{OPF:");
   const restoreOk = result.output === piiText;
   const hookSplitOk =
     maskHooks["tool.execute.before"] !== undefined &&

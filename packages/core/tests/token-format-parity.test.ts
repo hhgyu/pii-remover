@@ -2,7 +2,7 @@
  * Token-grammar parity guard.
  *
  * `packages/core/src/token/format.ts` is the single source of truth for the
- * `__OPF_<CATEGORY>__<HASH>__` grammar. Before this guard existed the hash
+ * `{{OPF:<CATEGORY>:<HASH>}}` grammar. Before this guard existed the hash
  * length was hardcoded as `{16}` in three unrelated files, so changing
  * TOKEN_HASH_LENGTH would have silently broken the plugin's dead-token sweep
  * and the secret scanner's self-exclusion with no failing test.
@@ -36,7 +36,7 @@ const PACKAGES_DIR = join(REPO_ROOT, "packages");
  * trip the guard. Template interpolations like `${category}` carry no digits
  * inside the braces and are therefore not matched.
  */
-const HARDCODED_OPF_QUANTIFIER = /__OPF_.*\{\s*\d+\s*\}/;
+const HARDCODED_OPF_QUANTIFIER = /{{OPF:.*\{\s*\d+\s*\}/;
 
 const HIGH_ENTROPY_HASH = "q7z3m9x1k5w8v2n4";
 const SAMPLE_TOKEN = formatToken("SECRET", HIGH_ENTROPY_HASH);

@@ -6,7 +6,7 @@ Bridges the two halves that already exist in this process:
   ``server.korean_ner_runner``) finds PII spans and returns stateless
   ``[OPF:LABEL]`` placeholders.
 - **The vault** (:mod:`server.pii.vault`) turns those spans into reversible
-  ``__OPF_<CATEGORY>__<HASH>__`` tokens.
+  ``{{OPF:<CATEGORY>:<HASH>}}`` tokens.
 
 The detection function is injected rather than imported so this module is
 testable without loading a 5 GB ONNX model, and so the API layer keeps ownership

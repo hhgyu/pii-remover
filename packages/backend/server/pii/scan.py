@@ -2,13 +2,12 @@
 
 Finds every OPF token in a string, in three passes of decreasing confidence:
 
-1. **strict** - the canonical ``__OPF_PERSON__<hash>__`` form.
-2. **lenient** - case-folded category, optional trailing suffix. What an LLM
+1. **strict** - the canonical ``{{OPF:PERSON:<hash>}}`` form.
+2. **lenient** - case-folded category, optional closing brace pair. What an LLM
    produces when it "helpfully" reformats a token.
-3. **repair** - a hash one character short or long, or underscores escaped by a
-   Markdown renderer. A repair hit means nothing on its own; it must clear the
-   vault-bounded checks in :mod:`server.pii.repair` before anything is
-   substituted.
+3. **repair** - a hash one character short or long, or a dropped brace. A repair
+   hit means nothing on its own; it must clear the vault-bounded checks in
+   :mod:`server.pii.repair` before anything is substituted.
 
 Later passes never overwrite an earlier one: a span already claimed by a strict
 match is skipped, so the same token is never counted twice.
@@ -20,9 +19,12 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .token_format import (
+    TOKEN_DELIMITER,
     TOKEN_LENIENT_REGEX,
+    TOKEN_PREFIX,
     TOKEN_REPAIR_REGEX,
     TOKEN_STRICT_REGEX,
+    TOKEN_SUFFIX,
 )
 
 MatchType = Literal["strict", "lenient", "repair"]
@@ -47,7 +49,7 @@ class TokenMatch:
 
 
 def build_normalized(category: str, token_hash_value: str) -> str:
-    return f"__OPF_{category}__{token_hash_value}__"
+    return f"{TOKEN_PREFIX}{category}{TOKEN_DELIMITER}{token_hash_value}{TOKEN_SUFFIX}"
 
 
 def _strip_escapes(value: str) -> str:

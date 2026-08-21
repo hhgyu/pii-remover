@@ -13,7 +13,7 @@
 │  사용자 │ ─────────────▶ │  PII Remover│ ─────────────▶ │   LLM    │
 └────────┘                  └────────────┘                  └──────────┘
                                   │                              │
-                                  │  vault: __OPF_PERSON_1__     │
+                                  │  vault: {{OPF:PERSON:…}}     │
                                   ▼                              │
                              ┌─────────┐                         │
                              │  복원   │ ◀───── tokens ──────────┘
@@ -136,7 +136,7 @@ export 하는 게 아닙니다.
 
 - **Hook은 prompt를 교체할 수 없음** (Claude Code/Codex 모두 source-verified). 마스킹은 항상 proxy가 수행. Hook은 detection + fail-closed gate.
 - **Vault는 인메모리 세션 스코프**: 프로세스 메모리 only, 디스크 영속 없음.
-- **토큰 형식 `__OPF_<CATEGORY>_<INDEX>__`**: identifier-safe — 번역/마크다운/코드에서도 안 깨짐.
+- **토큰 형식 `{{OPF:<CATEGORY>:<HASH>}}`** ([ADR-0022](./docs/ADR/0022-markdown-inert-token-delimiters.md)): `{`, `}`는 CommonMark가 claim하지 않아 마크다운 왕복에서 원형이 보존된다. 이전 `__OPF_…__`는 그 자체로 bold 스팬이라 모델이 렌더링하며 내부 구분자를 삭제했다.
 - **4-Tier 백엔드 신뢰 모델**: localhost (default) → self-hosted+TLS → vendor+DPA → public SaaS (비추천). 자세히는 [`docs/TRUST_TIERS.md`](./docs/TRUST_TIERS.md).
 - **Fail-closed default**: PII 감지 실패 시 LLM 호출 차단. `PII_REMOVER_BYPASS=1`만 우회.
 - **Audit 로깅** (기본 비활성화): 구조화 JSONL로 `mask` / `restore` / `bypass` / `block` / `error` 이벤트를 ISO 타임스탬프, 카테고리 건수(`{ private_email: 2, rrn: 1 }`), vault ID, 백엔드 이름, latency, provider와 함께 기록 — **PII 원문은 절대 저장 안 함**. config(`audit.enabled: true` + `audit.log_path`)로 활성화하거나 `PII_REMOVER_AUDIT=true/false`로 런타임 토글.

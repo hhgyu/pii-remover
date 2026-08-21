@@ -24,14 +24,14 @@
       }
     ],
     "tokens": {
-      "김철수": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "alice@example.com": "__OPF_EMAIL__4ov1qksihef66la1__",
-      "010-1234-5678": "__OPF_PHONE__4ov3lglyfs7qftua__",
-      "900101-1234567": "__OPF_RRN__4ov3t471giz7l1ov__"
+      "김철수": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "alice@example.com": "{{OPF:EMAIL:4ov1qksihef66la1}}",
+      "010-1234-5678": "{{OPF:PHONE:4ov3lglyfs7qftua}}",
+      "900101-1234567": "{{OPF:RRN:4ov3t471giz7l1ov}}"
     },
-    "expired_token": "__OPF_PERSON__4ovzzzzzzzzzzzzz__",
-    "foreign_token": "__OPF_PERSON__aaazzzzzzzzzzzzz__",
-    "repairable_token": "__OPF_PERSON__4ov9mhqtc1vepqfa__"
+    "expired_token": "{{OPF:PERSON:4ovzzzzzzzzzzzzz}}",
+    "foreign_token": "{{OPF:PERSON:aaazzzzzzzzzzzzz}}",
+    "repairable_token": "{{OPF:PERSON:4ov9mhqtc1vepqfa}}"
   },
   "scan": [
     {
@@ -45,172 +45,182 @@
       "with_repair": []
     },
     {
-      "text": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__ today.",
+      "text": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}} today.",
       "strict_and_lenient": [
         {
           "start": 8,
-          "end": 40,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "strict"
-        }
-      ],
-      "with_repair": [
-        {
-          "start": 8,
-          "end": 40,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "strict"
-        }
-      ]
-    },
-    {
-      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and __OPF_EMAIL__4ov1qksihef66la1__ both.",
-      "strict_and_lenient": [
-        {
-          "start": 0,
-          "end": 32,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "strict"
-        },
-        {
-          "start": 37,
-          "end": 68,
-          "token": "__OPF_EMAIL__4ov1qksihef66la1__",
-          "normalizedToken": "__OPF_EMAIL__4ov1qksihef66la1__",
-          "category": "EMAIL",
-          "hash": "4ov1qksihef66la1",
-          "matchType": "strict"
-        }
-      ],
-      "with_repair": [
-        {
-          "start": 0,
-          "end": 32,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "strict"
-        },
-        {
-          "start": 37,
-          "end": 68,
-          "token": "__OPF_EMAIL__4ov1qksihef66la1__",
-          "normalizedToken": "__OPF_EMAIL__4ov1qksihef66la1__",
-          "category": "EMAIL",
-          "hash": "4ov1qksihef66la1",
-          "matchType": "strict"
-        }
-      ]
-    },
-    {
-      "text": "__OPF_person__4ov9mhqtc1vepqf5__",
-      "strict_and_lenient": [
-        {
-          "start": 0,
-          "end": 32,
-          "token": "__OPF_person__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "lenient"
-        }
-      ],
-      "with_repair": [
-        {
-          "start": 0,
-          "end": 32,
-          "token": "__OPF_person__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "lenient"
-        }
-      ]
-    },
-    {
-      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5",
-      "strict_and_lenient": [
-        {
-          "start": 0,
-          "end": 30,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "lenient"
-        }
-      ],
-      "with_repair": [
-        {
-          "start": 0,
-          "end": 30,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "lenient"
-        }
-      ]
-    },
-    {
-      "text": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
-      "strict_and_lenient": [
-        {
-          "start": 3,
-          "end": 35,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "strict"
-        }
-      ],
-      "with_repair": [
-        {
-          "start": 3,
-          "end": 35,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "category": "PERSON",
-          "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "strict"
-        }
-      ]
-    },
-    {
-      "text": "\\_\\_OPF\\_PERSON\\_\\_4ov9mhqtc1vepqf5\\_\\_",
-      "strict_and_lenient": [],
-      "with_repair": [
-        {
-          "start": 0,
           "end": 39,
-          "token": "\\_\\_OPF\\_PERSON\\_\\_4ov9mhqtc1vepqf5\\_\\_",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
-          "matchType": "repair"
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 8,
+          "end": 39,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
         }
       ]
     },
     {
-      "text": "__OPF_PERSON__aaaaaaaaaaaaaaaaa__",
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and {{OPF:EMAIL:4ov1qksihef66la1}} both.",
+      "strict_and_lenient": [
+        {
+          "start": 0,
+          "end": 31,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        },
+        {
+          "start": 36,
+          "end": 66,
+          "token": "{{OPF:EMAIL:4ov1qksihef66la1}}",
+          "normalizedToken": "{{OPF:EMAIL:4ov1qksihef66la1}}",
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 31,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        },
+        {
+          "start": 36,
+          "end": 66,
+          "token": "{{OPF:EMAIL:4ov1qksihef66la1}}",
+          "normalizedToken": "{{OPF:EMAIL:4ov1qksihef66la1}}",
+          "category": "EMAIL",
+          "hash": "4ov1qksihef66la1",
+          "matchType": "strict"
+        }
+      ]
+    },
+    {
+      "text": "{{OPF:person:4ov9mhqtc1vepqf5}}",
+      "strict_and_lenient": [
+        {
+          "start": 0,
+          "end": 31,
+          "token": "{{OPF:person:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 31,
+          "token": "{{OPF:person:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ]
+    },
+    {
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+      "strict_and_lenient": [
+        {
+          "start": 0,
+          "end": 29,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 29,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "lenient"
+        }
+      ]
+    },
+    {
+      "text": "김철수{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다",
+      "strict_and_lenient": [
+        {
+          "start": 3,
+          "end": 34,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 3,
+          "end": 34,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ]
+    },
+    {
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "strict_and_lenient": [
+        {
+          "start": 0,
+          "end": 31,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ],
+      "with_repair": [
+        {
+          "start": 0,
+          "end": 31,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "category": "PERSON",
+          "hash": "4ov9mhqtc1vepqf5",
+          "matchType": "strict"
+        }
+      ]
+    },
+    {
+      "text": "{{OPF:PERSON:aaaaaaaaaaaaaaaaa}}",
       "strict_and_lenient": [],
       "with_repair": [
         {
           "start": 0,
-          "end": 33,
-          "token": "__OPF_PERSON__aaaaaaaaaaaaaaaaa__",
-          "normalizedToken": "__OPF_PERSON__aaaaaaaaaaaaaaaaa__",
+          "end": 32,
+          "token": "{{OPF:PERSON:aaaaaaaaaaaaaaaaa}}",
+          "normalizedToken": "{{OPF:PERSON:aaaaaaaaaaaaaaaaa}}",
           "category": "PERSON",
           "hash": "aaaaaaaaaaaaaaaaa",
           "matchType": "repair"
@@ -218,13 +228,13 @@
       ]
     },
     {
-      "text": "path D:\\Git\\__OPF_PERSON__4ov9mhqtc1vepqf5__\\file.ts here",
+      "text": "path D:\\Git\\{{OPF:PERSON:4ov9mhqtc1vepqf5}}\\file.ts here",
       "strict_and_lenient": [
         {
           "start": 12,
-          "end": 44,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "end": 43,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
           "matchType": "strict"
@@ -233,9 +243,9 @@
       "with_repair": [
         {
           "start": 12,
-          "end": 44,
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+          "end": 43,
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
           "matchType": "strict"
@@ -324,97 +334,97 @@
     {
       "name": "exact-live-entry",
       "category": "PERSON",
-      "hash": "4ov9mhqtc1vepqf5",
+      "hash": "ov9mhqtc1vepqf5",
       "epoch": "4ov",
       "index": [
         {
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         },
         {
           "category": "EMAIL",
           "hash": "4ov1qksihef66la1",
-          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+          "token": "{{OPF:EMAIL:4ov1qksihef66la1}}"
         },
         {
           "category": "PHONE",
           "hash": "4ov3lglyfs7qftua",
-          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+          "token": "{{OPF:PHONE:4ov3lglyfs7qftua}}"
         },
         {
           "category": "RRN",
           "hash": "4ov3t471giz7l1ov",
-          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+          "token": "{{OPF:RRN:4ov3t471giz7l1ov}}"
         }
       ],
       "resolution": {
         "kind": "repaired",
-        "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        "normalizedToken": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
       }
     },
     {
       "name": "repairable-one-edit",
       "category": "PERSON",
-      "hash": "4ov9mhqtc1vepqfa",
+      "hash": "ov9mhqtc1vepqfa",
       "epoch": "4ov",
       "index": [
         {
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         },
         {
           "category": "EMAIL",
           "hash": "4ov1qksihef66la1",
-          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+          "token": "{{OPF:EMAIL:4ov1qksihef66la1}}"
         },
         {
           "category": "PHONE",
           "hash": "4ov3lglyfs7qftua",
-          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+          "token": "{{OPF:PHONE:4ov3lglyfs7qftua}}"
         },
         {
           "category": "RRN",
           "hash": "4ov3t471giz7l1ov",
-          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+          "token": "{{OPF:RRN:4ov3t471giz7l1ov}}"
         }
       ],
       "resolution": {
-        "kind": "repaired",
-        "normalizedToken": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        "kind": "unresolved",
+        "cause": "foreign"
       }
     },
     {
       "name": "category-mismatch-blocks-repair",
       "category": "EMAIL",
-      "hash": "4ov9mhqtc1vepqfa",
+      "hash": "ov9mhqtc1vepqfa",
       "epoch": "4ov",
       "index": [
         {
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         },
         {
           "category": "EMAIL",
           "hash": "4ov1qksihef66la1",
-          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+          "token": "{{OPF:EMAIL:4ov1qksihef66la1}}"
         },
         {
           "category": "PHONE",
           "hash": "4ov3lglyfs7qftua",
-          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+          "token": "{{OPF:PHONE:4ov3lglyfs7qftua}}"
         },
         {
           "category": "RRN",
           "hash": "4ov3t471giz7l1ov",
-          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+          "token": "{{OPF:RRN:4ov3t471giz7l1ov}}"
         }
       ],
       "resolution": {
         "kind": "unresolved",
-        "cause": "expired"
+        "cause": "foreign"
       }
     },
     {
@@ -426,22 +436,22 @@
         {
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         },
         {
           "category": "EMAIL",
           "hash": "4ov1qksihef66la1",
-          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+          "token": "{{OPF:EMAIL:4ov1qksihef66la1}}"
         },
         {
           "category": "PHONE",
           "hash": "4ov3lglyfs7qftua",
-          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+          "token": "{{OPF:PHONE:4ov3lglyfs7qftua}}"
         },
         {
           "category": "RRN",
           "hash": "4ov3t471giz7l1ov",
-          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+          "token": "{{OPF:RRN:4ov3t471giz7l1ov}}"
         }
       ],
       "resolution": {
@@ -458,22 +468,22 @@
         {
           "category": "PERSON",
           "hash": "4ov9mhqtc1vepqf5",
-          "token": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+          "token": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
         },
         {
           "category": "EMAIL",
           "hash": "4ov1qksihef66la1",
-          "token": "__OPF_EMAIL__4ov1qksihef66la1__"
+          "token": "{{OPF:EMAIL:4ov1qksihef66la1}}"
         },
         {
           "category": "PHONE",
           "hash": "4ov3lglyfs7qftua",
-          "token": "__OPF_PHONE__4ov3lglyfs7qftua__"
+          "token": "{{OPF:PHONE:4ov3lglyfs7qftua}}"
         },
         {
           "category": "RRN",
           "hash": "4ov3t471giz7l1ov",
-          "token": "__OPF_RRN__4ov3t471giz7l1ov__"
+          "token": "{{OPF:RRN:4ov3t471giz7l1ov}}"
         }
       ],
       "resolution": {
@@ -490,12 +500,12 @@
         {
           "category": "PERSON",
           "hash": "aaabbbbbbbbbbbb",
-          "token": "__OPF_PERSON__aaabbbbbbbbbbbb__"
+          "token": "{{OPF:PERSON:aaabbbbbbbbbbbb}}"
         },
         {
           "category": "PERSON",
           "hash": "aaabbbbbbbbbbbc",
-          "token": "__OPF_PERSON__aaabbbbbbbbbbbc__"
+          "token": "{{OPF:PERSON:aaabbbbbbbbbbbc}}"
         }
       ],
       "resolution": {
@@ -517,87 +527,87 @@
   ],
   "is_inside_path": [
     {
-      "text": "D:\\Git\\__OPF_PERSON__4ov9mhqtc1vepqf5__\\file.ts",
+      "text": "D:\\Git\\{{OPF:PERSON:4ov9mhqtc1vepqf5}}\\file.ts",
       "start": 7,
-      "end": 39,
+      "end": 38,
       "inside_path": true
     },
     {
-      "text": "C:/Users/__OPF_PERSON__4ov9mhqtc1vepqf5__/doc.txt",
+      "text": "C:/Users/{{OPF:PERSON:4ov9mhqtc1vepqf5}}/doc.txt",
       "start": 9,
-      "end": 41,
+      "end": 40,
       "inside_path": true
     },
     {
-      "text": "\\\\server\\share\\__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "text": "\\\\server\\share\\{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
       "start": 15,
-      "end": 47,
+      "end": 46,
       "inside_path": true
     },
     {
-      "text": "/home/__OPF_PERSON__4ov9mhqtc1vepqf5__/notes.md",
+      "text": "/home/{{OPF:PERSON:4ov9mhqtc1vepqf5}}/notes.md",
       "start": 6,
-      "end": 38,
+      "end": 37,
       "inside_path": true
     },
     {
-      "text": "./src/__OPF_PERSON__4ov9mhqtc1vepqf5__/index.ts",
+      "text": "./src/{{OPF:PERSON:4ov9mhqtc1vepqf5}}/index.ts",
       "start": 6,
-      "end": 38,
+      "end": 37,
       "inside_path": true
     },
     {
-      "text": "../__OPF_PERSON__4ov9mhqtc1vepqf5__/x",
+      "text": "../{{OPF:PERSON:4ov9mhqtc1vepqf5}}/x",
       "start": 3,
+      "end": 34,
+      "inside_path": true
+    },
+    {
+      "text": "https://example.com/{{OPF:PERSON:4ov9mhqtc1vepqf5}}/page",
+      "start": 20,
+      "end": 51,
+      "inside_path": true
+    },
+    {
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} please respond",
+      "start": 0,
+      "end": 31,
+      "inside_path": false
+    },
+    {
+      "text": "Contact {{OPF:PERSON:4ov9mhqtc1vepqf5}}, thanks",
+      "start": 8,
+      "end": 39,
+      "inside_path": false
+    },
+    {
+      "text": "a/{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "start": 2,
+      "end": 33,
+      "inside_path": false
+    },
+    {
+      "text": "a/b/{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+      "start": 4,
       "end": 35,
       "inside_path": true
     },
     {
-      "text": "https://example.com/__OPF_PERSON__4ov9mhqtc1vepqf5__/page",
-      "start": 20,
-      "end": 52,
-      "inside_path": true
-    },
-    {
-      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ please respond",
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}/b/c",
       "start": 0,
-      "end": 32,
-      "inside_path": false
-    },
-    {
-      "text": "Contact __OPF_PERSON__4ov9mhqtc1vepqf5__, thanks",
-      "start": 8,
-      "end": 40,
-      "inside_path": false
-    },
-    {
-      "text": "a/__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "start": 2,
-      "end": 34,
-      "inside_path": false
-    },
-    {
-      "text": "a/b/__OPF_PERSON__4ov9mhqtc1vepqf5__",
-      "start": 4,
-      "end": 36,
+      "end": 31,
       "inside_path": true
     },
     {
-      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__/b/c",
-      "start": 0,
-      "end": 32,
-      "inside_path": true
-    },
-    {
-      "text": "prefix __OPF_PERSON__4ov9mhqtc1vepqf5__ suffix",
+      "text": "prefix {{OPF:PERSON:4ov9mhqtc1vepqf5}} suffix",
       "start": 7,
-      "end": 39,
+      "end": 38,
       "inside_path": false
     },
     {
-      "text": "prefix﻿/a/b/__OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "text": "prefix﻿/a/b/{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
       "start": 12,
-      "end": 44,
+      "end": 43,
       "inside_path": true
     }
   ],
@@ -650,7 +660,7 @@
     },
     {
       "name": "strict-single",
-      "text": "Hello __OPF_PERSON__4ov9mhqtc1vepqf5__!",
+      "text": "Hello {{OPF:PERSON:4ov9mhqtc1vepqf5}}!",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -673,7 +683,7 @@
     },
     {
       "name": "strict-multiple",
-      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ <__OPF_EMAIL__4ov1qksihef66la1__> __OPF_PHONE__4ov3lglyfs7qftua__",
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} <{{OPF:EMAIL:4ov1qksihef66la1}}> {{OPF:PHONE:4ov3lglyfs7qftua}}",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -696,7 +706,7 @@
     },
     {
       "name": "strict-repeated",
-      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ and again __OPF_PERSON__4ov9mhqtc1vepqf5__",
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} and again {{OPF:PERSON:4ov9mhqtc1vepqf5}}",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -719,7 +729,7 @@
     },
     {
       "name": "lenient-case-folded",
-      "text": "see __OPF_person__4ov9mhqtc1vepqf5__ here",
+      "text": "see {{OPF:person:ov9mhqtc1vepqf5}} here",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -729,9 +739,9 @@
         "text": "see 김철수 here",
         "match_count": 1,
         "restored_count": 1,
-        "partial_match_count": 1,
-        "lenient_restored_count": 1,
-        "repaired_count": 0,
+        "partial_match_count": 0,
+        "lenient_restored_count": 0,
+        "repaired_count": 1,
         "unknown_token_count": 0,
         "foreign_count": 0,
         "dead_token_count": 0,
@@ -742,7 +752,7 @@
     },
     {
       "name": "lenient-suffix-dropped",
-      "text": "see __OPF_PERSON__4ov9mhqtc1vepqf5 here",
+      "text": "see {{OPF:PERSON:4ov9mhqtc1vepqf5 here",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -765,14 +775,14 @@
     },
     {
       "name": "lenient-disabled",
-      "text": "see __OPF_person__4ov9mhqtc1vepqf5__ here",
+      "text": "see {{OPF:person:ov9mhqtc1vepqf5}} here",
       "opts": {
         "lenient": false,
         "repair": null,
         "skip_path_matches": null
       },
       "expected": {
-        "text": "see __OPF_person__4ov9mhqtc1vepqf5__ here",
+        "text": "see {{OPF:person:ov9mhqtc1vepqf5}} here",
         "match_count": 0,
         "restored_count": 0,
         "partial_match_count": 0,
@@ -788,7 +798,7 @@
     },
     {
       "name": "repairable-one-edit",
-      "text": "see __OPF_PERSON__4ov9mhqtc1vepqfa__ here",
+      "text": "see {{OPF:PERSON:4ov9mhqtc1vepqfa}} here",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -811,14 +821,14 @@
     },
     {
       "name": "repair-disabled",
-      "text": "see __OPF_PERSON__4ov9mhqtc1vepqfa__ here",
+      "text": "see {{OPF:PERSON:4ov9mhqtc1vepqfa}} here",
       "opts": {
         "lenient": null,
         "repair": false,
         "skip_path_matches": null
       },
       "expected": {
-        "text": "see __OPF_PERSON__4ov9mhqtc1vepqfa__ here",
+        "text": "see {{OPF:PERSON:4ov9mhqtc1vepqfa}} here",
         "match_count": 1,
         "restored_count": 0,
         "partial_match_count": 0,
@@ -834,14 +844,14 @@
     },
     {
       "name": "expired-same-epoch",
-      "text": "see __OPF_PERSON__4ovzzzzzzzzzzzzz__ here",
+      "text": "see {{OPF:PERSON:4ovzzzzzzzzzzzzz}} here",
       "opts": {
         "lenient": null,
         "repair": null,
         "skip_path_matches": null
       },
       "expected": {
-        "text": "see __OPF_PERSON__4ovzzzzzzzzzzzzz__ here",
+        "text": "see {{OPF:PERSON:4ovzzzzzzzzzzzzz}} here",
         "match_count": 1,
         "restored_count": 0,
         "partial_match_count": 0,
@@ -857,14 +867,14 @@
     },
     {
       "name": "foreign-other-epoch",
-      "text": "see __OPF_PERSON__aaazzzzzzzzzzzzz__ here",
+      "text": "see {{OPF:PERSON:aaazzzzzzzzzzzzz}} here",
       "opts": {
         "lenient": null,
         "repair": null,
         "skip_path_matches": null
       },
       "expected": {
-        "text": "see __OPF_PERSON__aaazzzzzzzzzzzzz__ here",
+        "text": "see {{OPF:PERSON:aaazzzzzzzzzzzzz}} here",
         "match_count": 1,
         "restored_count": 0,
         "partial_match_count": 0,
@@ -880,14 +890,14 @@
     },
     {
       "name": "path-skip-miss-inside-path",
-      "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+      "text": "open D:\\Git\\{{OPF:PERSON:4ovzzzzzzzzzzzzz}}\\file.ts now",
       "opts": {
         "lenient": null,
         "repair": null,
         "skip_path_matches": null
       },
       "expected": {
-        "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+        "text": "open D:\\Git\\{{OPF:PERSON:4ovzzzzzzzzzzzzz}}\\file.ts now",
         "match_count": 1,
         "restored_count": 0,
         "partial_match_count": 0,
@@ -903,14 +913,14 @@
     },
     {
       "name": "path-skip-disabled",
-      "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+      "text": "open D:\\Git\\{{OPF:PERSON:4ovzzzzzzzzzzzzz}}\\file.ts now",
       "opts": {
         "lenient": null,
         "repair": null,
         "skip_path_matches": false
       },
       "expected": {
-        "text": "open D:\\Git\\__OPF_PERSON__4ovzzzzzzzzzzzzz__\\file.ts now",
+        "text": "open D:\\Git\\{{OPF:PERSON:4ovzzzzzzzzzzzzz}}\\file.ts now",
         "match_count": 1,
         "restored_count": 0,
         "partial_match_count": 0,
@@ -926,7 +936,7 @@
     },
     {
       "name": "vault-hit-inside-path-still-restores",
-      "text": "open D:\\Git\\__OPF_PERSON__4ov9mhqtc1vepqf5__\\file.ts now",
+      "text": "open D:\\Git\\{{OPF:PERSON:4ov9mhqtc1vepqf5}}\\file.ts now",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -949,7 +959,7 @@
     },
     {
       "name": "markdown-escaped",
-      "text": "see \\_\\_OPF\\_PERSON\\_\\_4ov9mhqtc1vepqf5\\_\\_ here",
+      "text": "see {{OPF:PERSON:4ov9mhqtc1vepqf5}} here",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -972,7 +982,7 @@
     },
     {
       "name": "korean-adjacent",
-      "text": "김철수__OPF_PERSON__4ov9mhqtc1vepqf5__입니다",
+      "text": "김철수{{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다",
       "opts": {
         "lenient": null,
         "repair": null,
@@ -995,14 +1005,14 @@
     },
     {
       "name": "mixed-hit-and-miss",
-      "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__ then __OPF_PERSON__aaazzzzzzzzzzzzz__",
+      "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} then {{OPF:PERSON:aaazzzzzzzzzzzzz}}",
       "opts": {
         "lenient": null,
         "repair": null,
         "skip_path_matches": null
       },
       "expected": {
-        "text": "김철수 then __OPF_PERSON__aaazzzzzzzzzzzzz__",
+        "text": "김철수 then {{OPF:PERSON:aaazzzzzzzzzzzzz}}",
         "match_count": 2,
         "restored_count": 1,
         "partial_match_count": 0,

@@ -3,7 +3,7 @@
 The detection half of the system already lives in Python (``server.opf_runner``,
 ``server.regex_pipeline``, ``server.korean_ner_runner``) and emits stateless
 ``[OPF:LABEL]`` placeholders. This package adds the half that makes redaction
-*reversible*: a vault that mints ``__OPF_<CATEGORY>__<HASH>__`` tokens and a
+*reversible*: a vault that mints ``{{OPF:<CATEGORY>:<HASH>}}`` tokens and a
 restorer that turns them back into the original text.
 
 Why a port instead of a call into the TypeScript core: the proxy that needs

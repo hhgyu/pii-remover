@@ -46,7 +46,7 @@ LLM(OpenCode·Claude Code 등)에 PII가 평문으로 전송되지 않도록 **�
 | Q1 | **TypeScript 단일 core**, Bun 컴파일 바이너리로 Claude Code hook 호출 | OpenCode TS 강제 + Python 콜드스타트 회피 |
 | Q2 | **세션 스코프 인메모리 vault**, deformatic `opf.reversible.v1` 스키마 채택 | 평문 디스크 공격면 0 |
 | Q3 | **로컬 LLM 프록시가 응답 복원의 유일한 견고한 답** | Claude Code 응답 변환 hook 부재 |
-| Q4 | 토큰 형식 `__OPF_<TYPE>_<INDEX>__` (예: `__OPF_PERSON_1__`) | identifier-safe, 번역/마크다운/코드 견고 |
+| Q4 | 토큰 형식 `{{OPF:<CATEGORY>:<HASH>}}` (ADR-0020 해시 + ADR-0022 구분자) | `{`/`}`를 CommonMark가 claim하지 않아 마크다운 왕복에 안전 |
 | Q5 | v1 한국 NER은 휴리스틱(상위 100 성씨 + 음절 패턴), v2 KLUE-NER Docker sidecar | MVP scope 적정화 |
 | Q6 | **fail-closed default** + `PII_REMOVER_BYPASS=1` 명시 우회 | 보안 보증 깨짐 방지 |
 | Q7 | MVP는 single backend, 인터페이스는 tiered 허용 / 4-tier 신뢰표 / secret env-only | PII 네트워크 노출 최소화 |

@@ -11,7 +11,7 @@ import {
 import { startProxy, type ProxyServer, type FetchLike } from "../src/server.js";
 
 const OPENAI_PATH = "/openai/v1/chat/completions";
-const TOKEN_RE = /__OPF_[A-Z_]+__[a-z0-9]{16}__/;
+const TOKEN_RE = /{{OPF:[A-Z_]+:[a-z0-9]{16}}}/;
 
 async function makeRemover() {
   return PIIRemover.init({
@@ -43,7 +43,7 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
     );
     expect(out.rejection).toBeUndefined();
     const masked = userMessage(out.body.messages).content as string;
-    expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(masked).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
   });
 
   test("array content: text masked, image_url passthrough", async () => {
@@ -70,7 +70,7 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
       type: string;
       text?: string;
     }>;
-    expect(parts[0]!.text).toMatch(/__OPF_CARD__[a-z0-9]{16}__/);
+    expect(parts[0]!.text).toMatch(/{{OPF:CARD:[a-z0-9]{16}}}/);
     expect(parts[1]!.type).toBe("image_url");
   });
 
@@ -87,7 +87,7 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
     expect(out.rejection).toBeUndefined();
     expect(out.body.stream).toBe(true);
     const masked = userMessage(out.body.messages).content as string;
-    expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(masked).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
   });
 });
 
@@ -195,7 +195,7 @@ describe("startProxy — OpenAI round-trip via mock upstream", () => {
         ?.messages ?? [])
         .map((m) => m?.content ?? "")
         .join("\n");
-      const token = upstreamText.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
+      const token = upstreamText.match(TOKEN_RE)?.[0] ?? "{{OPF:EMAIL:ffffffffffffffff}}";
       return new Response(
         JSON.stringify({
           id: "chatcmpl_test",
@@ -248,7 +248,7 @@ describe("startProxy — OpenAI round-trip via mock upstream", () => {
       lastBody as { messages: Array<{ role: string; content: string }> }
     ).messages;
     expect(userMessage(upstreamMessages).content).toMatch(
-      /__OPF_EMAIL__[a-z0-9]{16}__/
+      /{{OPF:EMAIL:[a-z0-9]{16}}}/
     );
   });
 

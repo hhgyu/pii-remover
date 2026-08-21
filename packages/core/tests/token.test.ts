@@ -18,10 +18,10 @@ const H2 = "fedcba9876543210";
 
 describe("formatToken", () => {
   test("generates expected tokens for OPF + Korean categories", () => {
-    expect(formatToken("PERSON", H1)).toBe(`__OPF_PERSON__${H1}__`);
-    expect(formatToken("EMAIL", H1)).toBe(`__OPF_EMAIL__${H1}__`);
-    expect(formatToken("RRN", H1)).toBe(`__OPF_RRN__${H1}__`);
-    expect(formatToken("BIZ_NUM", H1)).toBe(`__OPF_BIZ_NUM__${H1}__`);
+    expect(formatToken("PERSON", H1)).toBe(`{{OPF:PERSON:${H1}}}`);
+    expect(formatToken("EMAIL", H1)).toBe(`{{OPF:EMAIL:${H1}}}`);
+    expect(formatToken("RRN", H1)).toBe(`{{OPF:RRN:${H1}}}`);
+    expect(formatToken("BIZ_NUM", H1)).toBe(`{{OPF:BIZ_NUM:${H1}}}`);
   });
 
   test("rejects invalid category (lowercase, starts with underscore, empty)", () => {
@@ -40,11 +40,11 @@ describe("formatToken", () => {
 
 describe("parseToken / isToken", () => {
   test("parseToken round-trips well-formed token", () => {
-    expect(parseToken(`__OPF_PERSON__${H1}__`)).toEqual({
+    expect(parseToken(`{{OPF:PERSON:${H1}}}`)).toEqual({
       category: "PERSON",
       hash: H1,
     });
-    expect(parseToken(`__OPF_BIZ_NUM__${H2}__`)).toEqual({
+    expect(parseToken(`{{OPF:BIZ_NUM:${H2}}}`)).toEqual({
       category: "BIZ_NUM",
       hash: H2,
     });
@@ -52,32 +52,32 @@ describe("parseToken / isToken", () => {
 
   test("parseToken rejects malformed input", () => {
     expect(parseToken("not a token")).toBeNull();
-    expect(parseToken(`__OPF_person__${H1}__`)).toBeNull();
-    expect(parseToken(`__OPF_PERSON__${H1}`)).toBeNull();
+    expect(parseToken(`{{OPF:person:${H1}}}`)).toBeNull();
+    expect(parseToken(`{{OPF:PERSON:${H1}`)).toBeNull();
     expect(parseToken(`OPF_PERSON__${H1}`)).toBeNull();
-    expect(parseToken("__OPF_PERSON__short__")).toBeNull();
+    expect(parseToken("{{OPF:PERSON:short}}")).toBeNull();
   });
 
   test("isToken accepts strict format only", () => {
-    expect(isToken(`__OPF_PERSON__${H1}__`)).toBe(true);
-    expect(isToken(`__OPF_PERSON__${H1}`)).toBe(false);
+    expect(isToken(`{{OPF:PERSON:${H1}}}`)).toBe(true);
+    expect(isToken(`{{OPF:PERSON:${H1}`)).toBe(false);
   });
 });
 
 describe("token regexes", () => {
   test("strict regex matches multiple tokens in text", () => {
-    const text = `hello __OPF_PERSON__${H1}__ and __OPF_EMAIL__${H2}__ goodbye`;
+    const text = `hello {{OPF:PERSON:${H1}}} and {{OPF:EMAIL:${H2}}} goodbye`;
     const matches = Array.from(text.matchAll(TOKEN_STRICT_REGEX)).map(
       (m) => m[0]
     );
     expect(matches).toEqual([
-      `__OPF_PERSON__${H1}__`,
-      `__OPF_EMAIL__${H2}__`,
+      `{{OPF:PERSON:${H1}}}`,
+      `{{OPF:EMAIL:${H2}}}`,
     ]);
   });
 
   test("strict regex disambiguates underscore categories (BIZ_NUM)", () => {
-    const text = `__OPF_BIZ_NUM__${H1}__`;
+    const text = `{{OPF:BIZ_NUM:${H1}}}`;
     const m = TOKEN_STRICT_REGEX.exec(text);
     TOKEN_STRICT_REGEX.lastIndex = 0;
     expect(m![1]).toBe("BIZ_NUM");
@@ -85,11 +85,11 @@ describe("token regexes", () => {
   });
 
   test("lenient regex catches case variants and missing suffix", () => {
-    const text = `see __opf_person__${H1}__ then __OPF_EMAIL__${H2}`;
+    const text = `see {{opf:person:${H1}}} then {{OPF:EMAIL:${H2}`;
     const matches = Array.from(text.matchAll(TOKEN_LENIENT_REGEX));
     expect(matches.length).toBe(2);
-    expect(matches[0]![0].toLowerCase()).toBe(`__opf_person__${H1}__`);
-    expect(matches[1]![0].toUpperCase()).toContain("__OPF_EMAIL__");
+    expect(matches[0]![0].toLowerCase()).toBe(`{{opf:person:${H1}}}`);
+    expect(matches[1]![0].toUpperCase()).toContain("{{OPF:EMAIL:");
   });
 });
 

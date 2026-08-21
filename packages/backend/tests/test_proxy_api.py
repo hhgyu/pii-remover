@@ -164,9 +164,9 @@ def test_anthropic_round_trip_masks_then_restores(client: TestClient, upstream: 
 
     assert response.status_code == 200
     assert PERSON not in upstream.last_body_text, "PII reached the upstream"
-    assert "__OPF_PERSON__" in upstream.last_body_text
+    assert "{{OPF:PERSON:" in upstream.last_body_text
     assert PERSON in response.json()["content"][0]["text"], "token never restored"
-    assert "__OPF_" not in response.text
+    assert "{{OPF:" not in response.text
 
 
 def test_openai_round_trip_masks_then_restores(client: TestClient, upstream: _Upstream) -> None:
@@ -207,7 +207,7 @@ def test_codex_round_trip_masks_then_restores(client: TestClient, upstream: _Ups
 def test_system_note_is_injected(client: TestClient, upstream: _Upstream) -> None:
     upstream.responder = lambda _r: httpx.Response(200, json={"content": []})
     client.post("/anthropic/v1/messages", json={"model": "m", "messages": [], "system": "be nice"})
-    assert "__OPF_<LABEL>__<HASH>__" in upstream.last_body_text
+    assert "{{OPF:<LABEL>:<HASH>}}" in upstream.last_body_text
 
 
 def test_hop_by_hop_headers_are_not_forwarded(client: TestClient, upstream: _Upstream) -> None:
@@ -298,7 +298,7 @@ def test_streaming_restores_tokens_split_across_deltas(
 
     assert response.status_code == 200
     assert PERSON in response.text, "split token never reassembled"
-    assert "__OPF_" not in response.text
+    assert "{{OPF:" not in response.text
 
 
 # --------------------------------------------------------------------------
@@ -380,7 +380,7 @@ def test_excluded_category_reaches_upstream_verbatim(
     assert response.status_code == 200
     assert EMAIL in upstream.last_body_text, "excluded category was masked anyway"
     assert PERSON not in upstream.last_body_text, "non-excluded category leaked"
-    assert "__OPF_PERSON__" in upstream.last_body_text
+    assert "{{OPF:PERSON:" in upstream.last_body_text
 
 
 def test_no_exclusion_masks_every_category(client: TestClient, upstream: _Upstream) -> None:
@@ -441,4 +441,4 @@ def test_exclusion_does_not_leak_spans_swallowed_by_the_excluded_span(
     assert response.status_code == 200
     assert "https://x.example.com" in upstream.last_body_text, "url should pass through"
     assert EMAIL not in upstream.last_body_text, "email leaked inside the excluded span"
-    assert "__OPF_EMAIL__" in upstream.last_body_text
+    assert "{{OPF:EMAIL:" in upstream.last_body_text

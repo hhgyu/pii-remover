@@ -1,29 +1,28 @@
 """Token grammar - port of ``core/src/token/format.ts`` + ``category-map.ts``.
 
-Format (ADR-0020)::
+Format (ADR-0022)::
 
-    __OPF_<CATEGORY>__<HASH>__
+    {{OPF:<CATEGORY>:<HASH>}}
 
 - ``CATEGORY``: uppercase ASCII + underscores (``PERSON``, ``BIZ_NUM``)
-- ``__`` delimiter separates CATEGORY from HASH (disambiguates ``BIZNUM``)
+- ``:`` separates the three fields
 - ``HASH``: lowercase base36, fixed :data:`TOKEN_HASH_LENGTH` chars
+
+The predecessor ``{{OPF:<CATEGORY>:<HASH>}}`` embedded a complete Markdown
+emphasis span in its own prefix (``{{OPF:PERSON:`` is bold ``OPF_PERSON``), so a
+model that rendered its own output deleted the delimiter between category and
+hash. ``{`` and ``}`` are claimed by no CommonMark construct and ``:`` is inert
+inline, so this grammar survives a Markdown round-trip untouched.
 
 Every consumer builds its regex from the ``*_PATTERN`` sources here instead of
 hardcoding the hash length, so widening the hash cannot leave a stale matcher
 behind.
 
-Two JavaScript/Python divergences are corrected explicitly below. Both were
-found by the golden vectors, not by reading:
-
-1. **Word boundary.** JavaScript ``\\b`` is ASCII-only; Python's is Unicode-aware.
-   For ``김__OPF_PERSON__...`` JS sees a boundary (``김`` is a non-word char) and
-   matches, while Python sees word-to-word and does *not*. Korean text sits
-   directly against tokens constantly, so ``\\b`` is replaced with explicit
-   ASCII look-around.
-2. **Whitespace.** ``canonicalize`` must use the JavaScript whitespace set:
-   Python's ``str.strip()`` leaves U+FEFF (a BOM survives a copy-paste and would
-   mint a different token), and Python's ``\\s`` additionally matches
-   U+001C-U+001F, which JavaScript does not.
+One JavaScript/Python divergence is corrected explicitly below, found by the
+golden vectors rather than by reading: ``canonicalize`` must use the JavaScript
+whitespace set. Python's ``str.strip()`` leaves U+FEFF (a BOM survives a
+copy-paste and would mint a different token), and Python's ``\\s`` additionally
+matches U+001C-U+001F, which JavaScript does not.
 """
 
 from __future__ import annotations
@@ -33,9 +32,9 @@ from typing import Final
 
 from .token_hash import TOKEN_HASH_LENGTH
 
-TOKEN_PREFIX: Final = "__OPF_"
-TOKEN_SUFFIX: Final = "__"
-TOKEN_DELIMITER: Final = "__"
+TOKEN_PREFIX: Final = "{{OPF:"
+TOKEN_SUFFIX: Final = "}}"
+TOKEN_DELIMITER: Final = ":"
 
 CATEGORY_MAP: Final[dict[str, str]] = {
     "private_person": "PERSON",
@@ -53,9 +52,8 @@ CATEGORY_MAP: Final[dict[str, str]] = {
 
 REVERSE_CATEGORY_MAP: Final[dict[str, str]] = {v: k for k, v in CATEGORY_MAP.items()}
 
-TOKEN_CATEGORY_PATTERN: Final = "[A-Z][A-Z0-9_]*?"
-"""Lazy so it stops at the first ``__`` delimiter, which is what keeps
-``BIZ_NUM`` from swallowing the delimiter into the category."""
+TOKEN_CATEGORY_PATTERN: Final = "[A-Z][A-Z0-9_]*"
+"""Greedy is safe: ``:`` cannot occur in a category."""
 
 TOKEN_HASH_PATTERN: Final = f"[a-z0-9]{{{TOKEN_HASH_LENGTH}}}"
 
@@ -71,48 +69,54 @@ MAX_TOKEN_LENGTH: Final = (
 """Longest token :func:`format_token` can emit.
 
 A streaming consumer that looks back fewer characters than this cannot see an
-in-progress token's ``__OPF_`` start and releases the tail raw.
+in-progress token's ``{{OPF:`` start and releases the tail raw.
 """
 
-# JavaScript `\b` equivalents. JS word chars are exactly [A-Za-z0-9_].
-_ASCII_WORD_BEFORE: Final = "(?<![A-Za-z0-9_])"
-_ASCII_WORD_AFTER: Final = "(?![A-Za-z0-9_])"
+TOKEN_PREFIX_PATTERN: Final = re.escape(TOKEN_PREFIX)
+"""Regex-safe form of :data:`TOKEN_PREFIX`.
+
+The prefix contains ``{``, so using the raw constant as a pattern would build a
+quantifier rather than a literal.
+"""
+
+_SUFFIX_RE: Final = re.escape(TOKEN_SUFFIX)
+_DELIMITER_RE: Final = re.escape(TOKEN_DELIMITER)
 
 TOKEN_STRICT_PATTERN: Final = (
-    f"{TOKEN_PREFIX}({TOKEN_CATEGORY_PATTERN}){TOKEN_DELIMITER}({TOKEN_HASH_PATTERN}){TOKEN_SUFFIX}"
+    f"{TOKEN_PREFIX_PATTERN}({TOKEN_CATEGORY_PATTERN}){_DELIMITER_RE}"
+    f"({TOKEN_HASH_PATTERN}){_SUFFIX_RE}"
 )
+
+_ASCII_WORD_AFTER: Final = "(?![A-Za-z0-9_])"
 
 TOKEN_LENIENT_PATTERN: Final = (
-    f"{_ASCII_WORD_BEFORE}{TOKEN_PREFIX}([A-Za-z][A-Za-z0-9_]*?){TOKEN_DELIMITER}"
-    f"({TOKEN_HASH_PATTERN})(?:{TOKEN_SUFFIX})?{_ASCII_WORD_AFTER}"
+    f"{TOKEN_PREFIX_PATTERN}([A-Za-z][A-Za-z0-9_]*){_DELIMITER_RE}"
+    f"({TOKEN_HASH_PATTERN})(?:{_SUFFIX_RE})?{_ASCII_WORD_AFTER}"
 )
-"""Case-insensitive category and an optional trailing suffix, for tokens an
-LLM has mangled. Always compile with :data:`re.IGNORECASE`."""
+"""Case-insensitive category and an optional closing brace pair, for tokens an
+LLM has mangled. Always compile with :data:`re.IGNORECASE`.
 
-
-def _escapable_literal(literal: str) -> str:
-    """Render a literal so each underscore may carry a preceding backslash.
-
-    Markdown renderers escape our tokens as ``\\_\\_OPF\\_...``; without this the
-    escaped form is invisible to the repair scanner.
-    """
-    return "".join("\\\\?_" if c == "_" else re.escape(c) for c in literal)
-
+The trailing look-ahead is load-bearing: without it a hash that grew a character
+still matches on its first :data:`TOKEN_HASH_LENGTH` characters, so a
+length-corrupted token reads as a valid one naming a different entry. Written as
+an explicit ASCII class rather than ``\\b`` because Python's ``\\b`` is
+Unicode-aware and JavaScript's is not - Korean text sits directly against tokens
+constantly.
+"""
 
 TOKEN_REPAIR_PATTERN: Final = (
-    f"{_escapable_literal(TOKEN_PREFIX)}([A-Za-z][A-Za-z0-9_\\\\]*?)"
-    f"{_escapable_literal(TOKEN_DELIMITER)}"
+    rf"\{{\{{?OPF{_DELIMITER_RE}([A-Za-z][A-Za-z0-9_]*){_DELIMITER_RE}"
     f"([a-z0-9]{{{TOKEN_HASH_LENGTH - 1},{TOKEN_HASH_LENGTH + 1}}})"
-    f"(?:{_escapable_literal(TOKEN_SUFFIX)})?"
+    r"(?:\}\}?)?"
 )
 """Deliberately looser than the matchers above, and NOT a restoration matcher.
 
 A hit here is only ever a *candidate*: it tolerates a hash one character short
-or long and a backslash before any underscore, so length-corrupted and
-Markdown-escaped tokens become visible at all. Every candidate must still clear
-the vault-bounded checks in :mod:`server.pii.restorer` - matching epoch,
-matching category, exactly one live vault entry within one edit - before a
-single character is substituted.
+or long and a dropped brace on either side, so length-corrupted and
+brace-damaged tokens become visible at all. Every candidate must still clear the
+vault-bounded checks in :mod:`server.pii.restorer` - matching epoch, matching
+category, exactly one live vault entry within one edit - before a single
+character is substituted.
 """
 
 TOKEN_STRICT_REGEX: Final = re.compile(TOKEN_STRICT_PATTERN)

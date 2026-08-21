@@ -184,7 +184,7 @@ def test_openai_streaming_tool_calls_pass_tokens_through(case: dict[str, Any]) -
 
     Consequence is a correctness bug, not a privacy leak - the direction that
     protects PII is the request side, which masks correctly. Here the client
-    executes a tool call carrying ``__OPF_EMAIL__...`` instead of the address.
+    executes a tool call carrying ``{{OPF:EMAIL:...`` instead of the address.
 
     When the TypeScript side is fixed, regenerate the vectors and this test
     fails loudly, which is the intent: it is a tracked defect, not a baseline.

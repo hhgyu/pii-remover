@@ -187,7 +187,7 @@ describe("PIIRemover audit integration", () => {
     const pii = await makeRemover(audit);
 
     const masked = await pii.mask("contact user@example.com");
-    const restored = pii.restore(`${masked.text} __OPF_EMAIL__ffffffffffffffff__`, {
+    const restored = pii.restore(`${masked.text} {{OPF:EMAIL:ffffffffffffffff}}`, {
       request_id: "req-restore",
       provider: "openai",
     });
@@ -210,7 +210,7 @@ describe("PIIRemover audit integration", () => {
     const restored = pii.restore(masked.text);
 
     expect(masked.bypassed).toBe(false);
-    expect(masked.text).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__$/);
+    expect(masked.text).toMatch(/^contact {{OPF:EMAIL:[a-z0-9]{16}}}$/);
     expect(restored.text).toBe("contact user@example.com");
     pii.dispose();
   });

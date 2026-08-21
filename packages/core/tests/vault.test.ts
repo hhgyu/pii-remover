@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { VaultManager } from "../src/vault/manager.js";
 import type { Detection, PIICategory } from "../src/types.js";
 
-const TOKEN_RE = /^__OPF_[A-Z_]+__[a-z0-9]{16}__$/;
-const EMAIL_UNKNOWN = "__OPF_EMAIL__ffffffffffffffff__";
+const TOKEN_RE = /^{{OPF:[A-Z_]+:[a-z0-9]{16}}}$/;
+const EMAIL_UNKNOWN = "{{OPF:EMAIL:ffffffffffffffff}}";
 
 function det(
   start: number,
@@ -37,8 +37,8 @@ describe("VaultManager — dedup and indexing (ADR-0003)", () => {
       det(0, 5, "private_person", "Alice"),
       det(10, 13, "private_person", "Bob"),
     ]);
-    expect(r[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
-    expect(r[1]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
+    expect(r[0]!.token).toMatch(/^{{OPF:PERSON:[a-z0-9]{16}}}$/);
+    expect(r[1]!.token).toMatch(/^{{OPF:PERSON:[a-z0-9]{16}}}$/);
     expect(r[0]!.token).not.toBe(r[1]!.token);
   });
 
@@ -48,8 +48,8 @@ describe("VaultManager — dedup and indexing (ADR-0003)", () => {
       det(0, 3, "private_person", "foo"),
       det(10, 13, "secret", "foo"),
     ]);
-    expect(r[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
-    expect(r[1]!.token).toMatch(/^__OPF_SECRET__[a-z0-9]{16}__$/);
+    expect(r[0]!.token).toMatch(/^{{OPF:PERSON:[a-z0-9]{16}}}$/);
+    expect(r[1]!.token).toMatch(/^{{OPF:SECRET:[a-z0-9]{16}}}$/);
     expect(r[0]!.token).not.toBe(r[1]!.token);
   });
 });
@@ -59,8 +59,8 @@ describe("VaultManager — session isolation (ADR-0003)", () => {
     const v = new VaultManager();
     const a = v.assign("A", [det(0, 5, "private_person", "Alice")]);
     const b = v.assign("B", [det(0, 3, "private_person", "Bob")]);
-    expect(a[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
-    expect(b[0]!.token).toMatch(/^__OPF_PERSON__[a-z0-9]{16}__$/);
+    expect(a[0]!.token).toMatch(/^{{OPF:PERSON:[a-z0-9]{16}}}$/);
+    expect(b[0]!.token).toMatch(/^{{OPF:PERSON:[a-z0-9]{16}}}$/);
     const vaA = v.getOrCreate("A");
     const vaB = v.getOrCreate("B");
     expect(vaA.vault_id).not.toBe(vaB.vault_id);

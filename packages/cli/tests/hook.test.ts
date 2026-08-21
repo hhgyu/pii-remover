@@ -66,7 +66,7 @@ describe("runHookCommand", () => {
     const stdout = io.out.join("");
     const parsed = JSON.parse(stdout.trim());
     expect(parsed.decision).toBe("block");
-    expect(parsed.reason).toContain("__OPF_");
+    expect(parsed.reason).toContain("{{OPF:");
     expect(parsed.reason).toContain("ANTHROPIC_BASE_URL");
   });
 
@@ -87,7 +87,7 @@ describe("runHookCommand", () => {
     expect(r.decision).toBe("allow_warn");
     expect(r.proxy_configured).toBe(true);
     const parsed = JSON.parse(io.out.join("").trim());
-    expect(parsed.hookSpecificOutput.additionalContext).toContain("__OPF_EMAIL_");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("{{OPF:EMAIL:");
     expect(parsed.hookSpecificOutput.additionalContext).toContain("pii-remover");
   });
 

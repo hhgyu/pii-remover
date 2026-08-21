@@ -151,7 +151,7 @@ describe("VaultManager — synthetic_value lifecycle", () => {
 });
 
 describe("applyTokens — mode dispatch", () => {
-  test("mode='token' replaces with __OPF_*__ tokens (default)", () => {
+  test("mode='token' replaces with {{OPF:*__ tokens (default)", () => {
     const out = applyTokens(
       "x",
       [
@@ -161,11 +161,11 @@ describe("applyTokens — mode dispatch", () => {
           category: "private_person",
           confidence: 1,
           text: "x",
-          token: "__OPF_PERSON__0123456789abcdef__",
+          token: "{{OPF:PERSON:0123456789abcdef}}",
         },
       ],
     );
-    expect(out).toBe("__OPF_PERSON__0123456789abcdef__");
+    expect(out).toBe("{{OPF:PERSON:0123456789abcdef}}");
   });
 
   test("mode='synthetic' uses syntheticValue when present", () => {
@@ -178,7 +178,7 @@ describe("applyTokens — mode dispatch", () => {
           category: "private_person",
           confidence: 1,
           text: "x",
-          token: "__OPF_PERSON__0123456789abcdef__",
+          token: "{{OPF:PERSON:0123456789abcdef}}",
           syntheticValue: "Jane Doe",
         },
       ],
@@ -197,12 +197,12 @@ describe("applyTokens — mode dispatch", () => {
           category: "secret",
           confidence: 1,
           text: "x",
-          token: "__OPF_SECRET__0123456789abcdef__",
+          token: "{{OPF:SECRET:0123456789abcdef}}",
         },
       ],
       "synthetic",
     );
-    expect(out).toBe("__OPF_SECRET__0123456789abcdef__");
+    expect(out).toBe("{{OPF:SECRET:0123456789abcdef}}");
   });
 });
 
@@ -303,7 +303,7 @@ describe("PIIRemover — synthetic round-trip", () => {
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
     const masked = await pii.mask("contact user@example.com please");
-    expect(masked.text).not.toContain("__OPF_EMAIL_");
+    expect(masked.text).not.toContain("{{OPF:EMAIL:");
     expect(masked.text).toContain("synthetic.user");
     expect(masked.text).toContain("@example.invalid");
     const restored = pii.restore(masked.text);
@@ -324,7 +324,7 @@ describe("PIIRemover — synthetic round-trip", () => {
       warn: () => {},
     });
     const masked = await pii.mask("저자는 위석호님이다");
-    expect(masked.text).not.toContain("__OPF_PERSON_");
+    expect(masked.text).not.toContain("{{OPF:PERSON:");
     expect(masked.text).not.toContain("위석호");
     const restored = pii.restore(masked.text);
     expect(restored.text).toBe("저자는 위석호님이다");
@@ -338,7 +338,7 @@ describe("PIIRemover — synthetic round-trip", () => {
       strategy: new SingleStrategy(new LocalRegexBackend()),
     });
     const masked = await pii.mask("contact user@example.com please");
-    expect(masked.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(masked.text).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
     expect(masked.text).not.toContain("synthetic.user");
     const restored = pii.restore(masked.text);
     expect(restored.text).toBe("contact user@example.com please");

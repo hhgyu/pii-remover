@@ -3,7 +3,7 @@
 This is the hard gate of the Python port. The hook (``packages/cli``, TypeScript,
 runs on the host) and this backend must mint the *same* token for the same
 ``(key, category, text)``; if they drift, a token minted on one side becomes
-unrestorable on the other and the user sees ``__OPF_PERSON__...`` in their output.
+unrestorable on the other and the user sees ``{{OPF:PERSON:...`` in their output.
 
 Vectors are generated from the TypeScript source::
 

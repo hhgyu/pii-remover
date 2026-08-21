@@ -60,7 +60,7 @@ describe("VisionClient", () => {
       { manager, sessionId }
     );
     expect(r.tokens).toHaveLength(1);
-    expect(r.tokens[0]!.token).toMatch(/^__OPF_EMAIL__[a-z0-9]{16}__$/);
+    expect(r.tokens[0]!.token).toMatch(/^{{OPF:EMAIL:[a-z0-9]{16}}}$/);
   });
 
   test("throws on empty image_b64", async () => {

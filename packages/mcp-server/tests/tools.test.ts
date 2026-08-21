@@ -37,8 +37,8 @@ function isError(result: unknown): boolean {
   return (result as { isError?: boolean }).isError === true;
 }
 
-const EMAIL_TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
-const UNKNOWN_EMAIL = "__OPF_EMAIL__ffffffffffffffff__";
+const EMAIL_TOKEN_RE = /{{OPF:EMAIL:[a-z0-9]{16}}}/;
+const UNKNOWN_EMAIL = "{{OPF:EMAIL:ffffffffffffffff}}";
 
 describe("sanitize tool", () => {
   test("masks email and returns vault_id + categories", async () => {
@@ -47,7 +47,7 @@ describe("sanitize tool", () => {
     const result = await handler({ text: "contact user@example.com please" });
     expect(isError(result)).toBe(false);
     const out = structured<SanitizeOutput>(result);
-    expect(out.text).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__ please$/);
+    expect(out.text).toMatch(/^contact {{OPF:EMAIL:[a-z0-9]{16}}} please$/);
     expect(out.vault_id.length).toBeGreaterThan(0);
     expect(out.token_count).toBe(1);
     expect(out.categories).toEqual({ private_email: 1 });
@@ -86,7 +86,7 @@ describe("sanitize tool", () => {
     const result = await handler({ text: "주민번호 921011-1234568 임" });
     const out = structured<SanitizeOutput>(result);
     expect(out.token_count).toBeGreaterThanOrEqual(1);
-    expect(out.text).toMatch(/__OPF_RRN__[a-z0-9]{16}__/);
+    expect(out.text).toMatch(/{{OPF:RRN:[a-z0-9]{16}}}/);
     expect(out.categories.rrn).toBeGreaterThanOrEqual(1);
     await pool.shutdown();
   });
@@ -96,7 +96,7 @@ describe("sanitize tool", () => {
     const handler = createSanitizeHandler({ vaultPool: pool });
     const result = await handler({ text: "전화 010-1234-5678 임" });
     const out = structured<SanitizeOutput>(result);
-    expect(out.text).toMatch(/__OPF_PHONE__[a-z0-9]{16}__/);
+    expect(out.text).toMatch(/{{OPF:PHONE:[a-z0-9]{16}}}/);
     expect(out.categories.private_phone).toBeGreaterThanOrEqual(1);
     await pool.shutdown();
   });

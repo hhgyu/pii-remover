@@ -317,7 +317,7 @@ describe("e2e: developer corpus via plugin + mock HTTP backend", () => {
       );
       const masked = (output.args as { text: string }).text;
       const expectedLabel = CATEGORY_TOKEN_LABEL[entry.category]!;
-      const tokenPresent = masked.includes(`__OPF_${expectedLabel}_`);
+      const tokenPresent = masked.includes(`{{OPF:${expectedLabel}:`);
       const needleAbsent = !masked.includes(entry.needle);
       if (tokenPresent && needleAbsent) {
         detected++;
@@ -359,7 +359,7 @@ describe("e2e: developer corpus via plugin + mock HTTP backend", () => {
         output
       );
       const masked = (output.args as { text: string }).text;
-      if (masked.includes("__OPF_")) {
+      if (masked.includes("{{OPF:")) {
         falsePositives++;
         offenders.push(`"${entry.text}" -> "${masked}"`);
       }
@@ -407,7 +407,7 @@ describe("e2e: developer corpus via plugin + mock HTTP backend", () => {
     expect(args.file_path).toBe("/home/john/work/repo/main.ts");
     expect(args.cwd).toBe("/home/john/work/repo");
     expect(args.url).toBe("https://github.com/example/repo");
-    expect(args.content).toContain("__OPF_EMAIL_");
+    expect(args.content).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 });
@@ -476,13 +476,13 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
 
     const userInput = "주민번호 850315-1123457 김철수 010-1234-5678";
     const masked = (await remover.mask(userInput)).text;
-    expect(masked).toContain("__OPF_RRN_");
-    expect(masked).toContain("__OPF_PERSON_");
-    expect(masked).toContain("__OPF_PHONE_");
+    expect(masked).toContain("{{OPF:RRN:");
+    expect(masked).toContain("{{OPF:PERSON:");
+    expect(masked).toContain("{{OPF:PHONE:");
 
     const llmMangled = masked
-      .replace("__OPF_RRN_1__", "__opf_rrn_1__")
-      .replace("__OPF_PERSON_1__", "__OPF_PERSON_1");
+      .replace("{{OPF:RRN_1:", "{{opf:rrn_1:")
+      .replace("{{OPF:PERSON_1:", "{{OPF:PERSON_1");
     const out = { text: llmMangled };
     await handler(
       { sessionID: "s", messageID: "m", partID: "p" },
@@ -517,7 +517,7 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
         output
       );
       const masked = (output.args as { text: string }).text;
-      if (masked.includes("__OPF_PERSON_") && !masked.includes(entry.name)) {
+      if (masked.includes("{{OPF:PERSON:") && !masked.includes(entry.name)) {
         detected++;
       } else {
         misses.push(`${entry.name} (${entry.surname_type}) -> ${masked}`);
@@ -555,7 +555,7 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
         output
       );
       const masked = (output.args as { text: string }).text;
-      if (masked.includes("__OPF_PERSON_")) {
+      if (masked.includes("{{OPF:PERSON:")) {
         falsePositives++;
         offenders.push(`"${entry.text}" (${entry.reason}) -> "${masked}"`);
       }
@@ -582,9 +582,9 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
 
     const sentence = "사업자 104-81-52702 와 연락처 010-1234-5678 처리.";
     const masked = (await remover.mask(sentence)).text;
-    expect(masked).toMatch(/__OPF_BIZNUM__[a-z0-9]{16}__/);
-    expect(masked).toMatch(/__OPF_PHONE__[a-z0-9]{16}__/);
-    const bizToken = masked.match(/__OPF_BIZNUM__[a-z0-9]{16}__/)![0];
+    expect(masked).toMatch(/{{OPF:BIZNUM:[a-z0-9]{16}}}/);
+    expect(masked).toMatch(/{{OPF:PHONE:[a-z0-9]{16}}}/);
+    const bizToken = masked.match(/{{OPF:BIZNUM:[a-z0-9]{16}}}/)![0];
 
     const toolOutput = {
       title: `Search hit ${bizToken}`,
@@ -597,7 +597,7 @@ describe("e2e: Korean PII round-trip (Phase 2 exit criteria)", () => {
     );
     expect(toolOutput.output).toContain("104-81-52702");
     expect(toolOutput.output).toContain("010-1234-5678");
-    expect(toolOutput.output).not.toContain("__OPF_");
+    expect(toolOutput.output).not.toContain("{{OPF:");
     expect(toolOutput.title).toContain("104-81-52702");
     remover.dispose();
   });

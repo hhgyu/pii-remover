@@ -29,7 +29,7 @@ describe("transformCodexResponsesRequest", () => {
     );
     expect(out.rejection).toBeUndefined();
     expect(typeof out.body.input).toBe("string");
-    expect(out.body.input as string).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(out.body.input as string).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
     expect(out.body.input as string).not.toContain("carol@example.com");
   });
 
@@ -43,7 +43,7 @@ describe("transformCodexResponsesRequest", () => {
       },
       remover
     );
-    expect(out.body.instructions).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(out.body.instructions).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
     expect(out.body.instructions).not.toContain("admin@example.com");
   });
 
@@ -71,7 +71,7 @@ describe("transformCodexResponsesRequest", () => {
     }>;
     const textPart = items[0]!.content![0]!;
     const imagePart = items[0]!.content![1]!;
-    expect(textPart.text).toMatch(/__OPF_CARD__[a-z0-9]{16}__/);
+    expect(textPart.text).toMatch(/{{OPF:CARD:[a-z0-9]{16}}}/);
     expect(textPart.text).not.toContain("5555-5555-5555-4444");
     expect(imagePart.type).toBe("input_image");
   });
@@ -116,7 +116,7 @@ describe("restoreCodexResponsesResponse", () => {
     );
     const text = restored.output![0]!.content![0]!.text!;
     expect(text).toContain("bob@example.com");
-    expect(text).not.toContain("__OPF_EMAIL_");
+    expect(text).not.toContain("{{OPF:EMAIL:");
   });
 
   test("restores top-level output_text", async () => {
@@ -127,7 +127,7 @@ describe("restoreCodexResponsesResponse", () => {
       remover
     );
     expect(restored.output_text).toContain("5555-5555-5555-4444");
-    expect(restored.output_text).not.toContain("__OPF_CARD_");
+    expect(restored.output_text).not.toContain("{{OPF:CARD:");
   });
 
   test("function_call.arguments JSON walk restores nested strings", async () => {
@@ -176,7 +176,7 @@ describe("restoreCodexResponsesResponse", () => {
       content?: Array<{ type: string; text?: string }>;
     }>;
     const maskedText = items[0]!.content![0]!.text!;
-    expect(maskedText).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(maskedText).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
 
     const restored = await restoreCodexResponsesResponse(
       {

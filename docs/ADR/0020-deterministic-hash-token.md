@@ -1,9 +1,17 @@
 # ADR-0020: 결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__`
 
-- **Status**: Accepted
+- **Status**: Accepted — 단, 표면 문법은 [ADR-0022](./0022-markdown-inert-token-delimiters.md)가 대체
 - **Date**: 2026-06-12
 - **Supersedes**: [ADR-0002](./0002-token-format-opf-underscore.md)
+- **Superseded in part by**: [ADR-0022](./0022-markdown-inert-token-delimiters.md)
 - **Related**: [ADR-0003](./0003-vault-session-in-memory.md), [ADR-0004](./0004-local-llm-proxy-streaming.md), [ADR-0010](./0010-pii-categories-opf-plus-korean.md), [ADR-0018](./0018-synthetic-substitution.md)
+
+> **부분 대체 (2026-08-21)**: 이 ADR의 **해시 유도**(HMAC + base36 절단)와 카테고리
+> 매핑은 그대로 유효하다. 대체되는 것은 **표면 문법뿐**이다 — `__OPF_PERSON__`이
+> 완결된 Markdown bold 스팬이라 모델이 렌더링하면서 중간 구분자를 삭제하는 문제가
+> 실측되었고, [ADR-0022](./0022-markdown-inert-token-delimiters.md)가
+> `{{OPF:<CATEGORY>:<HASH>}}`로 교체한다. 아래 본문의 `__OPF_…__` 표기는 당시
+> 결정의 기록으로 그대로 둔다.
 
 ---
 

@@ -109,7 +109,7 @@ def test_scan_matches_typescript(case: dict[str, Any]) -> None:
 def test_scan_matches_token_adjacent_to_hangul() -> None:
     """JavaScript ``\\b`` is ASCII-only; Python's is Unicode-aware.
 
-    ``김철수__OPF_...__입니다`` must still produce a match. A port that used
+    ``김철수{{OPF:...__입니다`` must still produce a match. A port that used
     Python's ``\\b`` would silently return nothing here, and every Korean
     sentence butting against a token would go unrestored.
     """
@@ -155,7 +155,7 @@ def test_resolve_miss_matches(case: dict[str, Any]) -> None:
 def test_category_mismatch_never_repairs() -> None:
     """Hash-only repair returned a DIFFERENT entry's value 54 times across the
     tier-1 eval corpus. The vault key is category + hash, so both must match."""
-    observed_hash = SETUP["repairable_token"][len("__OPF_PERSON__") : -2]
+    observed_hash = SETUP["repairable_token"][len("{{OPF:PERSON:") : -2]
     vault = _build_vault()
     index = build_repair_index(vault.tokens(SETUP["session_id"]))
 
@@ -256,11 +256,11 @@ def test_unknown_token_handler_replaces_span() -> None:
 def test_warnings_are_emitted_for_lenient_and_unresolved() -> None:
     vault = _build_vault()
     person = SETUP["tokens"]["김철수"]
-    inner_hash = person[len("__OPF_PERSON__") : -2]
+    inner_hash = person[len("{{OPF:PERSON:") : -2]
     seen: list[str] = []
     restorer = Restorer(vault, RestoreOptions(warn=seen.append))
 
-    restorer.restore(f"see __OPF_person__{inner_hash}__ here", SETUP["session_id"])
+    restorer.restore(f"see {{{{OPF:person:{inner_hash}}}}} here", SETUP["session_id"])
     assert any("lenient match" in m for m in seen)
 
     seen.clear()

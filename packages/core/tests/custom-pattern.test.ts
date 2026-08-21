@@ -97,7 +97,7 @@ describe("PIIRemover with custom_patterns", () => {
     });
     const result = await remover.mask("see EMP-987654 in the log");
     expect(result.text).not.toContain("EMP-987654");
-    expect(result.text).toMatch(/__OPF_ACCOUNT__[a-z0-9]{16}__/);
+    expect(result.text).toMatch(/{{OPF:ACCOUNT:[a-z0-9]{16}}}/);
     remover.dispose();
   });
 });

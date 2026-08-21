@@ -32,8 +32,9 @@
 | 0017 | [Personal Data Library — 사용자 정의 PII 사전 등록](./0017-personal-data-library.md) | Accepted | 2026-05-19 |
 | 0018 | [Synthetic Substitution 모드 — 토큰 대신 그럴듯한 가짜 값](./0018-synthetic-substitution.md) | Accepted | 2026-05-19 |
 | 0019 | [Backend auto-start (opt-in) + idle model unload (default-on)](./0019-backend-auto-start-and-idle-unload.md) | Accepted | 2026-05-20 |
-| 0020 | [결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__`](./0020-deterministic-hash-token.md) | Accepted | 2026-06-12 |
+| 0020 | [결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__`](./0020-deterministic-hash-token.md) | Accepted (문법만 0022가 대체) | 2026-06-12 |
 | 0021 | [토큰 epoch 접두 + vault 경계 복구](./0021-token-epoch-and-bounded-repair.md) | Accepted | 2026-08-10 |
+| 0022 | [Markdown 중립 토큰 구분자 `{{OPF:<CATEGORY>:<HASH>}}`](./0022-markdown-inert-token-delimiters.md) | Accepted | 2026-08-21 |
 
 ## ADR 카테고리별 그룹
 
@@ -50,6 +51,7 @@
 - **ADR-0002**: 토큰 형식 `__OPF_<CATEGORY>_<INDEX>__` (Superseded by 0020)
 - **ADR-0020**: 결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__` (정수 인덱스 → HMAC 해시)
 - **ADR-0021**: 해시 안에 키 epoch 3자를 심어 환각/dead token 판별 + vault 키셋으로 경계 지은 편집거리-1 복구 (wire format 무변경)
+- **ADR-0022**: `__OPF_PERSON__`이 완결된 Markdown bold 스팬이라 렌더링 시 중간 구분자가 소실 — 구분자를 CommonMark가 claim하지 않는 `{{OPF:<CATEGORY>:<HASH>}}`로 교체 (해시 유도는 0020 그대로)
 - **ADR-0003**: Vault 스키마 + 세션 스코프 인메모리
 - **ADR-0010**: PII 카테고리 (OPF 8 + 한국 3)
 - **ADR-0018**: Synthetic Substitution 모드 — 토큰 vs 가짜 자연어 값 선택 가능

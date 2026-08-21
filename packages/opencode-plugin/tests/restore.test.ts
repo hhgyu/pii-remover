@@ -28,8 +28,8 @@ async function maskString(remover: PIIRemover, text: string): Promise<string> {
   return r.text;
 }
 
-const TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
-const FAKE_TOKEN = "__OPF_FAKE__ffffffffffffffff__";
+const TOKEN_RE = /{{OPF:EMAIL:[a-z0-9]{16}}}/;
+const FAKE_TOKEN = "{{OPF:FAKE:ffffffffffffffff}}";
 
 describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable hook)", () => {
   test("restores email tokens emitted from tool.output", async () => {
@@ -46,7 +46,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     await hooks["tool.execute.after"]!({ tool: "read", sessionID: "s", callID: "c", args: {} },
     output);
     expect(output.output).toContain("alice@example.com");
-    expect(output.output).not.toContain("__OPF_EMAIL_");
+    expect(output.output).not.toContain("{{OPF:EMAIL:");
   });
 
   test("restores tokens in tool output.title", async () => {
@@ -101,7 +101,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
       structuredContent: { summary: string };
     };
     expect(restored.content[0]!.text).toContain("alice@example.com");
-    expect(restored.content[0]!.text).not.toContain("__OPF_EMAIL_");
+    expect(restored.content[0]!.text).not.toContain("{{OPF:EMAIL:");
     expect(restored.structuredContent.summary).toContain("alice@example.com");
   });
 
@@ -121,7 +121,7 @@ describe("createPluginHooks — restore via tool.execute.after (ADR-0011 stable 
     output);
     const meta = output.metadata as { result: { note: string } };
     expect(meta.result.note).toContain("dev@example.com");
-    expect(meta.result.note).not.toContain("__OPF_EMAIL_");
+    expect(meta.result.note).not.toContain("{{OPF:EMAIL:");
   });
 
   test("hallucinated tokens stay as-is (vault miss)", async () => {
@@ -187,7 +187,7 @@ describe("createPluginHooks — restore via experimental.text.complete (ADR-0011
       output
     );
     expect(output.text).toContain("dev@example.com");
-    expect(output.text).not.toContain("__OPF_EMAIL_");
+    expect(output.text).not.toContain("{{OPF:EMAIL:");
   });
 
   test("handles LLM case-folding (lenient match)", async () => {
@@ -224,8 +224,8 @@ describe("createPluginHooks — round-trip integration", () => {
 
     const original = "연락처 010-1234-5678 이고 이메일 user@example.com";
     const maskedInput = await maskString(remover, original);
-    expect(maskedInput).toContain("__OPF_PHONE_");
-    expect(maskedInput).toContain("__OPF_EMAIL_");
+    expect(maskedInput).toContain("{{OPF:PHONE:");
+    expect(maskedInput).toContain("{{OPF:EMAIL:");
     expect(maskedInput).not.toContain("010-1234-5678");
     expect(maskedInput).not.toContain("user@example.com");
 
@@ -234,7 +234,7 @@ describe("createPluginHooks — round-trip integration", () => {
     output);
     expect(output.output).toContain("010-1234-5678");
     expect(output.output).toContain("user@example.com");
-    expect(output.output).not.toContain("__OPF_");
+    expect(output.output).not.toContain("{{OPF:");
   });
 
   test("text.complete still restores after session.idle", async () => {
@@ -273,8 +273,8 @@ describe("createPluginHooks — display-tool round-trip (security invariant)", (
       (userMessages.messages[0]?.parts?.[0] as { text?: string })?.text ?? "";
     expect(maskedUserText).not.toContain("김철수");
     expect(maskedUserText).not.toContain("010-1234-5678");
-    expect(maskedUserText).toContain("__OPF_PERSON_");
-    expect(maskedUserText).toContain("__OPF_PHONE_");
+    expect(maskedUserText).toContain("{{OPF:PERSON:");
+    expect(maskedUserText).toContain("{{OPF:PHONE:");
 
     const llmToolCallArgs = {
       questions: [
@@ -298,7 +298,7 @@ describe("createPluginHooks — display-tool round-trip (security invariant)", (
     }).questions[0]?.question;
     expect(displayedQuestion).toContain("김철수");
     expect(displayedQuestion).toContain("010-1234-5678");
-    expect(displayedQuestion).not.toContain("__OPF_PERSON_");
+    expect(displayedQuestion).not.toContain("{{OPF:PERSON:");
 
     const nextTurnHistory = {
       messages: [
@@ -344,10 +344,10 @@ describe("createPluginHooks — display-tool round-trip (security invariant)", (
       "010-1234-5678"
     );
     expect(toolPart?.state?.input?.questions?.[0]?.question).toContain(
-      "__OPF_PERSON_"
+      "{{OPF:PERSON:"
     );
     expect(toolPart?.state?.title).not.toContain("김철수");
-    expect(toolPart?.state?.title).toContain("__OPF_PERSON_");
+    expect(toolPart?.state?.title).toContain("{{OPF:PERSON:");
 
     remover.dispose();
   });

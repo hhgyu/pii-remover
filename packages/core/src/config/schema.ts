@@ -199,7 +199,7 @@ export const DEFAULT_CONFIG: PiiRemoverConfig = {
     generic_secret_scan: false,
   },
   restoration: {
-    token_format: "__OPF_{CATEGORY}__{HASH}__",
+    token_format: "{{OPF:{CATEGORY}:{HASH}}}",
     lenient_match: true,
     warn_on_partial: true,
     mode: "token",

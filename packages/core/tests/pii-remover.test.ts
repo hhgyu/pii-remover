@@ -15,9 +15,9 @@ import type {
 
 const H1 = "0123456789abcdef";
 const H2 = "fedcba9876543210";
-const EMAIL_RE = /^__OPF_EMAIL__[a-z0-9]{16}__$/;
-const EMAIL_UNKNOWN = "__OPF_EMAIL__ffffffffffffffff__";
-const FAKE_UNKNOWN = "__OPF_FAKE__ffffffffffffffff__";
+const EMAIL_RE = /^{{OPF:EMAIL:[a-z0-9]{16}}}$/;
+const EMAIL_UNKNOWN = "{{OPF:EMAIL:ffffffffffffffff}}";
+const FAKE_UNKNOWN = "{{OPF:FAKE:ffffffffffffffff}}";
 
 function mkConfig(overrides: Partial<typeof DEFAULT_CONFIG> = {}) {
   return { ...DEFAULT_CONFIG, ...overrides };
@@ -45,7 +45,7 @@ describe("applyTokens", () => {
         category: "private_email",
         confidence: 0.9,
         text: "user@example.com",
-        token: `__OPF_EMAIL__${H1}__`,
+        token: `{{OPF:EMAIL:${H1}}}`,
       },
       {
         start: 27,
@@ -53,10 +53,10 @@ describe("applyTokens", () => {
         category: "card",
         confidence: 0.99,
         text: "4242 4242 4242 4242",
-        token: `__OPF_CARD__${H2}__`,
+        token: `{{OPF:CARD:${H2}}}`,
       },
     ]);
-    expect(out).toBe(`email __OPF_EMAIL__${H1}__ and __OPF_CARD__${H2}__`);
+    expect(out).toBe(`email {{OPF:EMAIL:${H1}}} and {{OPF:CARD:${H2}}}`);
   });
 
   test("returns unchanged text when there are no tokens", () => {
@@ -76,7 +76,7 @@ describe("PIIRemover.mask — round trip (Phase 1)", () => {
     });
     const r = await pii.mask("contact user@example.com please");
     expect(r.bypassed).toBe(false);
-    expect(r.text).toMatch(/^contact __OPF_EMAIL__[a-z0-9]{16}__ please$/);
+    expect(r.text).toMatch(/^contact {{OPF:EMAIL:[a-z0-9]{16}}} please$/);
     expect(r.tokens).toHaveLength(1);
     expect(r.tokens[0]!.token).toMatch(EMAIL_RE);
     expect(typeof r.vault_id).toBe("string");
@@ -164,7 +164,7 @@ describe("PIIRemover.mask — always-on secret scanner (Oracle recommendation)",
       "key sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz here"
     );
     expect(r.text).not.toContain("sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz");
-    expect(r.text).toMatch(/__OPF_SECRET__[a-z0-9]{16}__/);
+    expect(r.text).toMatch(/{{OPF:SECRET:[a-z0-9]{16}}}/);
     expect(r.tokens).toHaveLength(1);
     expect(r.tokens[0]!.category).toBe("secret");
     pii.dispose();
@@ -312,7 +312,7 @@ describe("PIIRemover.mask — failure_policy (ADR-0006)", () => {
     });
     const r = await pii.mask("contact user@example.com please");
     expect(r.bypassed).toBe(false);
-    expect(r.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(r.text).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
     pii.dispose();
   });
 
@@ -414,7 +414,7 @@ describe("PIIRemover.mask — critical backend down + failure_policy (regression
     });
     const r = await pii.mask("contact user@example.com please");
     expect(r.bypassed).toBe(false);
-    expect(r.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(r.text).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
     pii.dispose();
   });
 
@@ -446,8 +446,8 @@ describe("PIIRemover.restore — round trip (Phase 2)", () => {
       "Contact alice@example.com or visit https://wiki.acme.internal/runbook";
     const masked = await pii.mask(original);
     expect(masked.text).not.toBe(original);
-    expect(masked.text).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
-    expect(masked.text).toMatch(/__OPF_URL__[a-z0-9]{16}__/);
+    expect(masked.text).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
+    expect(masked.text).toMatch(/{{OPF:URL:[a-z0-9]{16}}}/);
 
     const restored = pii.restore(masked.text);
     expect(restored.text).toBe(original);

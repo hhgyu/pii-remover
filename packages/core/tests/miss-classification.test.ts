@@ -45,28 +45,28 @@ function mutateHash(token: string, replacement: string): string {
   return chars.join("");
 }
 
-// A token is <head><16-char hash>__, so the hash is always slice(-18, -2).
+// A token is <head><16-char hash>}}, so the hash is always slice(-18, -2).
 const head = (token: string): string => token.slice(0, -18);
 const hashOf = (token: string): string => token.slice(-18, -2);
 
 function dropHashChar(token: string): string {
   const hash = hashOf(token);
-  return `${head(token)}${hash.slice(0, 8)}${hash.slice(9)}__`;
+  return `${head(token)}${hash.slice(0, 8)}${hash.slice(9)}}}`;
 }
 
 function insertHashChar(token: string): string {
   const hash = hashOf(token);
-  return `${head(token)}${hash.slice(0, 8)}z${hash.slice(8)}__`;
+  return `${head(token)}${hash.slice(0, 8)}z${hash.slice(8)}}}`;
 }
 
 function corruptEpochChar(token: string): string {
   const hash = hashOf(token);
   const swapped = hash[0] === "q" ? "r" : "q";
-  return `${head(token)}${swapped}${hash.slice(1)}__`;
+  return `${head(token)}${swapped}${hash.slice(1)}}}`;
 }
 
-function markdownEscape(token: string): string {
-  return token.replace(/_/g, "\\_");
+function braceStrip(token: string): string {
+  return token.replace(/^\{\{/, "{").replace(/\}\}$/, "}");
 }
 
 describe("isWithinOneEdit", () => {
@@ -88,7 +88,7 @@ describe("resolveMiss — classification", () => {
   const candidate = (suffix: string, category = "EMAIL"): RepairCandidate => ({
     category,
     hash: `${epoch}${suffix}`,
-    token: `__OPF_${category}__${epoch}${suffix}__`,
+      token: `{{OPF:${category}:${epoch}${suffix}}}`,
   });
   const observed = (suffix: string, category = "EMAIL") => ({
     category,
@@ -120,7 +120,7 @@ describe("resolveMiss — classification", () => {
 
     expect(out).toEqual({
       kind: "repaired",
-      normalizedToken: `__OPF_EMAIL__${epoch}0000000000000__`,
+      normalizedToken: `{{OPF:EMAIL:${epoch}0000000000000}}`,
     });
   });
 
@@ -228,12 +228,12 @@ describe("Restorer — end-to-end miss classification", () => {
     expect(out.text).toBe("mail alice@example.com now");
   });
 
-  test("a Markdown-escaped token restores without needing repair", () => {
+  test("a brace-stripped token restores without needing repair", () => {
     const vault = new VaultManager({ tokenKey: KEY_A });
     const token = mintToken(vault, "s1", "alice@example.com");
     const restorer = new Restorer(vault);
 
-    const out = restorer.restore(`mail ${markdownEscape(token)} now`, "s1");
+    const out = restorer.restore(`mail ${braceStrip(token)} now`, "s1");
 
     expect(out.restoredCount).toBe(1);
     expect(out.repairedCount).toBe(0);
@@ -247,7 +247,7 @@ describe("Restorer — end-to-end miss classification", () => {
     for (const mangled of [
       dropHashChar(token),
       insertHashChar(token),
-      markdownEscape(token),
+      braceStrip(token),
     ]) {
       expect(scanTokens(mangled)).toEqual([]);
       expect(scanTokensWithRepairCandidates(mangled)).toHaveLength(1);
@@ -258,7 +258,7 @@ describe("Restorer — end-to-end miss classification", () => {
     const vault = new VaultManager({ tokenKey: KEY_A });
     mintToken(vault, "s1", "alice@example.com");
     const restorer = new Restorer(vault);
-    const strayLookalike = "__OPF_EMAIL__zzzzzzzzzzzzzzzzz__";
+    const strayLookalike = "{{OPF:EMAIL:zzzzzzzzzzzzzzzzz}}";
 
     const out = restorer.restore(`see ${strayLookalike} here`, "s1", {
       unknownTokenHandler: () => "[SHOULD NOT APPLY]",
@@ -284,7 +284,7 @@ describe("Restorer — end-to-end miss classification", () => {
     const vault = new VaultManager({ tokenKey: KEY_A });
     const token = mintToken(vault, "s1", "alice@example.com");
 
-    const hash = token.slice(token.lastIndexOf("__", token.length - 3) + 2, -2);
+    const hash = token.slice(token.lastIndexOf(":") + 1, -2);
 
     expect(hash.slice(0, 3)).toBe(tokenEpoch(KEY_A));
     expect(hash.slice(0, 3)).not.toBe(tokenEpoch(KEY_B));

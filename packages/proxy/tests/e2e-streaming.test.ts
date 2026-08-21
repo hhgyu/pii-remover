@@ -52,11 +52,11 @@ function openaiSseChunks(text: string, chunkSize: number): string[] {
   return events;
 }
 
-const TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+const TOKEN_RE = /{{OPF:EMAIL:[a-z0-9]{16}}}/;
 
 function extractEmailToken(init?: RequestInit): string {
   const raw = typeof init?.body === "string" ? init.body : "";
-  return raw.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
+  return raw.match(TOKEN_RE)?.[0] ?? "{{OPF:EMAIL:ffffffffffffffff}}";
 }
 
 function makeSseFetch(buildChunks: (token: string) => string[]): FetchLike {
@@ -139,7 +139,7 @@ describe("e2e SSE — Anthropic streaming round-trip", () => {
 
     const body = await consumeSseBody(res);
     expect(aggregateSseText(body)).toContain("alice@example.com");
-    expect(body).not.toContain("__OPF_EMAIL_");
+    expect(body).not.toContain("{{OPF:EMAIL:");
     expect(body).toContain("message_start");
     expect(body).toContain("message_stop");
   });
@@ -179,7 +179,7 @@ describe("e2e SSE — OpenAI streaming round-trip", () => {
 
     const body = await consumeSseBody(res);
     expect(aggregateSseText(body)).toContain("dev@example.com");
-    expect(body).not.toContain("__OPF_EMAIL_");
+    expect(body).not.toContain("{{OPF:EMAIL:");
     expect(body).toContain("[DONE]");
   });
 });

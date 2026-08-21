@@ -70,7 +70,7 @@ describe("findSecrets — Bearer tokens (default-on, entropy gate)", () => {
   });
 
   test("does NOT mask Bearer of an OPF token", () => {
-    const found = findSecrets("Bearer __OPF_SECRET__0123456789abcdef__");
+    const found = findSecrets("Bearer {{OPF:SECRET:0123456789abcdef}}");
     expect(found.length).toBe(0);
   });
 });

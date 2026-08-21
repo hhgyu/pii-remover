@@ -28,7 +28,7 @@ describe("runDetectCommand", () => {
     expect(r.exitCode).toBe(0);
     expect(r.detections).toBeGreaterThanOrEqual(1);
     const parsed = JSON.parse(out.join("").trim());
-    expect(parsed.masked).toContain("__OPF_EMAIL_");
+    expect(parsed.masked).toContain("{{OPF:EMAIL:");
     expect(parsed.tokens[0].category).toBe("private_email");
     expect(parsed.tokens[0].original).toBe("user@example.com");
     expect(typeof parsed.latency_ms).toBe("number");

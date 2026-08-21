@@ -22,7 +22,7 @@ from server.pii.stream_buffer import (
     create_stream_buffer,
     find_unsafe_boundary,
 )
-from server.pii.token_format import MAX_TOKEN_LENGTH
+from server.pii.token_format import MAX_TOKEN_LENGTH, TOKEN_PREFIX
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "stream_vectors.json"
 
@@ -49,23 +49,23 @@ def test_trailing_newline_does_not_anchor_the_unsafe_tail() -> None:
     """JavaScript ``$`` anchors at end-of-string; Python's also matches before a
     trailing newline.
 
-    ``"__OPF_PERS\\n"`` carries a partial token that is *not* at the end, so
+    ``"{{OPF:PERS\\n"`` carries a partial token that is *not* at the end, so
     JavaScript releases the whole buffer. A Python port using ``$`` instead of
     ``\\Z`` matches the partial token before the ``\\n``, returns 0, and holds the
     buffer forever - the stream stops advancing and the user sees nothing.
     """
-    for buffer in ("__OPF_PERS\n", "__OPF_\n", "text\n"):
+    for buffer in ("{{OPF:PERS\n", "{{OPF:\n", "text\n"):
         assert find_unsafe_boundary(buffer) == len(buffer), buffer
 
-    assert find_unsafe_boundary("__OPF_PERS") == 0
-    assert find_unsafe_boundary("__OPF_") == 0
+    assert find_unsafe_boundary("{{OPF:PERS") == 0
+    assert find_unsafe_boundary("{{OPF:") == 0
 
 
 def test_partial_prefixes_are_held_back() -> None:
-    """Every proper prefix of ``__OPF_`` must be withheld, inclusive of the
+    """Every proper prefix of ``{{OPF:`` must be withheld, inclusive of the
     complete prefix - otherwise ``__OPF`` goes out raw and the token is split
     across two restore calls."""
-    for partial in ("_", "__", "__O", "__OP", "__OPF", "__OPF_"):
+    for partial in (TOKEN_PREFIX[:i] for i in range(1, len(TOKEN_PREFIX) + 1)):
         assert find_unsafe_boundary(partial) == 0, partial
 
 
@@ -117,9 +117,9 @@ def test_token_is_never_released_in_pieces() -> None:
 
 def test_flush_drains_and_resets() -> None:
     buf = create_stream_buffer(None)
-    assert buf.push("__OPF_PERS") == ""
-    assert buf.size() == len("__OPF_PERS")
-    assert buf.flush() == "__OPF_PERS"
+    assert buf.push("{{OPF:PERS") == ""
+    assert buf.size() == len("{{OPF:PERS")
+    assert buf.flush() == "{{OPF:PERS"
     assert buf.size() == 0
     assert buf.flush() == ""
 

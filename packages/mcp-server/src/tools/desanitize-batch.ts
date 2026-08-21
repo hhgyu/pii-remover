@@ -10,7 +10,7 @@ import { withToolErrorMapping } from "../errors.js";
 import { DesanitizeOutputSchema, type DesanitizeOutput } from "./desanitize.js";
 
 export const DesanitizeBatchInputSchema = z.object({
-  texts: z.array(z.string()).min(1).describe("Array of texts each potentially containing __OPF_*__ tokens."),
+  texts: z.array(z.string()).min(1).describe("Array of texts each potentially containing {{OPF:*__ tokens."),
   vault_id: z.string().min(1).describe("vault_id returned by a prior sanitize call."),
 });
 
@@ -26,7 +26,7 @@ export const DESANITIZE_BATCH_TOOL_DEFINITION = {
   name: "desanitize_batch",
   title: "Desanitize PII tokens (Batch)",
   description:
-    "Restore __OPF_*__ tokens across multiple texts using a single vault_id. Returns one DesanitizeOutput per input.",
+    "Restore {{OPF:*__ tokens across multiple texts using a single vault_id. Returns one DesanitizeOutput per input.",
   inputSchema: DesanitizeBatchInputSchema,
   outputSchema: DesanitizeBatchOutputSchema,
   annotations: {

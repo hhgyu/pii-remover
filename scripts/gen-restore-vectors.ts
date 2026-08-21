@@ -100,7 +100,7 @@ const FOREIGN_TOKEN = formatToken("PERSON", `${foreignEpoch}zzzzzzzzzzzzz`);
 
 /** One character of the PERSON hash mutated -> exactly one repair candidate. */
 function mutateOneChar(token: string): string {
-  const hash = token.slice("__OPF_PERSON__".length, -2);
+  const hash = token.slice("{{OPF:PERSON:".length, -2);
   const idx = hash.length - 1;
   const replacement = hash[idx] === "a" ? "b" : "a";
   return formatToken("PERSON", hash.slice(0, idx) + replacement + hash.slice(idx + 1));
@@ -118,7 +118,7 @@ const SCAN_INPUTS: string[] = [
   `Contact ${PERSON} today.`,
   `${PERSON} and ${EMAIL} both.`,
   // lenient: case-folded category
-  `__OPF_person__${PERSON.slice("__OPF_PERSON__".length, -2)}__`,
+  `{{OPF:person:${PERSON.slice("{{OPF:PERSON:".length, -2)}}}`,
   // lenient: trailing suffix dropped
   PERSON.slice(0, -2),
   // Korean butting directly against the token: JS `\b` is ASCII-only, so this
@@ -127,7 +127,7 @@ const SCAN_INPUTS: string[] = [
   // repair-only: markdown-escaped underscores
   markdownEscape(PERSON),
   // repair-only: hash one char too long
-  `__OPF_PERSON__${"a".repeat(17)}__`,
+  `{{OPF:PERSON:${"a".repeat(17)}}}`,
   `path D:\\Git\\${PERSON}\\file.ts here`,
 ];
 const scanCases = SCAN_INPUTS.map((text) => ({
@@ -166,8 +166,8 @@ const editCases = EDIT_PAIRS.map(([a, b]) => ({
 // synthetic index — exactly how the TypeScript suite covers it.
 const realIndex = buildRepairIndex(vault.tokens(SESSION));
 const syntheticIndex: RepairCandidate[] = [
-  { category: "PERSON", hash: "aaabbbbbbbbbbbb", token: "__OPF_PERSON__aaabbbbbbbbbbbb__" },
-  { category: "PERSON", hash: "aaabbbbbbbbbbbc", token: "__OPF_PERSON__aaabbbbbbbbbbbc__" },
+  { category: "PERSON", hash: "aaabbbbbbbbbbbb", token: "{{OPF:PERSON:aaabbbbbbbbbbbb}}" },
+  { category: "PERSON", hash: "aaabbbbbbbbbbbc", token: "{{OPF:PERSON:aaabbbbbbbbbbbc}}" },
 ];
 const RESOLVE_CASES: ReadonlyArray<{
   name: string;
@@ -233,13 +233,13 @@ const RESTORE_CASES: ReadonlyArray<RestoreCase> = [
   { name: "strict-repeated", text: `${PERSON} and again ${PERSON}`, opts: {} },
   {
     name: "lenient-case-folded",
-    text: `see __OPF_person__${PERSON.slice(14, -2)}__ here`,
+    text: `see {{OPF:person:${PERSON.slice(14, -2)}}} here`,
     opts: {},
   },
   { name: "lenient-suffix-dropped", text: `see ${PERSON.slice(0, -2)} here`, opts: {} },
   {
     name: "lenient-disabled",
-    text: `see __OPF_person__${PERSON.slice(14, -2)}__ here`,
+    text: `see {{OPF:person:${PERSON.slice(14, -2)}}} here`,
     opts: { lenient: false },
   },
   { name: "repairable-one-edit", text: `see ${REPAIRABLE_TOKEN} here`, opts: {} },

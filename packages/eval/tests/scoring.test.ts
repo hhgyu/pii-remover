@@ -32,7 +32,7 @@ describe("roundtrip scoring", () => {
     // Given an output holding one of two expected values
     // When it is scored
     const score = scoreRoundtrip({
-      restoredText: "Email John Smith at __OPF_EMAIL__bbbbbbbbbbbbbbbb__",
+      restoredText: "Email John Smith at {{OPF:EMAIL:bbbbbbbbbbbbbbbb}}",
       expectedValues: [PERSON.value, EMAIL.value],
     });
     // Then only the present value counts as restored

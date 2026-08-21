@@ -13,7 +13,7 @@ import { aggregateCategories } from "./shared.js";
 
 export const SanitizeInputSchema = z.object({
   text: z.string().describe(
-    "Text containing potential PII. Detected PII is replaced with __OPF_<CATEGORY>_<INDEX>__ tokens.",
+    "Text containing potential PII. Detected PII is replaced with {{OPF:<CATEGORY>:<INDEX>__ tokens.",
   ),
   vault_id: z
     .string()

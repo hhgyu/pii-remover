@@ -11,7 +11,7 @@ import type { Logger } from "../logging.js";
 import { withToolErrorMapping } from "../errors.js";
 
 export const DesanitizeInputSchema = z.object({
-  text: z.string().describe("Text containing __OPF_*__ tokens to restore to original PII."),
+  text: z.string().describe("Text containing {{OPF:*__ tokens to restore to original PII."),
   vault_id: z.string().min(1).describe("vault_id returned by a prior sanitize call."),
 });
 
@@ -30,7 +30,7 @@ export const DESANITIZE_TOOL_DEFINITION = {
   name: "desanitize",
   title: "Desanitize PII tokens",
   description:
-    "Restore __OPF_*__ tokens in text to their original PII values using the given vault_id. Tokens not found in the vault are left in place and counted in unknown_token_count.",
+    "Restore {{OPF:*__ tokens in text to their original PII values using the given vault_id. Tokens not found in the vault are left in place and counted in unknown_token_count.",
   inputSchema: DesanitizeInputSchema,
   outputSchema: DesanitizeOutputSchema,
   annotations: {

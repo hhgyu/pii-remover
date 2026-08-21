@@ -100,7 +100,7 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
     const input = anthropicDelta(0, `Email ${token} please`);
     const out = t.push(input) + t.flush();
     expect(out).toContain("alice@example.com");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:EMAIL:");
   });
 
   test("reassembles token split across deltas", async () => {
@@ -114,7 +114,7 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
     out += t.push(anthropicDelta(0, fullText.slice(splitAt)));
     out += t.flush();
     expect(aggregateSseText(out)).toContain("bob@example.com");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:EMAIL:");
   });
 
   test("content_block_stop flushes pending buffer for that index (lenient: suffix dropped)", async () => {
@@ -163,8 +163,8 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
     out += t.flush();
     expect(out).toContain("김철수");
     expect(out).toContain("alice@example.com");
-    expect(out).not.toContain("__OPF_PERSON_");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:PERSON:");
+    expect(out).not.toContain("{{OPF:EMAIL:");
     expect(out).toContain("input_json_delta");
   });
 
@@ -200,7 +200,7 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
     const token = (await remover.mask("dev@example.com")).tokens[0]!.token;
     const t = new AnthropicSseTransformer(remover);
     let out = "";
-    const cut = "__OPF_E".length;
+    const cut = "{{OPF:E".length;
     out += t.push(anthropicDelta(0, `first ${token.slice(0, cut)}`));
     out += t.push(anthropicDelta(1, `second ${token.slice(0, cut)}`));
     out += t.push(anthropicDelta(0, `${token.slice(cut)} end0`));
@@ -241,7 +241,7 @@ describe("OpenAISseTransformer — token-restoring delta pipeline", () => {
     const t = new OpenAISseTransformer(remover);
     const out = t.push(openaiDelta(`Email ${token} please`)) + t.flush();
     expect(out).toContain("alice@example.com");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:EMAIL:");
   });
 
   test("reassembles token split across deltas", async () => {
@@ -255,7 +255,7 @@ describe("OpenAISseTransformer — token-restoring delta pipeline", () => {
     out += t.push(openaiDelta(fullText.slice(splitAt)));
     out += t.flush();
     expect(aggregateSseText(out)).toContain("bob@example.com");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:EMAIL:");
   });
 
   test("[DONE] sentinel passes through", async () => {
@@ -301,8 +301,8 @@ describe("OpenAISseTransformer — token-restoring delta pipeline", () => {
     out += t.flush();
     expect(out).toContain("김철수");
     expect(out).toContain("alice@example.com");
-    expect(out).not.toContain("__OPF_PERSON_");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:PERSON:");
+    expect(out).not.toContain("{{OPF:EMAIL:");
     expect(out).toContain("tool_calls");
   });
 });
@@ -342,8 +342,8 @@ describe("CodexSseTransformer — function_call_arguments restoration", () => {
     out += t.flush();
     expect(out).toContain("김철수");
     expect(out).toContain("alice@example.com");
-    expect(out).not.toContain("__OPF_PERSON_");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:PERSON:");
+    expect(out).not.toContain("{{OPF:EMAIL:");
     expect(out).toContain("function_call_arguments.done");
   });
 
@@ -361,6 +361,6 @@ describe("CodexSseTransformer — function_call_arguments restoration", () => {
       raw: "",
     })) + t.flush();
     expect(out).toContain("bob@example.com");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:EMAIL:");
   });
 });

@@ -187,7 +187,7 @@ def test_codex_text_input_is_masked() -> None:
     )
     masked = out["input"][0]["content"][0]["text"]
     assert "김철수" not in masked
-    assert masked.startswith("__OPF_PERSON__")
+    assert masked.startswith("{{OPF:PERSON:")
 
 
 CASES_HITTING_UNMASKED_TOOL_ARGUMENTS = {

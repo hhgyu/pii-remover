@@ -1,13 +1,16 @@
 import {
+  TOKEN_DELIMITER,
   TOKEN_LENIENT_REGEX,
+  TOKEN_PREFIX,
   TOKEN_REPAIR_PATTERN,
   TOKEN_STRICT_REGEX,
+  TOKEN_SUFFIX,
 } from "../token/format.js";
 
 /**
  * A token detected in text. May be the canonical strict form
- * (`__OPF_PERSON__<hash>__`) or a lenient/LLM-mangled variant (case-folded,
- * suffix dropped). See ADR-0020.
+ * (`{{OPF:PERSON:<hash>}}`) or a lenient/LLM-mangled variant (case-folded,
+ * closing braces dropped). See ADR-0022.
  *
  * `normalizedToken` is the canonical form used for vault lookup; `token`
  * preserves the original surface form so callers can attribute the
@@ -34,7 +37,7 @@ export interface TokenMatch {
 type Range = readonly [number, number];
 
 export function buildNormalized(category: string, hash: string): string {
-  return `__OPF_${category}__${hash}__`;
+  return `${TOKEN_PREFIX}${category}${TOKEN_DELIMITER}${hash}${TOKEN_SUFFIX}`;
 }
 
 /**

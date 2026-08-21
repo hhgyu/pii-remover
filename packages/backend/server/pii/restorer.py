@@ -1,6 +1,6 @@
 """Token restoration — port of ``core/src/restorer/index.ts``.
 
-Turns ``__OPF_PERSON__<hash>__`` back into the original text, using the vault
+Turns ``{{OPF:PERSON:<hash>}}`` back into the original text, using the vault
 for one session.
 
 Algorithm (ADR-0020 round-trip, ADR-0021 miss classification):

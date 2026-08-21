@@ -21,18 +21,18 @@
     "pii_table": [
       [
         "alice@example.com",
-        "__OPF_EMAIL__4ov1qksihef66la1__"
+        "{{OPF:EMAIL:4ov1qksihef66la1}}"
       ],
       [
         "010-1234-5678",
-        "__OPF_PHONE__4ov3lglyfs7qftua__"
+        "{{OPF:PHONE:4ov3lglyfs7qftua}}"
       ],
       [
         "김철수",
-        "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+        "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
       ]
     ],
-    "placeholder_note": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+    "placeholder_note": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
   },
   "anthropic": {
     "requests": [
@@ -52,10 +52,10 @@
           "messages": [
             {
               "role": "user",
-              "content": "저는 __OPF_PERSON__4ov9mhqtc1vepqf5__입니다"
+              "content": "저는 {{OPF:PERSON:4ov9mhqtc1vepqf5}}입니다"
             }
           ],
-          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       },
       {
@@ -90,7 +90,7 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "메일은 __OPF_EMAIL__4ov1qksihef66la1__"
+                  "text": "메일은 {{OPF:EMAIL:4ov1qksihef66la1}}"
                 },
                 {
                   "type": "image",
@@ -103,7 +103,7 @@
               ]
             }
           ],
-          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       },
       {
@@ -115,7 +115,7 @@
         },
         "expected": {
           "model": "m",
-          "system": "돕는 도우미. __OPF_PERSON__4ov9mhqtc1vepqf5__ 담당.\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written.",
+          "system": "돕는 도우미. {{OPF:PERSON:4ov9mhqtc1vepqf5}} 담당.\n\nInputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written.",
           "messages": []
         }
       },
@@ -136,11 +136,11 @@
           "system": [
             {
               "type": "text",
-              "text": "연락처 __OPF_PHONE__4ov3lglyfs7qftua__"
+              "text": "연락처 {{OPF:PHONE:4ov3lglyfs7qftua}}"
             },
             {
               "type": "text",
-              "text": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "text": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ],
           "messages": []
@@ -153,7 +153,7 @@
           "system": [
             {
               "type": "text",
-              "text": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "text": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ],
           "messages": []
@@ -163,7 +163,7 @@
           "system": [
             {
               "type": "text",
-              "text": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "text": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ],
           "messages": []
@@ -178,7 +178,7 @@
         "expected": {
           "model": "m",
           "messages": [],
-          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       },
       {
@@ -208,7 +208,7 @@
               ]
             }
           ],
-          "system": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "system": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       }
     ],
@@ -219,7 +219,7 @@
           "content": [
             {
               "type": "text",
-              "text": "안녕 __OPF_PERSON__4ov9mhqtc1vepqf5__"
+              "text": "안녕 {{OPF:PERSON:4ov9mhqtc1vepqf5}}"
             }
           ]
         },
@@ -241,9 +241,9 @@
               "id": "t1",
               "name": "send",
               "input": {
-                "to": "__OPF_EMAIL__4ov1qksihef66la1__",
+                "to": "{{OPF:EMAIL:4ov1qksihef66la1}}",
                 "cc": [
-                  "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                  "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
                 ]
               }
             }
@@ -280,7 +280,7 @@
           "content": [
             {
               "type": "thinking",
-              "thinking": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+              "thinking": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
             }
           ]
         },
@@ -288,7 +288,7 @@
           "content": [
             {
               "type": "thinking",
-              "thinking": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+              "thinking": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
             }
           ]
         }
@@ -313,11 +313,11 @@
           "messages": [
             {
               "role": "system",
-              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             },
             {
               "role": "user",
-              "content": "__OPF_PERSON__4ov9mhqtc1vepqf5__ __OPF_PHONE__4ov3lglyfs7qftua__"
+              "content": "{{OPF:PERSON:4ov9mhqtc1vepqf5}} {{OPF:PHONE:4ov3lglyfs7qftua}}"
             }
           ]
         }
@@ -342,11 +342,11 @@
           "messages": [
             {
               "role": "system",
-              "content": "너는 조수다\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "너는 조수다\n\nInputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             },
             {
               "role": "user",
-              "content": "__OPF_EMAIL__4ov1qksihef66la1__ 로 보내"
+              "content": "{{OPF:EMAIL:4ov1qksihef66la1}} 로 보내"
             }
           ]
         }
@@ -383,7 +383,7 @@
             },
             {
               "role": "system",
-              "content": "second\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "second\n\nInputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ]
         }
@@ -395,7 +395,7 @@
           "messages": [
             {
               "role": "system",
-              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ]
         },
@@ -404,7 +404,7 @@
           "messages": [
             {
               "role": "system",
-              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ]
         }
@@ -433,13 +433,13 @@
               "content": [
                 {
                   "type": "text",
-                  "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                  "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
                 }
               ]
             },
             {
               "role": "system",
-              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ]
         }
@@ -471,14 +471,14 @@
           "messages": [
             {
               "role": "system",
-              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             },
             {
               "role": "user",
               "content": [
                 {
                   "type": "text",
-                  "text": "메일 __OPF_EMAIL__4ov1qksihef66la1__"
+                  "text": "메일 {{OPF:EMAIL:4ov1qksihef66la1}}"
                 },
                 {
                   "type": "image_url",
@@ -502,7 +502,7 @@
           "messages": [
             {
               "role": "system",
-              "content": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+              "content": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
             }
           ]
         }
@@ -515,7 +515,7 @@
           "choices": [
             {
               "message": {
-                "content": "안녕 __OPF_PERSON__4ov9mhqtc1vepqf5__"
+                "content": "안녕 {{OPF:PERSON:4ov9mhqtc1vepqf5}}"
               }
             }
           ]
@@ -539,7 +539,7 @@
                 "content": [
                   {
                     "type": "text",
-                    "text": "__OPF_EMAIL__4ov1qksihef66la1__"
+                    "text": "{{OPF:EMAIL:4ov1qksihef66la1}}"
                   }
                 ]
               }
@@ -572,7 +572,7 @@
                     "id": "c1",
                     "function": {
                       "name": "send",
-                      "arguments": "{\"to\":\"__OPF_EMAIL__4ov1qksihef66la1__\"}"
+                      "arguments": "{\"to\":\"{{OPF:EMAIL:4ov1qksihef66la1}}\"}"
                     }
                   }
                 ]
@@ -608,7 +608,7 @@
                   {
                     "function": {
                       "name": "x",
-                      "arguments": "bare __OPF_PERSON__4ov9mhqtc1vepqf5__"
+                      "arguments": "bare {{OPF:PERSON:4ov9mhqtc1vepqf5}}"
                     }
                   }
                 ]
@@ -655,8 +655,8 @@
         },
         "expected": {
           "model": "m",
-          "instructions": "__OPF_PERSON__4ov9mhqtc1vepqf5__를 도와라\n\nInputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written.",
-          "input": "__OPF_EMAIL__4ov1qksihef66la1__ 확인"
+          "instructions": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}를 도와라\n\nInputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written.",
+          "input": "{{OPF:EMAIL:4ov1qksihef66la1}} 확인"
         }
       },
       {
@@ -667,8 +667,8 @@
         },
         "expected": {
           "model": "m",
-          "input": "__OPF_PERSON__4ov9mhqtc1vepqf5__",
-          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "input": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       },
       {
@@ -704,7 +704,7 @@
               "content": [
                 {
                   "type": "input_text",
-                  "text": "전화 __OPF_PHONE__4ov3lglyfs7qftua__"
+                  "text": "전화 {{OPF:PHONE:4ov3lglyfs7qftua}}"
                 }
               ]
             },
@@ -718,7 +718,7 @@
               ]
             }
           ],
-          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       },
       {
@@ -740,7 +740,7 @@
               "arguments": "{\"to\":\"alice@example.com\"}"
             }
           ],
-          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       },
       {
@@ -762,7 +762,7 @@
               "arguments": "not json 김철수"
             }
           ],
-          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern __OPF_<LABEL>__<HASH>__. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every __OPF_*__ token exactly as written."
+          "instructions": "Inputs may contain privacy-preserving placeholders matching the pattern {{OPF:<LABEL>:<HASH>}}. Treat them as the original semantic entity, but never generate, expand, or invent new placeholders. When summarizing or compressing conversation history, preserve every {{OPF:*__ token exactly as written."
         }
       }
     ],
@@ -775,7 +775,7 @@
               "content": [
                 {
                   "type": "output_text",
-                  "text": "안녕 __OPF_PERSON__4ov9mhqtc1vepqf5__"
+                  "text": "안녕 {{OPF:PERSON:4ov9mhqtc1vepqf5}}"
                 }
               ]
             }
@@ -799,7 +799,7 @@
         "input": {
           "output": [
             {
-              "arguments": "{\"to\":\"__OPF_EMAIL__4ov1qksihef66la1__\"}"
+              "arguments": "{\"to\":\"{{OPF:EMAIL:4ov1qksihef66la1}}\"}"
             }
           ]
         },
@@ -814,7 +814,7 @@
       {
         "name": "output-text-top-level",
         "input": {
-          "output_text": "연락 __OPF_EMAIL__4ov1qksihef66la1__"
+          "output_text": "연락 {{OPF:EMAIL:4ov1qksihef66la1}}"
         },
         "expected": {
           "output_text": "연락 alice@example.com"
@@ -828,7 +828,7 @@
               "content": [
                 {
                   "type": "refusal",
-                  "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                  "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
                 }
               ]
             }
@@ -840,7 +840,7 @@
               "content": [
                 {
                   "type": "refusal",
-                  "text": "__OPF_PERSON__4ov9mhqtc1vepqf5__"
+                  "text": "{{OPF:PERSON:4ov9mhqtc1vepqf5}}"
                 }
               ]
             }

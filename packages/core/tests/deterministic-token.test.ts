@@ -55,8 +55,8 @@ describe("PIIRemover — cross-instance determinism (ADR-0020)", () => {
     const ra = await a.mask("email me at alice@example.com please");
     const rb = await b.mask("write to alice@example.com now");
 
-    const tokenA = ra.text.match(/__OPF_EMAIL__[a-z0-9]{16}__/)?.[0];
-    const tokenB = rb.text.match(/__OPF_EMAIL__[a-z0-9]{16}__/)?.[0];
+    const tokenA = ra.text.match(/{{OPF:EMAIL:[a-z0-9]{16}}}/)?.[0];
+    const tokenB = rb.text.match(/{{OPF:EMAIL:[a-z0-9]{16}}}/)?.[0];
     expect(tokenA).toBeDefined();
     expect(tokenA).toBe(tokenB!);
 
@@ -88,8 +88,8 @@ describe("PIIRemover — cross-instance determinism (ADR-0020)", () => {
       config: localOnlyConfig(),
       env: { PII_REMOVER_TOKEN_KEY: "key-two" },
     });
-    const ta = (await a.mask("user@example.com")).text.match(/__OPF_EMAIL__[a-z0-9]{16}__/)?.[0];
-    const tb = (await b.mask("user@example.com")).text.match(/__OPF_EMAIL__[a-z0-9]{16}__/)?.[0];
+    const ta = (await a.mask("user@example.com")).text.match(/{{OPF:EMAIL:[a-z0-9]{16}}}/)?.[0];
+    const tb = (await b.mask("user@example.com")).text.match(/{{OPF:EMAIL:[a-z0-9]{16}}}/)?.[0];
     expect(ta).toBeDefined();
     expect(tb).toBeDefined();
     expect(ta).not.toBe(tb);

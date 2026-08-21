@@ -80,7 +80,7 @@ describe("createPluginHooks — mode split", () => {
     );
 
     const args = output.args as { content: string };
-    expect(args.content).toContain("__OPF_EMAIL_");
+    expect(args.content).toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 
@@ -89,7 +89,7 @@ describe("createPluginHooks — mode split", () => {
 
     // First mask to populate the vault
     const maskResult = await remover.mask("email alice@example.com");
-    expect(maskResult.text).toContain("__OPF_EMAIL_");
+    expect(maskResult.text).toContain("{{OPF:EMAIL:");
 
     // Now restore via hook
     const hooks = createPluginHooks(remover, { warn: silentWarn(), mode: "restore" });
@@ -120,7 +120,7 @@ describe("createPluginHooks — mode split", () => {
       output
     );
     const masked = (output.args as { content: string }).content;
-    expect(masked).toContain("__OPF_EMAIL_");
+    expect(masked).toContain("{{OPF:EMAIL:");
 
     const restoreOutput = { title: "", output: masked, metadata: {} };
     await restoreHooks["tool.execute.after"]!(
@@ -135,7 +135,7 @@ describe("createPluginHooks — mode split", () => {
   test("mode=mask still restores display-tool args (shared vault read)", async () => {
     const remover = await buildRemover();
     const masked = await remover.mask("contact alice@example.com please");
-    expect(masked.text).toContain("__OPF_EMAIL_");
+    expect(masked.text).toContain("{{OPF:EMAIL:");
 
     const maskHooks = createPluginHooks(remover, { warn: silentWarn(), mode: "mask" });
     const output = { args: { questions: [{ question: masked.text }] } };
@@ -146,7 +146,7 @@ describe("createPluginHooks — mode split", () => {
     const q = (output.args as { questions: Array<{ question: string }> })
       .questions[0];
     expect(q?.question).toContain("alice@example.com");
-    expect(q?.question).not.toContain("__OPF_EMAIL_");
+    expect(q?.question).not.toContain("{{OPF:EMAIL:");
     remover.dispose();
   });
 });

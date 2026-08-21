@@ -127,7 +127,7 @@ describe("integration — plugin + OpfHttpBackend (mock HTTP)", () => {
     output);
     const masked = (output.args as { content: string }).content;
     expect(masked).not.toContain("alice@example.com");
-    expect(masked).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(masked).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
 
     remover.dispose();
   });
@@ -149,7 +149,7 @@ describe("integration — plugin + OpfHttpBackend (mock HTTP)", () => {
     await hooks["tool.execute.before"]!({ tool: "task", sessionID: "s", callID: "c1" },
     first);
     const maskedMsg = (first.args as { msg: string }).msg;
-    expect(maskedMsg).toMatch(/__OPF_EMAIL__[a-z0-9]{16}__/);
+    expect(maskedMsg).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
 
     await hooks.event({
       event: { type: "session.idle", properties: { sessionID: "s" } },
@@ -186,7 +186,7 @@ describe("integration — plugin + OpfHttpBackend (mock HTTP)", () => {
     await hooks["tool.execute.before"]!({ tool: "task", sessionID: "s", callID: "c1" },
     output);
     const masked = (output.args as { content: string }).content;
-    expect(masked).toMatch(/__OPF_URL__[a-z0-9]{16}__/);
+    expect(masked).toMatch(/{{OPF:URL:[a-z0-9]{16}}}/);
     expect(masked).not.toContain("github.com/example/repo");
   });
 });

@@ -27,11 +27,20 @@ export const dropTrailingSuffix: Mutator = (text) => ({
   expectedRecoverable: true,
 });
 
-/** 5 — a markdown renderer escapes every underscore. */
-export const markdownEscape: Mutator = (text) => ({
-  text: rewriteTokens(text, (match) => match.token.replaceAll("_", "\\_")),
+/**
+ * 5 — the model drops the outer brace on each side.
+ *
+ * This replaces an older `markdownEscape` mutator that backslash-escaped every
+ * underscore. Under ADR-0022 the delimiters carry no underscores and CommonMark
+ * escapes nothing inside `{{…}}`, so that mutation became a no-op — it left the
+ * token matching strictly and stopped testing anything.
+ */
+export const braceStrip: Mutator = (text) => ({
+  text: rewriteTokens(text, (match) =>
+    match.token.replace(/^\{\{/, "{").replace(/\}\}$/, "}"),
+  ),
   expectedRecoverable: true,
-  note: "backslash-escaped underscores hide the token from both matchers; the candidate scan tolerates the escapes and the normalized form is an exact vault key",
+  note: "single braces hide the token from both matchers; the candidate scan tolerates a dropped brace and the normalized form is an exact vault key",
 });
 
 /** 6 — the model quotes the token as inline code. */

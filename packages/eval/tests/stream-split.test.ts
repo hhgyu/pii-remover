@@ -27,7 +27,7 @@ function entryById(id: string): MaskedEntry {
 const sample = entryById("en-multi-01");
 
 /** Where the first token's prefix ends — the delta boundary an LLM produces
- *  whenever its tokenizer emits `__OPF_` as a single unit. */
+ *  whenever its tokenizer emits `{{OPF:` as a single unit. */
 function prefixBoundary(text: string): number {
   return text.indexOf(TOKEN_PREFIX) + TOKEN_PREFIX.length;
 }
@@ -68,7 +68,7 @@ describe("mutation 7 — SSE delta split through the real proxy buffer", () => {
   });
 
   test("holds back a partial token whose category has started", () => {
-    // Given a prefix that stops after `__OPF_PER`
+    // Given a prefix that stops after `{{OPF:PER`
     const token = sample.tokens[0].token;
     const head = `hello ${token.slice(0, TOKEN_PREFIX.length + 3)}`;
     // When the boundary detector inspects it
@@ -77,7 +77,7 @@ describe("mutation 7 — SSE delta split through the real proxy buffer", () => {
   });
 
   test("holds back a delta that ends exactly on the token prefix", () => {
-    // Given a delta boundary landing right after `__OPF_` and nothing else
+    // Given a delta boundary landing right after `{{OPF:` and nothing else
     const head = sample.masked.slice(0, prefixBoundary(sample.masked));
     // When the boundary detector inspects it
     // Then the whole prefix is held back, not just its final underscore
@@ -85,7 +85,7 @@ describe("mutation 7 — SSE delta split through the real proxy buffer", () => {
   });
 
   test("never releases a token across two chunks at that boundary", () => {
-    // Given the two deltas an LLM emits when `__OPF_` is one tokenizer unit
+    // Given the two deltas an LLM emits when `{{OPF:` is one tokenizer unit
     const cut = prefixBoundary(sample.masked);
     const chunks = streamChunks([
       sample.masked.slice(0, cut),

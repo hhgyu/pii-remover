@@ -19,11 +19,11 @@ from typing import Final
 
 OPF_PLACEHOLDER_SYSTEM_NOTE: Final = (
     "Inputs may contain privacy-preserving placeholders matching the pattern "
-    "__OPF_<LABEL>__<HASH>__. "
+    "{{OPF:<LABEL>:<HASH>}}. "
     "Treat them as the original semantic entity, but never generate, expand, or "
     "invent new placeholders. "
     "When summarizing or compressing conversation history, preserve every "
-    "__OPF_*__ token exactly as written."
+    "{{OPF:*__ token exactly as written."
 )
 
 

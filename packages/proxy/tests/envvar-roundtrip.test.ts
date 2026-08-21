@@ -7,15 +7,15 @@ import {
   type ProxyServer,
 } from "../src/server.js";
 
-const TOKEN_RE = /__OPF_EMAIL__[a-z0-9]{16}__/;
+const TOKEN_RE = /{{OPF:EMAIL:[a-z0-9]{16}}}/;
 
 function tokenFromInit(init?: RequestInit): string {
   const raw = typeof init?.body === "string" ? init.body : "";
-  return raw.match(TOKEN_RE)?.[0] ?? "__OPF_EMAIL__ffffffffffffffff__";
+  return raw.match(TOKEN_RE)?.[0] ?? "{{OPF:EMAIL:ffffffffffffffff}}";
 }
 
 function replaceFixtureTokens<T>(body: T, token: string): T {
-  return JSON.parse(JSON.stringify(body).replace(/__OPF_EMAIL__0123456789abcdef__/g, token)) as T;
+  return JSON.parse(JSON.stringify(body).replace(/{{OPF:EMAIL:0123456789abcdef}}/g, token)) as T;
 }
 
 function makeSseFetch(chunksForToken: (token: string) => string[]): FetchLike {
@@ -97,7 +97,7 @@ describe("Phase 3 — ANTHROPIC_BASE_URL roundtrip via env var", () => {
         type: "message",
         role: "assistant",
         content: [
-          { type: "text", text: "Will reach __OPF_EMAIL__0123456789abcdef__ soon." },
+          { type: "text", text: "Will reach {{OPF:EMAIL:0123456789abcdef}} soon." },
         ],
         model: "claude-test",
         stop_reason: "end_turn",
@@ -129,7 +129,7 @@ describe("Phase 3 — ANTHROPIC_BASE_URL roundtrip via env var", () => {
     };
     const text = json.content.map((c) => c.text).join("");
     expect(text).toContain("alice@example.com");
-    expect(text).not.toContain("__OPF_EMAIL_");
+    expect(text).not.toContain("{{OPF:EMAIL:");
   });
 
   test("ANTHROPIC_BASE_URL streaming SSE roundtrip", async () => {
@@ -172,7 +172,7 @@ describe("Phase 3 — ANTHROPIC_BASE_URL roundtrip via env var", () => {
     expect(res.status).toBe(200);
     const body = await consumeStream(res);
     expect(body).toContain("charlie@example.com");
-    expect(body).not.toContain("__OPF_EMAIL_");
+    expect(body).not.toContain("{{OPF:EMAIL:");
     expect(body).toContain("message_stop");
   });
 });
@@ -188,7 +188,7 @@ describe("Phase 3 — OPENAI_API_BASE roundtrip via env var", () => {
         choices: [
           {
             index: 0,
-            message: { role: "assistant", content: "Reaching __OPF_EMAIL__0123456789abcdef__ now." },
+            message: { role: "assistant", content: "Reaching {{OPF:EMAIL:0123456789abcdef}} now." },
             finish_reason: "stop",
           },
         ],
@@ -215,7 +215,7 @@ describe("Phase 3 — OPENAI_API_BASE roundtrip via env var", () => {
     };
     const text = json.choices[0]!.message.content;
     expect(text).toContain("dev@example.com");
-    expect(text).not.toContain("__OPF_EMAIL_");
+    expect(text).not.toContain("{{OPF:EMAIL:");
   });
 
   test("OPENAI_API_BASE + ANTHROPIC_BASE_URL share vault on single proxy (multi-provider)", async () => {

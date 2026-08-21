@@ -3,7 +3,7 @@
  *
  * This is the per-delta hot path: an LLM splits a token across SSE chunks and
  * the buffer decides, on every chunk, how much is safe to release. Getting the
- * boundary one character wrong leaks `__OPF_PE` to the user's screen.
+ * boundary one character wrong leaks `{{OPF:PE` to the user's screen.
  *
  * Two things are pinned:
  *
@@ -61,33 +61,33 @@ const BOUNDARY_INPUTS: string[] = [
   "__O",
   "__OP",
   "__OPF",
-  "__OPF_",
+  "{{OPF:",
   "text _",
-  "text __OPF_",
+  "text {{OPF:",
   // Category in progress.
-  "__OPF_P",
-  "__OPF_PERSON",
-  "__OPF_PERSON_",
-  "__OPF_PERSON__",
-  "__OPF_PERSON__4ov",
-  "__OPF_PERSON__4ov9mhqtc1vepqf5",
-  "__OPF_PERSON__4ov9mhqtc1vepqf5_",
-  "__OPF_PERSON__4ov9mhqtc1vepqf5__",
+  "{{OPF:P",
+  "{{OPF:PERSON",
+  "{{OPF:PERSON:",
+  "{{OPF:PERSON:",
+  "{{OPF:PERSON:4ov",
+  "{{OPF:PERSON:4ov9mhqtc1vepqf5",
+  "{{OPF:PERSON:4ov9mhqtc1vepqf5_",
+  "{{OPF:PERSON:4ov9mhqtc1vepqf5}}",
   // THE NEWLINE TRAP. JS `$` does not match before "\n"; Python `$` does.
   `${PERSON}\n`,
   `${PERSON}\n\n`,
-  "__OPF_PERSON__4ov9mhqtc1vepqf5__\n",
-  "__OPF_PERS\n",
-  "__OPF_\n",
+  "{{OPF:PERSON:4ov9mhqtc1vepqf5}}\n",
+  "{{OPF:PERS\n",
+  "{{OPF:\n",
   "text\n",
-  "text\n__OPF_",
+  "text\n{{OPF:",
   `${PERSON} after\n`,
   // Underscores that are not a token.
   "snake_case_identifier",
   "___",
   "a__OPF",
   // Two tokens, second incomplete.
-  `${PERSON} and __OPF_EMA`,
+  `${PERSON} and {{OPF:EMA`,
   `${PERSON}${EMAIL}`,
   BIZNUM,
 ];

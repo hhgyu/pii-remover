@@ -13,7 +13,7 @@
 │  user  │ ─────────────▶ │ PII Remover │ ─────────────▶ │   LLM    │
 └────────┘                  └────────────┘                  └──────────┘
                                   │                              │
-                                  │  vault: __OPF_PERSON_1__     │
+                                  │  vault: {{OPF:PERSON:…}}     │
                                   ▼                              │
                              ┌─────────┐                         │
                              │ restore │ ◀───── tokens ──────────┘
@@ -186,7 +186,7 @@ Backend-side; `OpfRunner.unload()` + `KoreanNerRunner.unload()` release ONNX ses
 
 - **The hook cannot replace the prompt** (both Claude Code and Codex are source-verified). Masking always happens at the proxy. The hook is detection + fail-closed gate only.
 - **Vault is in-memory, project-scoped**: process memory only, never persisted to disk. Lives for the host process lifetime (all chat/subagent sessions of a project share it — required so subagents can restore tokens minted in the parent session); tokens that survive a process restart in persisted history are neutralized to `[UNRESTORABLE]` at the LLM boundary.
-- **Token format `__OPF_<CATEGORY>_<INDEX>__`**: identifier-safe — survives translation, Markdown formatting, and code generation contexts.
+- **Token format `{{OPF:<CATEGORY>:<HASH>}}`** ([ADR-0022](./docs/ADR/0022-markdown-inert-token-delimiters.md)): `{` and `}` are claimed by no CommonMark construct, so the token survives a Markdown round-trip. The earlier `__OPF_…__` form was itself a valid bold span, and models deleted its inner delimiter while rendering.
 - **4-tier backend trust model**: localhost (default) → self-hosted+TLS → vendor+DPA → public SaaS (discouraged). See [`docs/TRUST_TIERS.md`](./docs/TRUST_TIERS.md).
 - **Fail-closed by default**: any detection failure blocks the LLM call. `PII_REMOVER_BYPASS=1` is the only escape.
 - **Audit logging** (disabled by default): structured JSONL records `mask` / `restore` / `bypass` / `block` / `error` events with ISO timestamps, category counts (`{ private_email: 2, rrn: 1 }`), vault ID, backend name, latency, and provider — **no PII plaintext ever written**. Enable via config (`audit.enabled: true` + `audit.log_path`) or toggle at runtime with `PII_REMOVER_AUDIT=true/false`.

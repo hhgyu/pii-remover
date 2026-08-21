@@ -4,6 +4,7 @@ import {
   OPF_PLACEHOLDER_SYSTEM_NOTE,
   PIIRemover,
   TOKEN_PREFIX,
+  TOKEN_PREFIX_PATTERN,
   TOKEN_STRICT_PATTERN,
   maybeAutoStartBackend,
   type BackendClient,
@@ -159,7 +160,7 @@ export interface CreatedHooks {
 // String.replace, which resets lastIndex on entry and exit; the probe regex is
 // non-global so .test() stays stateless.
 const OPF_TOKEN_SWEEP_REGEX = new RegExp(TOKEN_STRICT_PATTERN, "gi");
-const OPF_PREFIX_PROBE_REGEX = new RegExp(TOKEN_PREFIX, "i");
+const OPF_PREFIX_PROBE_REGEX = new RegExp(TOKEN_PREFIX_PATTERN, "i");
 
 const NEUTRALIZE_REASON = {
   expired:
@@ -401,7 +402,7 @@ export function createPluginHooks(
 
   // Tokens whose vault mapping no longer exists (minted by a previous
   // process before a session resume) can never be restored. Left as-is the
-  // LLM copies them verbatim into new tool args — surfacing __OPF_* in
+  // LLM copies them verbatim into new tool args — surfacing {{OPF:* in
   // permission prompts and broken filesystem paths. Replacing them forces
   // the LLM onto a normal failure path (re-discover or ask the user).
   // Live tokens are preserved so the LLM can keep reusing them.
@@ -411,7 +412,7 @@ export function createPluginHooks(
       OPF_TOKEN_SWEEP_REGEX,
       (raw, label: string, hash: string) => {
         const category = label.toUpperCase();
-        const normalized = `__OPF_${category}__${hash.toLowerCase()}__`;
+        const normalized = `{{OPF:${category}:${hash.toLowerCase()}}}`;
         const status = remover.tokenStatus(normalized);
         if (status === "live") return raw;
         if (!warnedDeadTokens.has(normalized)) {
@@ -438,7 +439,7 @@ export function createPluginHooks(
     // User-authored parts are never swept. Neutralization exists to stop the
     // MODEL copying an unusable token into a new tool call; the user typing
     // one is authoritative input. Sweeping it silently rewrote documentation,
-    // tests and the "what is this __OPF_ token?" question itself before the
+    // tests and the "what is this {{OPF: token?" question itself before the
     // model ever saw it.
     if (type !== "compaction" && !authoredByUser) {
       await maskTextFieldsStrict(part, neutralizeDeadTokens);
@@ -457,7 +458,7 @@ export function createPluginHooks(
         if (state.input !== undefined && state.input !== null) {
           // Use maskTextFields (with path-skip) instead of strict so the LLM
           // sees real filesystem paths. This prevents token-index confusion
-          // where the LLM picks the wrong __OPF_PERSON_N__ for a path.
+          // where the LLM picks the wrong {{OPF:PERSON_N: for a path.
           state.input = await maskTextFields(
             state.input,
             maskMessagePartText
@@ -535,7 +536,7 @@ export function createPluginHooks(
     // `session.idle` is deliberately NOT handled: OpenCode emits it after
     // EVERY completed turn and for every subagent session, so disposing the
     // vault here destroyed live mappings mid-conversation (unrestorable
-    // __OPF_* tokens in permission prompts and tool args). The vault is
+    // {{OPF:* tokens in permission prompts and tool args). The vault is
     // in-memory only and deduplicated, so process lifetime is the correct
     // and affordable disposal boundary.
     async event(_input: EventEnvelope): Promise<void> {},
@@ -549,7 +550,7 @@ export function createPluginHooks(
       if (output.args === undefined || output.args === null) return;
 
       // Restore vault tokens the LLM echoed into args (e.g.
-      // "D:\Git\__OPF_PERSON_1__Plugin" composed from masked context) so
+      // "D:\Git\{{OPF:PERSON_1:Plugin" composed from masked context) so
       // the permission dialog and the tool both see the real filesystem.
       const restored = await restoreTextFields(output.args, restoreArgText);
       output.args = restored;
@@ -557,7 +558,7 @@ export function createPluginHooks(
       // Args originate FROM the LLM, so masking them here adds no LLM-side
       // privacy — the boundary mask (experimental.chat.messages.transform)
       // re-tokenises everything before the next dispatch. Re-masking here
-      // would re-introduce __OPF_* into paths right after restoring them,
+      // would re-introduce {{OPF:* into paths right after restoring them,
       // breaking execution and the external_directory permission prompt.
       if (registerExperimental) return;
 

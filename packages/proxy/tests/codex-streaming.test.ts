@@ -47,13 +47,13 @@ describe("CodexSseTransformer", () => {
     const t = new CodexSseTransformer(remover);
     const out = t.push(deltaEvent(masked.text));
     expect(out).toContain("carol@example.com");
-    expect(out).not.toContain("__OPF_EMAIL_");
+    expect(out).not.toContain("{{OPF:EMAIL:");
   });
 
   test("token split across two deltas is buffered then restored", async () => {
     const remover = await makeRemover();
     const masked = await remover.mask("contact me at alice@example.com");
-    const tokenMatch = /__OPF_EMAIL__[a-z0-9]{16}__/.exec(masked.text);
+    const tokenMatch = /{{OPF:EMAIL:[a-z0-9]{16}}}/.exec(masked.text);
     expect(tokenMatch).not.toBeNull();
     const token = tokenMatch![0];
     const mid = Math.floor(token.length / 2);
@@ -65,7 +65,7 @@ describe("CodexSseTransformer", () => {
     const out2 = t.push(deltaEvent(second));
     const combined = out1 + out2 + t.flush();
     expect(combined).toContain("alice@example.com");
-    expect(combined).not.toContain("__OPF_EMAIL_");
+    expect(combined).not.toContain("{{OPF:EMAIL:");
   });
 
   test("non-delta events pass through (response.created, completed)", async () => {
@@ -96,7 +96,7 @@ describe("CodexSseTransformer", () => {
   test("flush emits remaining buffered text with lenient restore", async () => {
     const remover = await makeRemover();
     const masked = await remover.mask("Email carol@example.com");
-    const tokenMatch = /__OPF_EMAIL__[a-z0-9]{16}__/.exec(masked.text);
+    const tokenMatch = /{{OPF:EMAIL:[a-z0-9]{16}}}/.exec(masked.text);
     const token = tokenMatch![0];
     const stripped = token.slice(0, token.length - 2);
 

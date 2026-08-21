@@ -14,7 +14,7 @@ import {
   dropTrailingSuffix,
   jsonStringEscape,
   koreanParticle,
-  markdownEscape,
+  braceStrip,
   tripleRepeat,
   windowsPathEmbed,
 } from "./surface.js";
@@ -32,7 +32,7 @@ export {
   inventedToken,
   jsonStringEscape,
   koreanParticle,
-  markdownEscape,
+  braceStrip,
   sseDeltaSplit,
   tripleRepeat,
   windowsPathEmbed,
@@ -94,11 +94,11 @@ export const MUTATION_CLASSES: readonly MutationClass[] = [
   },
   {
     id: 5,
-    name: "markdown-escape",
+    name: "brace-strip",
     kind: "surface",
     minTokens: 1,
     description: "every underscore backslash-escaped",
-    mutate: markdownEscape,
+    mutate: braceStrip,
   },
   {
     id: 6,

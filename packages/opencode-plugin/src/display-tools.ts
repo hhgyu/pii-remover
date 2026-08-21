@@ -4,7 +4,7 @@
  * "Display tools" are tools whose ARGS are rendered to the user — i.e. the
  * tool args themselves are user-facing content (a question prompt, an option
  * label, etc.), not just plumbing to drive the tool. For these tools, masked
- * tokens like `__OPF_PERSON_27__` in the args produce a broken UX because
+ * tokens like `{{OPF:PERSON_27:` in the args produce a broken UX because
  * the user sees gibberish instead of the original PII.
  *
  * Restoring tokens in such args is a narrow exception to the general "mask

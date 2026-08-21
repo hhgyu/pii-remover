@@ -22,7 +22,7 @@ import {
   inventedToken,
   jsonStringEscape,
   koreanParticle,
-  markdownEscape,
+  braceStrip,
   tripleRepeat,
   windowsPathEmbed,
 } from "../src/mutators/index.js";
@@ -78,7 +78,7 @@ describe("mutation catalog", () => {
   });
 
   test("leaves an inert token lookalike untouched", () => {
-    // Given an adversarial entry carrying a non-matching `__OPF_` string
+    // Given an adversarial entry carrying a non-matching `{{OPF:` string
     const adversarial = entryById("en-adv-01");
     // When the case-flip mutation runs
     const result = caseFlip(adversarial.masked, adversarial.tokens);
@@ -161,10 +161,10 @@ describe("surface mutations keep token identity", () => {
     expect(scanTokens(result.text)).toHaveLength(6);
   });
 
-  test("markdown-escape hides the token from the restoration matchers", () => {
+  test("brace-strip hides the token from the restoration matchers", () => {
     // Given a masked entry
-    // When every underscore is backslash-escaped
-    const result = markdownEscape(twoTokenEntry.masked, twoTokenEntry.tokens);
+    // When the outer brace on each side is dropped
+    const result = braceStrip(twoTokenEntry.masked, twoTokenEntry.tokens);
     // Then the strict and lenient matchers see nothing, and only the
     // repair-only candidate scan still finds the spans
     expect(scanTokens(result.text)).toHaveLength(0);

@@ -68,8 +68,8 @@ def test_substitution_is_right_to_left() -> None:
 
     masked = codec.mask(original)
 
-    assert masked.count("__OPF_PERSON__") == 2
-    assert masked.count("__OPF_PHONE__") == 1
+    assert masked.count("{{OPF:PERSON:") == 2
+    assert masked.count("{{OPF:PHONE:") == 1
     assert codec.restore(masked) == original
 
 
@@ -77,7 +77,7 @@ def test_repeated_pii_shares_one_token_and_one_vault_entry() -> None:
     codec = _codec(("김철수", "private_person"))
     masked = codec.mask("김철수 김철수 김철수")
 
-    tokens = {part for part in masked.split() if part.startswith("__OPF_")}
+    tokens = {part for part in masked.split() if part.startswith("{{OPF:")}
     assert len(tokens) == 1
     assert codec.vault.size("s") == 1
 
@@ -93,7 +93,7 @@ def test_empty_and_clean_text_pass_through_untouched() -> None:
 def test_restore_leaves_unknown_tokens_alone() -> None:
     """A token minted by another key must not be invented into some value."""
     codec = _codec(("김철수", "private_person"))
-    foreign = "__OPF_PERSON__zzzzzzzzzzzzzzzz__"
+    foreign = "{{OPF:PERSON:zzzzzzzzzzzzzzzz}}"
     assert codec.restore(f"see {foreign}") == f"see {foreign}"
 
 
@@ -162,5 +162,5 @@ def test_overlapping_detections_do_not_fail_the_request() -> None:
     codec = VaultTokenCodec(detect=overlapping_detect, vault=vault, session_id="s")
     masked = codec.mask("abcdefghij")
 
-    assert masked.startswith("__OPF_PERSON__")
+    assert masked.startswith("{{OPF:PERSON:")
     assert masked.endswith("ghij")
