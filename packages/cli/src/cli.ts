@@ -32,6 +32,13 @@ export interface CliIo {
   fetchFn?: FetchLike;
   installFs?: InstallFs;
   initPiiRemover?: HookCommandIo["initPiiRemover"];
+  /**
+   * Stubs for the two side-effecting steps of the hook path. Without them a
+   * test run reads the caller's real `pii-remover.json` and, when it sets
+   * `auto_start`, warms a real backend or spawns Docker.
+   */
+  loadConfigFn?: HookCommandIo["loadConfigFn"];
+  autoStartFn?: HookCommandIo["autoStartFn"];
   argv0?: string;
 }
 
@@ -209,6 +216,8 @@ export async function runCli(
       ...(io.initPiiRemover !== undefined
         ? { initPiiRemover: io.initPiiRemover }
         : {}),
+      ...(io.loadConfigFn !== undefined ? { loadConfigFn: io.loadConfigFn } : {}),
+      ...(io.autoStartFn !== undefined ? { autoStartFn: io.autoStartFn } : {}),
     };
     const r = await runHookCommand(hookIo);
     return r.exitCode;

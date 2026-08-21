@@ -12,6 +12,20 @@ function localOnlyConfig(): PiiRemoverConfig {
   };
 }
 
+/**
+ * The hook path calls the real `loadConfig` and `maybeAutoStartBackend` unless
+ * both are injected. Left un-stubbed it reads the developer's own
+ * `pii-remover.json` and, when that sets `auto_start`, blocks on a real backend
+ * warmup — which is what made this suite intermittently exceed the 5s per-test
+ * timeout.
+ */
+function hookStubs() {
+  return {
+    loadConfigFn: async () => localOnlyConfig(),
+    autoStartFn: async () => {},
+  };
+}
+
 import { helpText, parseFlags, runCli } from "../src/cli.js";
 import type { InstallFs } from "../src/commands/install.js";
 
@@ -311,6 +325,7 @@ describe("runCli — help text mentions new lifecycle flags", () => {
       stdin: () => Promise.resolve(stdinJson),
       env: {},
       initPiiRemover: (opts) => PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
+      ...hookStubs(),
     });
     expect(code).toBe(0);
     expect(io.out.join("")).toBe("");
@@ -331,6 +346,7 @@ describe("runCli — help text mentions new lifecycle flags", () => {
       stdin: () => Promise.resolve(stdinJson),
       env: {},
       initPiiRemover: (opts) => PIIRemover.init({ ...(opts ?? {}), config: localOnlyConfig() }),
+      ...hookStubs(),
     });
     expect(code).toBe(0);
     const parsed = JSON.parse(io.out.join("").trim());
