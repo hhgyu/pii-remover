@@ -35,14 +35,24 @@ export {
   ProxySessionPool,
   DEFAULT_SESSION_ID,
   SESSION_HEADER,
+  type ProxySession,
   type SessionPoolOptions,
 } from "./session.js";
 
 export {
   transformAnthropicRequest,
   restoreAnthropicResponse,
+  isAnthropicThinkingBlock,
   type AnthropicTransformResult,
 } from "./providers/anthropic.js";
+
+export {
+  createThinkingCache,
+  DEFAULT_THINKING_CACHE_MAX_ENTRIES,
+  DEFAULT_THINKING_CACHE_MAX_BYTES,
+  type ThinkingCache,
+  type ThinkingCacheOptions,
+} from "./stream/thinking-cache.js";
 
 export {
   transformOpenAIRequest,
@@ -66,9 +76,12 @@ export {
 export type {
   ProviderName,
   AnthropicContentBlock,
+  AnthropicThinkingBlock,
+  AnthropicRedactedThinkingBlock,
   AnthropicMessage,
   AnthropicRequestBody,
   AnthropicResponseBody,
+  AnthropicResponseContentBlock,
   OpenAIContentPart,
   OpenAIMessage,
   OpenAIRequestBody,

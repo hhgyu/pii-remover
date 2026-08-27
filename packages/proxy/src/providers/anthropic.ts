@@ -3,12 +3,20 @@ import {
   OPF_PLACEHOLDER_SYSTEM_NOTE,
   appendPlaceholderNote,
 } from "@pii-remover/core";
+import type { ThinkingCache } from "../stream/thinking-cache.js";
+import {
+  replayThinking,
+  restoreThinkingBlock,
+  THINKING_REPLAY_REJECTION,
+} from "./thinking-replay.js";
 import type {
   AnthropicContentBlock,
   AnthropicMessage,
   AnthropicRequestBody,
   AnthropicResponseBody,
 } from "./types.js";
+
+export { isAnthropicThinkingBlock } from "./thinking-replay.js";
 
 export type ImageRedactor = (base64: string) => Promise<string>;
 
@@ -18,9 +26,16 @@ export interface AnthropicTransformOptions {
   /** Shared across the mask event and every restore event of one HTTP request
    *  so the audit stream can join them. */
   requestId?: string;
+  /** Session store of the masked thinking bytes Anthropic signed, keyed by
+   *  signature. Present: thinking is restored for display on the way out and
+   *  swapped back to the signed bytes on the way in. Absent: thinking is left
+   *  alone end-to-end, which is the only other safe option. */
+  thinkingCache?: ThinkingCache;
 }
 
 export interface AnthropicTransformResult {
+  /** Masked request to forward. Meaningless when `rejection` is set — the
+   *  caller answers with the rejection and forwards nothing. */
   body: AnthropicRequestBody;
   rejection?: { status: number; body: { error: string; message: string } };
 }
@@ -30,7 +45,14 @@ export async function transformAnthropicRequest(
   remover: PIIRemover,
   opts: AnthropicTransformOptions = {}
 ): Promise<AnthropicTransformResult> {
-  const messages = await maskMessages(raw.messages, remover, opts);
+  const replay = replayThinking(raw.messages, opts.thinkingCache);
+  // Refused here rather than sent on: a turn missing one of its thinking blocks
+  // draws an opaque 400 from upstream, and the restored text the client replayed
+  // is the user's plaintext PII.
+  if (replay.kind === "unresolvable") {
+    return { body: raw, rejection: THINKING_REPLAY_REJECTION };
+  }
+  const messages = await maskMessages(replay.messages, remover, opts);
   const system = await maskSystem(raw.system, remover, opts);
   const out: AnthropicRequestBody = { ...raw, messages };
   out.system = withPlaceholderNote(system);
@@ -66,6 +88,13 @@ export async function restoreAnthropicResponse(
         return { ...block, input: walkRestore(input, remover, opts) };
       }
     }
+    if (block.type === "thinking") {
+      return restoreThinkingBlock(
+        block,
+        opts.thinkingCache,
+        (text) => restoreWithProvider(remover, text, opts).text
+      );
+    }
     return block;
   });
   return { ...body, content: restoredContent };
@@ -91,11 +120,10 @@ function walkRestore(
 }
 
 async function maskMessages(
-  msgs: AnthropicMessage[] | undefined,
+  msgs: AnthropicMessage[],
   remover: PIIRemover,
   opts: AnthropicTransformOptions
 ): Promise<AnthropicMessage[]> {
-  if (!Array.isArray(msgs)) return [];
   const out: AnthropicMessage[] = [];
   for (const m of msgs) {
     if (typeof m.content === "string") {

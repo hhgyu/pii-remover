@@ -10,9 +10,26 @@ export interface AnthropicImageBlock {
   source: unknown;
 }
 
+/** Extended-thinking block. `signature` is opaque: Anthropic verifies it against
+ *  the exact `thinking` bytes it emitted and rejects any edit with a 400. */
+export interface AnthropicThinkingBlock {
+  type: "thinking";
+  thinking: string;
+  signature: string;
+}
+
+/** Thinking Anthropic itself withheld. Always replayed verbatim — there is no
+ *  plaintext to restore and nothing to cache. */
+export interface AnthropicRedactedThinkingBlock {
+  type: "redacted_thinking";
+  data: string;
+}
+
 export type AnthropicContentBlock =
   | AnthropicTextBlock
   | AnthropicImageBlock
+  | AnthropicThinkingBlock
+  | AnthropicRedactedThinkingBlock
   | { type: string; [key: string]: unknown };
 
 export interface AnthropicMessage {
@@ -28,11 +45,17 @@ export interface AnthropicRequestBody {
   [key: string]: unknown;
 }
 
+export interface AnthropicResponseContentBlock {
+  type: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
 export interface AnthropicResponseBody {
   id?: string;
   type?: "message";
   role?: "assistant";
-  content?: Array<{ type: string; text?: string; [key: string]: unknown }>;
+  content?: AnthropicResponseContentBlock[];
   model?: string;
   stop_reason?: string;
   usage?: unknown;

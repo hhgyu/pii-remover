@@ -44,6 +44,7 @@ import { ProxySessionPool } from "./session.js";
 import { AnthropicSseTransformer } from "./stream/anthropic-sse.js";
 import { OpenAISseTransformer } from "./stream/openai-sse.js";
 import { CodexSseTransformer } from "./stream/codex-sse.js";
+import type { ThinkingCache } from "./stream/thinking-cache.js";
 
 export type FetchLike = (
   input: string | URL,
@@ -195,7 +196,7 @@ async function handleRequest(
     });
   }
 
-  const { remover } = await sessions.get(request.headers);
+  const { remover, thinkingCache } = await sessions.get(request.headers);
 
   // One id per HTTP request, shared by the request-side mask event and every
   // response-side restore event (streaming emits one per SSE delta). Without a
@@ -218,7 +219,7 @@ async function handleRequest(
     const result = await transformAnthropicRequest(
       parsedBody as AnthropicRequestBody,
       remover,
-      { provider: "anthropic", requestId }
+      { provider: "anthropic", requestId, thinkingCache }
     );
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
@@ -240,6 +241,7 @@ async function handleRequest(
         remover,
         resolved,
         requestId,
+        thinkingCache,
         clientSignal: request.signal,
       });
     }
@@ -247,6 +249,7 @@ async function handleRequest(
     const restored = await restoreAnthropicResponse(responseBody, remover, {
       provider: "anthropic",
       requestId,
+      thinkingCache,
     });
     return jsonResponse(
       upstreamRes.status,
@@ -353,6 +356,8 @@ interface StreamingContext {
   remover: PIIRemover;
   resolved: ResolvedProxyConfig;
   requestId: string;
+  /** Anthropic-only: no other provider signs its reasoning blocks. */
+  thinkingCache?: ThinkingCache;
   clientSignal?: AbortSignal;
 }
 
@@ -364,7 +369,12 @@ function selectStreamTransformer(ctx: StreamingContext): StreamingTransformer {
     requestId,
     provider,
   };
-  if (provider === "anthropic") return new AnthropicSseTransformer(remover, opts);
+  if (provider === "anthropic") {
+    return new AnthropicSseTransformer(remover, {
+      ...opts,
+      ...(ctx.thinkingCache !== undefined ? { thinkingCache: ctx.thinkingCache } : {}),
+    });
+  }
   if (provider === "openai") return new OpenAISseTransformer(remover, opts);
   return new CodexSseTransformer(remover, opts);
 }

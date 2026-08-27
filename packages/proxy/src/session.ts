@@ -6,6 +6,8 @@ import {
   type BackendStrategy,
 } from "@pii-remover/core";
 
+import { createThinkingCache, type ThinkingCache } from "./stream/thinking-cache.js";
+
 const DEFAULT_SESSION_ID = "proxy:default";
 const SESSION_HEADER = "x-pii-session";
 
@@ -17,23 +19,34 @@ export interface SessionPoolOptions {
   warn?: (msg: string) => void;
 }
 
+/**
+ * Per-session state. The thinking cache is scoped exactly like the vault: a
+ * signature minted for one session's masked bytes must never resolve against
+ * another session's, or a replay would hand the wrong conversation's thinking
+ * to upstream.
+ */
+export interface ProxySession {
+  remover: PIIRemover;
+  thinkingCache: ThinkingCache;
+}
+
 export class ProxySessionPool {
-  private readonly cache = new Map<string, Promise<PIIRemover>>();
+  private readonly sessions = new Map<string, Promise<ProxySession>>();
 
   constructor(private readonly opts: SessionPoolOptions) {}
 
-  async get(headers: Headers): Promise<{ remover: PIIRemover; sessionId: string }> {
+  async get(headers: Headers): Promise<ProxySession & { sessionId: string }> {
     const sessionId = readSessionHeader(headers) ?? DEFAULT_SESSION_ID;
-    let pending = this.cache.get(sessionId);
+    let pending = this.sessions.get(sessionId);
     if (!pending) {
       pending = this.create(sessionId);
-      this.cache.set(sessionId, pending);
+      this.sessions.set(sessionId, pending);
     }
-    const remover = await pending;
-    return { remover, sessionId };
+    const session = await pending;
+    return { ...session, sessionId };
   }
 
-  private async create(sessionId: string): Promise<PIIRemover> {
+  private async create(sessionId: string): Promise<ProxySession> {
     const initOpts: Parameters<typeof PIIRemover.init>[0] = {
       sessionId,
     };
@@ -43,23 +56,25 @@ export class ProxySessionPool {
     else if (this.opts.backends && this.opts.backends.length > 0)
       initOpts.backends = this.opts.backends;
     if (this.opts.audit) initOpts.audit = this.opts.audit;
-    return PIIRemover.init(initOpts);
+    const remover = await PIIRemover.init(initOpts);
+    return { remover, thinkingCache: createThinkingCache() };
   }
 
   async disposeAll(): Promise<void> {
-    const removers = await Promise.all(this.cache.values());
-    for (const r of removers) {
+    const sessions = await Promise.all(this.sessions.values());
+    for (const session of sessions) {
+      session.thinkingCache.clear();
       try {
-        r.dispose();
+        session.remover.dispose();
       } catch (_err) {
         void _err;
       }
     }
-    this.cache.clear();
+    this.sessions.clear();
   }
 
   size(): number {
-    return this.cache.size;
+    return this.sessions.size;
   }
 }
 

@@ -9,6 +9,7 @@ import { AnthropicSseTransformer } from "../src/stream/anthropic-sse.js";
 import { OpenAISseTransformer } from "../src/stream/openai-sse.js";
 import { CodexSseTransformer } from "../src/stream/codex-sse.js";
 import { SseLineParser, serializeSseEvent } from "../src/stream/sse-parser.js";
+import { createThinkingCache } from "../src/stream/thinking-cache.js";
 
 async function makeRemover() {
   return PIIRemover.init({
@@ -28,6 +29,51 @@ function anthropicDelta(index: number, text: string): string {
     }),
     raw: "",
   });
+}
+
+function anthropicThinkingDelta(index: number, thinking: string): string {
+  return serializeSseEvent({
+    event: "content_block_delta",
+    data: JSON.stringify({
+      type: "content_block_delta",
+      index,
+      delta: { type: "thinking_delta", thinking },
+    }),
+    raw: "",
+  });
+}
+
+function anthropicSignatureDelta(index: number, signature: string): string {
+  return serializeSseEvent({
+    event: "content_block_delta",
+    data: JSON.stringify({
+      type: "content_block_delta",
+      index,
+      delta: { type: "signature_delta", signature },
+    }),
+    raw: "",
+  });
+}
+
+function aggregateSseThinking(sse: string): {
+  thinking: string;
+  signature: string;
+} {
+  let thinking = "";
+  let signature = "";
+  for (const block of sse.split("\n\n")) {
+    const line = block.split("\n").find((l) => l.startsWith("data: "));
+    if (!line) continue;
+    try {
+      const data: { delta?: { thinking?: string; signature?: string } } =
+        JSON.parse(line.slice(6));
+      thinking += data.delta?.thinking ?? "";
+      signature += data.delta?.signature ?? "";
+    } catch {
+      // ignore sentinels
+    }
+  }
+  return { thinking, signature };
 }
 
 function openaiDelta(content: string, index = 0): string {
@@ -231,6 +277,67 @@ describe("AnthropicSseTransformer — token-restoring delta pipeline", () => {
       t.flush();
     expect(out).toContain("message_start");
     expect(out).toContain("message_stop");
+  });
+
+  test("with a thinking cache, thinking_delta restores a split token while signature_delta replays byte-identical", async () => {
+    // Given: a minted OPF token split across two thinking deltas, plus an opaque signature
+    const remover = await makeRemover();
+    const token = (await remover.mask("alice@example.com")).tokens[0]!.token;
+    const signature = "ErUBCkYIBRgCIkC9+z/Rp0Nq4w==";
+    const splitAt = token.length >> 1;
+    const thinkingCache = createThinkingCache();
+    const t = new AnthropicSseTransformer(remover, { thinkingCache });
+
+    // When: the client streams thinking deltas, a signature delta, then content_block_stop
+    let out = "";
+    out += t.push(anthropicThinkingDelta(0, `Reply to ${token.slice(0, splitAt)}`));
+    out += t.push(anthropicThinkingDelta(0, `${token.slice(splitAt)} shortly`));
+    out += t.push(anthropicSignatureDelta(0, signature));
+    out += t.push(
+      serializeSseEvent({
+        event: "content_block_stop",
+        data: JSON.stringify({ type: "content_block_stop", index: 0 }),
+        raw: "",
+      })
+    );
+    out += t.flush();
+
+    // Then: thinking is restored to the original PII while the signature is unchanged
+    const aggregated = aggregateSseThinking(out);
+    expect(aggregated.thinking).toContain("alice@example.com");
+    expect(aggregated.thinking).not.toContain("{{OPF:");
+    expect(aggregated.signature).toBe(signature);
+    expect(thinkingCache.get(signature)).toBe(`Reply to ${token} shortly`);
+  });
+
+  test("without a thinking cache, thinking_delta stays masked and the signature is still verbatim", async () => {
+    // Given: the same stream through a transformer that has nowhere to cache
+    //        the signed bytes, so restoring for display would be unreplayable
+    const remover = await makeRemover();
+    const token = (await remover.mask("alice@example.com")).tokens[0]!.token;
+    const signature = "ErUBCkYIBRgCIkC9+z/Rp0Nq4w==";
+    const splitAt = token.length >> 1;
+    const t = new AnthropicSseTransformer(remover);
+
+    // When: the client streams thinking deltas, a signature delta, then content_block_stop
+    let out = "";
+    out += t.push(anthropicThinkingDelta(0, `Reply to ${token.slice(0, splitAt)}`));
+    out += t.push(anthropicThinkingDelta(0, `${token.slice(splitAt)} shortly`));
+    out += t.push(anthropicSignatureDelta(0, signature));
+    out += t.push(
+      serializeSseEvent({
+        event: "content_block_stop",
+        data: JSON.stringify({ type: "content_block_stop", index: 0 }),
+        raw: "",
+      })
+    );
+    out += t.flush();
+
+    // Then: the upstream bytes reach the client untouched, signature included
+    const aggregated = aggregateSseThinking(out);
+    expect(aggregated.thinking).toBe(`Reply to ${token} shortly`);
+    expect(aggregated.thinking).not.toContain("alice@example.com");
+    expect(aggregated.signature).toBe(signature);
   });
 });
 

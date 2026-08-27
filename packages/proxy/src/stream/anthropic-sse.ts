@@ -1,5 +1,6 @@
 import type { PIIRemover } from "@pii-remover/core";
 
+import { ThinkingStreamAccumulator } from "./anthropic-thinking.js";
 import { createStreamBuffer, type StreamBuffer } from "./buffer.js";
 import {
   createStreamRestoreScope,
@@ -10,18 +11,23 @@ import {
   serializeSseEvent,
   type SseEvent,
 } from "./sse-parser.js";
+import type { ThinkingCache } from "./thinking-cache.js";
 
 export interface AnthropicSseTransformerOptions {
   bufferWindow?: number;
   flushOnClose?: boolean;
   requestId?: string;
   provider?: string;
+  /** Session store that remembers the signed upstream thinking bytes so the
+   *  next request can replay them verbatim. Omit to leave thinking untouched. */
+  thinkingCache?: ThinkingCache;
 }
 
 export class AnthropicSseTransformer {
   private readonly parser = new SseLineParser();
   private readonly buffers = new Map<number, StreamBuffer>();
   private readonly toolInputAccumulators = new Map<number, string>();
+  private readonly thinking: ThinkingStreamAccumulator;
   private readonly bufferWindow: number;
   private readonly flushOnClose: boolean;
   private readonly scope: StreamRestoreScope;
@@ -33,6 +39,11 @@ export class AnthropicSseTransformer {
     this.scope = createStreamRestoreScope(remover, {
       ...(opts.requestId !== undefined ? { requestId: opts.requestId } : {}),
       ...(opts.provider !== undefined ? { provider: opts.provider } : {}),
+    });
+    this.thinking = new ThinkingStreamAccumulator({
+      scope: this.scope,
+      bufferWindow: this.bufferWindow,
+      ...(opts.thinkingCache !== undefined ? { cache: opts.thinkingCache } : {}),
     });
   }
 
@@ -82,9 +93,13 @@ export class AnthropicSseTransformer {
           });
         }
       }
+      for (const tail of this.thinking.drain()) {
+        out += thinkingDeltaEvent(tail.index, tail.text);
+      }
     }
     this.toolInputAccumulators.clear();
     this.buffers.clear();
+    this.thinking.clear();
     return out;
   }
 
@@ -108,7 +123,13 @@ export class AnthropicSseTransformer {
     const obj = payload as {
       type?: string;
       index?: number;
-      delta?: { type?: string; text?: string; partial_json?: string };
+      delta?: {
+        type?: string;
+        text?: string;
+        partial_json?: string;
+        thinking?: string;
+        signature?: string;
+      };
     };
     if (!obj) return serializeSseEvent(ev);
     const blockIndex = typeof obj.index === "number" ? obj.index : 0;
@@ -120,6 +141,20 @@ export class AnthropicSseTransformer {
         (this.toolInputAccumulators.get(blockIndex) ?? "") + chunk
       );
       return "";
+    }
+
+    if (obj.delta?.type === "thinking_delta") {
+      const chunk = typeof obj.delta.thinking === "string" ? obj.delta.thinking : "";
+      const restored = this.thinking.pushThinking(blockIndex, chunk);
+      if (restored.length === 0) return "";
+      const out: unknown = { ...obj, delta: { ...obj.delta, thinking: restored } };
+      return serializeSseEvent({ event: ev.event, data: JSON.stringify(out), raw: "" });
+    }
+
+    if (obj.delta?.type === "signature_delta") {
+      const chunk = typeof obj.delta.signature === "string" ? obj.delta.signature : "";
+      this.thinking.pushSignature(blockIndex, chunk);
+      return serializeSseEvent(ev);
     }
 
     if (obj.delta?.type !== "text_delta") {
@@ -197,6 +232,12 @@ export class AnthropicSseTransformer {
       }
       this.buffers.delete(blockIndex);
     }
+
+    const thinkingTail = this.thinking.stop(blockIndex);
+    if (thinkingTail.length > 0) {
+      out += thinkingDeltaEvent(blockIndex, thinkingTail);
+    }
+
     out += serializeSseEvent(ev);
     return out;
   }
@@ -209,4 +250,16 @@ export class AnthropicSseTransformer {
     }
     return buf;
   }
+}
+
+function thinkingDeltaEvent(index: number, thinking: string): string {
+  return serializeSseEvent({
+    event: "content_block_delta",
+    data: JSON.stringify({
+      type: "content_block_delta",
+      index,
+      delta: { type: "thinking_delta", thinking },
+    }),
+    raw: "",
+  });
 }
