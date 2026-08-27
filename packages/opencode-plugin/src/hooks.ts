@@ -618,8 +618,21 @@ export function createPluginHooks(
         _input: {},
         output: ChatMessagesTransformOutput
       ): Promise<void> => {
-        if (!Array.isArray(output.messages)) return;
-        for (const message of output.messages) {
+        const messages = output.messages;
+        if (!Array.isArray(messages)) return;
+        // maskPartInPlace rewrites part.text and nested state objects. Those
+        // objects belong to the host's live message store, so masking them
+        // directly rewrote already-rendered Thought blocks into OPF tokens.
+        // Detaching the whole tree once keeps every nested host-owned array
+        // and object out of reach of the in-place masker.
+        //
+        // The detached copy has to land back in the SAME array: OpenCode calls
+        // plugin.trigger(..., { messages: msgs }) and then serializes `msgs`
+        // itself, so assigning output.messages is a silent no-op that ships the
+        // untouched originals to the model. Splicing the clones in is observed.
+        const detached = structuredClone(messages);
+        messages.splice(0, messages.length, ...detached);
+        for (const message of messages) {
           if (!message || !Array.isArray(message.parts)) continue;
           const authoredByUser = message.info?.role === "user";
           for (const part of message.parts) {

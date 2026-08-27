@@ -545,6 +545,48 @@ describe("createPluginHooks — experimental.chat.messages.transform (comprehens
     remover.dispose();
   });
 
+  test("masks the array OpenCode serializes while leaving the host-owned reasoning part untouched", async () => {
+    const remover = await buildRemover();
+    const hooks = createPluginHooks(remover, { warn: silentWarn() });
+
+    // Given: an SDK-shaped reasoning part owned by the host message store and
+    // already rendered in a Thought block, held here by the same reference the
+    // host keeps — inside the very array OpenCode goes on to serialize.
+    const hostPart = {
+      id: "prt_reasoning_1",
+      sessionID: "test-session",
+      messageID: "msg_1",
+      type: "reasoning",
+      text: "user mentioned alice@example.com so reuse it in the answer",
+      time: { start: 0, end: 1 },
+    };
+    const originalReasoningText = hostPart.text;
+    const serializedMessages = [
+      { info: { role: "assistant" }, parts: [hostPart] },
+    ];
+    const output = { messages: serializedMessages };
+
+    // When: the plugin masks the message tree at the LLM boundary.
+    await hooks["experimental.chat.messages.transform"]?.({}, output);
+
+    // Then: the array OpenCode dispatches is the one the plugin wrote into —
+    // a reassignment of output.messages would never reach the model ...
+    expect(output.messages).toBe(serializedMessages);
+
+    // ... its reasoning part is a detached clone carrying the masked text ...
+    const dispatchedPart = serializedMessages[0]?.parts?.[0];
+    expect(dispatchedPart).not.toBe(hostPart);
+    const dispatchedText = dispatchedPart?.text ?? "";
+    expect(dispatchedText).not.toContain("alice@example.com");
+    expect(dispatchedText).toMatch(EMAIL_TOKEN_RE);
+
+    // ... and the host's own reasoning part still reads as originally emitted,
+    // so an already-rendered Thought block cannot turn into an OPF token.
+    expect(hostPart.text).toBe(originalReasoningText);
+
+    remover.dispose();
+  });
+
   test("masks assistant tool part state.input recursively", async () => {
     const remover = await buildRemover();
     const hooks = createPluginHooks(remover, { warn: silentWarn() });
