@@ -46,6 +46,7 @@
     "@pii-remover/opencode-plugin": "workspace:*"
   },
   "devDependencies": {
+    "@inquirer/testing": "^3.3.11",
     "@types/bun": "^1.1.14",
     "@types/node": "^22.10.0",
     "typescript": "^5.9.3"
