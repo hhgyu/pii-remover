@@ -1,36 +1,19 @@
-import { join, resolve } from "node:path";
-import { createInterface } from "node:readline";
-import { homedir } from "node:os";
-import checkbox from "@inquirer/checkbox";
+import { join } from "node:path";
 
 import { PACKAGE_VERSION, DEFAULT_PROXY_PORT } from "./constants.js";
 import { runHookCommand, readStdin, type HookCommandIo } from "./commands/hook.js";
+import type { InstallTarget, InstallScope } from "./commands/install.js";
 import {
-  runInstall,
-  runOpenCodeInstall,
-  loadExistingConfig,
-  defaultProxyUrl,
-  ALL_CATEGORIES,
-  CATEGORY_LABELS,
-  OPENCODE_PLUGIN_PACKAGE,
-  type InstallTarget,
-  type InstallScope,
-  type InstallFs,
-  type PiiRemoverConfigSlice,
-} from "./commands/install.js";
-import { runCodexInstall } from "./commands/codex-install.js";
+  runInstallCommand,
+  type InstallCommandIo,
+} from "./commands/install-command.js";
 import { runDetectCommand, type DetectCommandIo } from "./commands/detect.js";
 import { runHealthCommand, type HealthCommandIo, type FetchLike } from "./commands/health.js";
-import { DEFAULT_CONFIG, type PIICategory } from "@pii-remover/core";
 
-export interface CliIo {
-  stdout: (s: string) => void;
-  stderr: (s: string) => void;
+export interface CliIo extends InstallCommandIo {
   stdin?: () => Promise<string>;
-  prompt?: (question: string) => Promise<string>;
   env?: NodeJS.ProcessEnv;
   fetchFn?: FetchLike;
-  installFs?: InstallFs;
   initPiiRemover?: HookCommandIo["initPiiRemover"];
   /**
    * Stubs for the two side-effecting steps of the hook path. Without them a
@@ -39,7 +22,6 @@ export interface CliIo {
    */
   loadConfigFn?: HookCommandIo["loadConfigFn"];
   autoStartFn?: HookCommandIo["autoStartFn"];
-  argv0?: string;
 }
 
 export interface ParsedFlags {
@@ -136,8 +118,11 @@ export function helpText(): string {
     "Commands:",
     "  hook                       Run as a UserPromptSubmit hook (reads stdin JSON, writes",
     "                             stdout JSON per ADR-0012). exit 0 always; decisions in JSON.",
-    "  install --target <t>       Register the hook/plugin. Prompts for OPF endpoint + categories.",
-    "          [--scope <s>]      <t> = 'claude-code'  UserPromptSubmit hook in Claude Code settings.json",
+    "  install [--target <t>]     Register the hook/plugin. Prompts for OPF endpoint + categories.",
+    "          [--scope <s>]      Without --target, pick any subset of the three hosts from a",
+    "                             checkbox; they install in order claude-code -> opencode -> codex,",
+    "                             one shared config, and a failing host does not stop the rest.",
+    "                             <t> = 'claude-code'  UserPromptSubmit hook in Claude Code settings.json",
     "                             <t> = 'opencode'     Plugin entry in OpenCode opencode.json",
     "                             <t> = 'codex'        UserPromptSubmit hook in Codex config.toml (ADR-0013)",
     "                             <s> = 'global'  (default) user-level config",
@@ -155,14 +140,17 @@ export function helpText(): string {
     "  --proxy                    install only: proxy mode — write the local proxy base URL into the",
     "                             host config so no manual export is needed. Per target:",
     "                               claude-code  env.ANTHROPIC_BASE_URL in settings.json",
-    "                               opencode     provider.anthropic.options.baseURL in opencode.json",
+    "                               opencode     provider.anthropic + provider.openai options.baseURL",
+    "                                            in opencode.json",
     "                               codex        openai_base_url in config.toml",
     "                             An existing different base URL is never overwritten (warns instead).",
     "  --proxy-url <url>          install only: same as --proxy but with an explicit URL",
-    "                             (remote/self-hosted proxy). Overrides --proxy.",
-    "  --proxy-only               install --target opencode only: implies --proxy and registers no",
-    "                             plugin, removing any this installer added before. Plugin and proxy",
-    "                             keep separate vaults, so running both leaves tokens unrestorable.",
+    "                             (remote/self-hosted proxy). Overrides --proxy. Any route suffix is",
+    "                             stripped and each host's own route re-derived from the root.",
+    "  --proxy-only               install, opencode only: mask entirely at the proxy, skipping (and",
+    "                             removing) the plugin entries. Normal plugin+proxy install is",
+    "                             supported and needs no special handling; use this only for a",
+    "                             minimal proxy-only setup. Exits 64 when opencode isn't selected.",
     "  --auto-start               install only: write backend.auto_start=true (opt-in Docker spawn).",
     "                             Default: backend must be started manually. See ADR-0019.",
     "  --no-auto-start            install only: write backend.auto_start=false (explicit opt-out).",
@@ -224,149 +212,7 @@ export async function runCli(
   }
 
   if (cmd === "install") {
-    const target = flags.target;
-    if (!target) {
-      io.stderr(
-        "install: --target is required (claude-code | claude-code-project | opencode | opencode-project)\n"
-      );
-      return 64;
-    }
-
-    const home = homedir();
-    const project = process.cwd();
-    const installFs = io.installFs;
-
-    let piiConfig: PiiRemoverConfigSlice;
-
-    const hasNonInteractive =
-      flags.endpoint ||
-      flags.categories ||
-      flags.autoStart !== undefined ||
-      flags.composeFile !== undefined ||
-      flags.startTimeoutMs !== undefined;
-
-    if (hasNonInteractive) {
-      piiConfig = {
-        endpoint: flags.endpoint ?? DEFAULT_CONFIG.backend.endpoint,
-        categories: (flags.categories?.filter((c): c is PIICategory =>
-          ALL_CATEGORIES.includes(c as PIICategory)
-        )) ?? [...DEFAULT_CONFIG.detection.enabled_categories],
-      };
-    } else {
-      const promptFn = io.prompt ?? makeReadlinePrompt();
-      const fsForLoad = installFs ?? {
-        exists: (p: string) => { const { existsSync } = require("node:fs"); return existsSync(p); },
-        readFile: async (p: string) => { const { readFile } = require("node:fs/promises"); return readFile(p, "utf8"); },
-        writeFile: async () => {},
-        mkdir: async () => {},
-      };
-      const existing = await loadExistingConfig(project, home, fsForLoad);
-
-      if (existing) {
-        io.stdout(`\nFound existing config — endpoint: ${existing.endpoint}, ${existing.categories.length} categories enabled.\n`);
-        const use = await promptFn("Use existing config? [Y/n] ");
-        piiConfig = use.trim().toLowerCase() === "n"
-          ? await promptForConfig(promptFn, io.stdout)
-          : existing;
-      } else {
-        io.stdout("\nNo pii-remover.json found. Let's configure it.\n");
-        piiConfig = await promptForConfig(promptFn, io.stdout);
-      }
-    }
-
-    if (flags.autoStart !== undefined) piiConfig.auto_start = flags.autoStart;
-    if (flags.composeFile !== undefined) piiConfig.compose_file = flags.composeFile;
-    if (flags.startTimeoutMs !== undefined) piiConfig.start_timeout_ms = flags.startTimeoutMs;
-
-    const effectiveProxyUrl =
-      flags.proxyUrl ?? (flags.proxy === true ? defaultProxyUrl(target) : undefined);
-
-    try {
-      let r;
-      if (target === "opencode") {
-        const opts: Parameters<typeof runOpenCodeInstall>[0] = {
-          target,
-          scope: flags.scope ?? "global",
-          pluginRef: flags.commandPath ?? OPENCODE_PLUGIN_PACKAGE,
-          dryRun: flags.dryRun,
-          piiConfig,
-        };
-        if (effectiveProxyUrl !== undefined) opts.proxyUrl = effectiveProxyUrl;
-        if (flags.proxyOnly === true) opts.proxyOnly = true;
-        if (installFs) opts.fs = installFs;
-        r = await runOpenCodeInstall(opts);
-      } else if (target === "codex") {
-        const commandPath =
-          flags.commandPath ?? resolve(io.argv0 ?? process.argv[1] ?? "pii-remover");
-        const opts: Parameters<typeof runCodexInstall>[0] = {
-          target,
-          scope: flags.scope ?? "global",
-          commandPath,
-          dryRun: flags.dryRun,
-          piiConfig,
-        };
-        if (effectiveProxyUrl !== undefined) opts.proxyUrl = effectiveProxyUrl;
-        if (installFs) opts.fs = installFs;
-        r = await runCodexInstall(opts);
-      } else {
-        const commandPath =
-          flags.commandPath ?? resolve(io.argv0 ?? process.argv[1] ?? "pii-remover");
-        const opts: Parameters<typeof runInstall>[0] = {
-          target,
-          scope: flags.scope ?? "global",
-          commandPath,
-          dryRun: flags.dryRun,
-          piiConfig,
-        };
-        if (effectiveProxyUrl !== undefined) opts.proxyUrl = effectiveProxyUrl;
-        if (installFs) opts.fs = installFs;
-        r = await runInstall(opts);
-      }
-
-      const lines = [
-        `${flags.dryRun ? "[dry-run] " : ""}${r.settings_path}`,
-        `${flags.dryRun ? "would " : ""}${r.created ? "create" : "patch"}; plugin/hook ${
-          r.hook_already_present ? "already present" : "registered"
-        }.`,
-      ];
-      if (r.config_written && r.config_path) {
-        lines.push(`Config written: ${r.config_path}`);
-      }
-      if (effectiveProxyUrl !== undefined) {
-        lines.push(
-          r.base_url_written === true
-            ? `Proxy mode: ENABLED -> ${effectiveProxyUrl}`
-            : `Proxy mode: NOT APPLIED (existing base URL left untouched) — requests will bypass the proxy`
-        );
-      }
-      if (piiConfig.auto_start === true) {
-        lines.push(
-          `Backend auto-start: ENABLED (compose_file=${piiConfig.compose_file ?? "cpu"})`
-        );
-      } else if (piiConfig.auto_start === false) {
-        lines.push("Backend auto-start: DISABLED (explicit opt-out)");
-      }
-      lines.push("", "Next steps:", ...r.next_steps);
-      if (flags.idleTimeoutSeconds !== undefined) {
-        lines.push(
-          "",
-          `Idle-unload timeout requested: ${flags.idleTimeoutSeconds}s`,
-          `  (config files do NOT carry OPF_IDLE_TIMEOUT_SECONDS — it is a backend-side env var)`,
-          `  Set on the backend container, e.g.:`,
-          `    OPF_IDLE_TIMEOUT_SECONDS=${flags.idleTimeoutSeconds} docker compose up -d`,
-          `  Or persist via packages/backend/docker-compose.yml or a .env file.`,
-          flags.idleTimeoutSeconds === 0
-            ? `  (0 = disabled; model stays loaded until container stops)`
-            : `  Next /redact after ${flags.idleTimeoutSeconds}s idle lazy-reloads the model.`,
-        );
-      }
-      lines.push("");
-      io.stdout(lines.join("\n"));
-      return 0;
-    } catch (err) {
-      io.stderr(`install failed: ${(err as Error).message}\n`);
-      return 2;
-    }
+    return runInstallCommand(flags, io);
   }
 
   if (cmd === "detect") {
@@ -407,30 +253,3 @@ export async function runCli(
 }
 
 export { join };
-
-function makeReadlinePrompt(): (q: string) => Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return (q: string) =>
-    new Promise((resolve) => rl.question(q, (a) => { rl.close(); resolve(a); }));
-}
-
-async function promptForConfig(
-  prompt: (q: string) => Promise<string>,
-  stdout: (s: string) => void
-): Promise<PiiRemoverConfigSlice> {
-  const defaultEndpoint = DEFAULT_CONFIG.backend.endpoint;
-  const endpointInput = await prompt(`OPF backend endpoint [${defaultEndpoint}]: `);
-  const endpoint = endpointInput.trim() || defaultEndpoint;
-
-  const categories = await checkbox({
-    message: "Select PII categories to detect:",
-    choices: ALL_CATEGORIES.map((c) => ({
-      name: `${CATEGORY_LABELS[c]} (${c})`,
-      value: c,
-      checked: true,
-    })),
-  });
-
-  stdout(`\nConfig: endpoint=${endpoint}, ${categories.length}/${ALL_CATEGORIES.length} categories enabled.\n`);
-  return { endpoint, categories: categories as PIICategory[] };
-}

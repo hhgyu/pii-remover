@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   DEFAULT_CONFIG,
   PIIRemover,
+  type PIICategory,
   type PiiRemoverConfig,
 } from "@pii-remover/core";
 
@@ -27,23 +30,35 @@ function hookStubs() {
 }
 
 import { helpText, parseFlags, runCli } from "../src/cli.js";
-import type { InstallFs } from "../src/commands/install.js";
+import type { InstallFs, InstallTarget } from "../src/commands/install.js";
+import type {
+  CheckboxChoice,
+  SelectCategoriesFn,
+  SelectTargetsFn,
+} from "../src/commands/install-command.js";
 
 function makeIo(promptAnswers: string[] = []) {
   const out: string[] = [];
   const err: string[] = [];
+  const prompts: string[] = [];
   let promptIdx = 0;
   return {
     stdout: (s: string) => out.push(s),
     stderr: (s: string) => err.push(s),
-    prompt: async (_q: string) => promptAnswers[promptIdx++] ?? "",
+    prompt: async (q: string) => {
+      prompts.push(q);
+      return promptAnswers[promptIdx++] ?? "";
+    },
     out,
     err,
+    prompts,
   };
 }
 
-function memFs(): InstallFs & { files: Map<string, string> } {
-  const files = new Map<string, string>();
+type MemFs = InstallFs & { files: Map<string, string> };
+
+function memFs(seed: Record<string, string> = {}): MemFs {
+  const files = new Map<string, string>(Object.entries(seed));
   return {
     files,
     exists: (p) => files.has(p),
@@ -54,6 +69,54 @@ function memFs(): InstallFs & { files: Map<string, string> } {
     mkdir: async () => {},
   };
 }
+
+function writtenFile(fs: MemFs, matches: (path: string) => boolean): string {
+  for (const [path, content] of fs.files) {
+    if (matches(path)) return content;
+  }
+  throw new Error(
+    `no written file matched; wrote: ${[...fs.files.keys()].join(", ")}`
+  );
+}
+
+function writtenJson<T>(fs: MemFs, matches: (path: string) => boolean): T {
+  return JSON.parse(writtenFile(fs, matches));
+}
+
+interface ClaudeSettings {
+  env?: { ANTHROPIC_BASE_URL?: string };
+  hooks?: unknown;
+}
+
+interface OpenCodeConfig {
+  plugin?: string[];
+  provider?: Record<string, { options?: { baseURL?: string } }>;
+}
+
+function targetSelector(answer: readonly InstallTarget[]) {
+  const offered: CheckboxChoice<InstallTarget>[][] = [];
+  const fn: SelectTargetsFn = async (choices) => {
+    offered.push([...choices]);
+    return answer;
+  };
+  return { fn, offered };
+}
+
+function categorySelector(answer: readonly PIICategory[] = ["private_email"]) {
+  const offered: CheckboxChoice<PIICategory>[][] = [];
+  const fn: SelectCategoriesFn = async (choices) => {
+    offered.push([...choices]);
+    return answer;
+  };
+  return { fn, offered };
+}
+
+const OPENCODE_GLOBAL_CONFIG = join(
+  homedir(),
+  ".config",
+  "opencode",
+  "opencode.json"
+);
 
 describe("parseFlags", () => {
   test("--proxy-only implies --proxy", () => {
@@ -139,11 +202,21 @@ describe("runCli", () => {
     expect(io.out.join("")).toContain("Usage:");
   });
 
-  test("install without --target -> 64", async () => {
+  test("install with an empty target selection -> 64, nothing written", async () => {
     const io = makeIo();
-    const code = await runCli(["install"], { ...io, installFs: memFs() });
+    const fs = memFs();
+    const targets = targetSelector([]);
+    const categories = categorySelector();
+    const code = await runCli(["install"], {
+      ...io,
+      installFs: fs,
+      selectTargets: targets.fn,
+      selectCategories: categories.fn,
+    });
     expect(code).toBe(64);
-    expect(io.err.join("")).toContain("--target");
+    expect(fs.files.size).toBe(0);
+    expect(categories.offered).toHaveLength(0);
+    expect(io.err.join("")).toContain("at least one");
   });
 
   test("install --target claude-code --dry-run writes nothing", async () => {
@@ -234,6 +307,40 @@ describe("runCli", () => {
     expect(out).toContain("0 = disabled");
   });
 
+  test("install --target claude-code --idle-timeout 0 with forced failure emits guidance and exits 2", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    // Force install to fail by providing an invalid settings path that cannot be written
+    const code = await runCli(
+      [
+        "install",
+        "--target", "claude-code",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--idle-timeout", "0",
+      ],
+      {
+        ...io,
+        installFs: {
+          exists: () => false,
+          readFile: async () => "{}",
+          writeFile: async () => {
+            throw new Error("write failed");
+          },
+          mkdir: async () => {
+            throw new Error("mkdir failed");
+          },
+        },
+      }
+    );
+    expect(code).toBe(2);
+    const out = io.out.join("");
+    // Failure is on stderr, but idle guidance should be on stdout
+    expect(out).toContain("OPF_IDLE_TIMEOUT_SECONDS=0");
+    expect(out).toContain("0 = disabled");
+  });
+
   test("install --no-auto-start explicitly disables (writes auto_start:false)", async () => {
     const io = makeIo();
     const fs = memFs();
@@ -277,6 +384,298 @@ describe("runCli", () => {
     expect(cfgEntry![0]).toMatch(/\.config[\\/]opencode[\\/]pii-remover\.json$/);
     const cfg = JSON.parse(cfgEntry![1]);
     expect(cfg.backend.auto_start).toBe(true);
+  });
+});
+
+describe("runCli install — target checkbox flow", () => {
+  test("no --target offers exactly the three targets in canonical order", async () => {
+    const io = makeIo([""]);
+    const targets = targetSelector(["opencode"]);
+    const categories = categorySelector();
+    const code = await runCli(["install", "--dry-run"], {
+      ...io,
+      installFs: memFs(),
+      selectTargets: targets.fn,
+      selectCategories: categories.fn,
+    });
+    expect(code).toBe(0);
+    const [firstOffer] = targets.offered;
+    expect(targets.offered).toHaveLength(1);
+    expect(firstOffer?.map((c) => c.value)).toEqual([
+      "claude-code",
+      "opencode",
+      "codex",
+    ]);
+  });
+
+  test("explicit --target skips the target checkbox entirely", async () => {
+    const io = makeIo();
+    const targets = targetSelector(["codex"]);
+    const code = await runCli(
+      [
+        "install",
+        "--target", "claude-code",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--dry-run",
+      ],
+      { ...io, installFs: memFs(), selectTargets: targets.fn }
+    );
+    expect(code).toBe(0);
+    expect(targets.offered).toHaveLength(0);
+    const out = io.out.join("");
+    expect(out).not.toContain("=== ");
+    expect(out).not.toContain("Summary:");
+  });
+
+  test("a scrambled selection installs in canonical claude-code -> opencode -> codex order", async () => {
+    const io = makeIo([""]);
+    const targets = targetSelector(["codex", "claude-code", "opencode"]);
+    const categories = categorySelector();
+    const code = await runCli(
+      ["install", "--command-path", "/abs/pii-remover", "--dry-run"],
+      {
+        ...io,
+        installFs: memFs(),
+        argv0: "/abs/pii-remover",
+        selectTargets: targets.fn,
+        selectCategories: categories.fn,
+      }
+    );
+    expect(code).toBe(0);
+    const out = io.out.join("");
+    expect(out.indexOf("=== claude-code ===")).toBeGreaterThanOrEqual(0);
+    expect(out.indexOf("=== claude-code ===")).toBeLessThan(
+      out.indexOf("=== opencode ===")
+    );
+    expect(out.indexOf("=== opencode ===")).toBeLessThan(
+      out.indexOf("=== codex ===")
+    );
+    expect(out).toContain("Summary:");
+  });
+
+  test("PII config is resolved once for the whole selection", async () => {
+    const io = makeIo(["http://backend:9000/redact"]);
+    const targets = targetSelector(["claude-code", "opencode", "codex"]);
+    const categories = categorySelector(["private_email", "secret"]);
+    const code = await runCli(
+      ["install", "--command-path", "/abs/pii-remover", "--dry-run"],
+      {
+        ...io,
+        installFs: memFs(),
+        selectTargets: targets.fn,
+        selectCategories: categories.fn,
+      }
+    );
+    expect(code).toBe(0);
+    expect(categories.offered).toHaveLength(1);
+    expect(io.prompts.filter((q) => q.includes("endpoint"))).toHaveLength(1);
+  });
+
+  test("--proxy-url derives the per-target route from one normalized root", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      [
+        "install",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--proxy-url", "https://gw.corp/pii/anthropic/v1",
+      ],
+      {
+        ...io,
+        installFs: fs,
+        argv0: "/abs/pii-remover",
+        selectTargets: targetSelector(["claude-code", "opencode", "codex"]).fn,
+      }
+    );
+    expect(code).toBe(0);
+
+    const claude = writtenJson<ClaudeSettings>(fs, (p) =>
+      p.endsWith("settings.json")
+    );
+    expect(claude.env?.ANTHROPIC_BASE_URL).toBe("https://gw.corp/pii/anthropic/v1");
+
+    const opencode = writtenJson<OpenCodeConfig>(
+      fs,
+      (p) => p === OPENCODE_GLOBAL_CONFIG
+    );
+    expect(opencode.provider?.anthropic?.options?.baseURL).toBe(
+      "https://gw.corp/pii/anthropic/v1"
+    );
+    expect(opencode.provider?.openai?.options?.baseURL).toBe(
+      "https://gw.corp/pii/openai/v1"
+    );
+
+    const codexToml = writtenFile(fs, (p) => p.endsWith("config.toml"));
+    expect(codexToml).toContain('openai_base_url = "https://gw.corp/pii/codex/v1"');
+  });
+
+  test("--proxy derives every route from the default local root", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      [
+        "install",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--proxy",
+      ],
+      {
+        ...io,
+        installFs: fs,
+        argv0: "/abs/pii-remover",
+        selectTargets: targetSelector(["claude-code", "opencode", "codex"]).fn,
+      }
+    );
+    expect(code).toBe(0);
+    const opencode = writtenJson<OpenCodeConfig>(
+      fs,
+      (p) => p === OPENCODE_GLOBAL_CONFIG
+    );
+    expect(opencode.provider?.anthropic?.options?.baseURL).toBe(
+      "http://localhost:8000/anthropic/v1"
+    );
+    expect(opencode.provider?.openai?.options?.baseURL).toBe(
+      "http://localhost:8000/openai/v1"
+    );
+    const claude = writtenJson<ClaudeSettings>(fs, (p) =>
+      p.endsWith("settings.json")
+    );
+    expect(claude.env?.ANTHROPIC_BASE_URL).toBe("http://localhost:8000/anthropic/v1");
+  });
+
+  test("one failing target does not stop the rest; exit 2 with a per-target report", async () => {
+    const io = makeIo();
+    const fs = memFs({ [OPENCODE_GLOBAL_CONFIG]: "{ this is not json" });
+    const code = await runCli(
+      [
+        "install",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--dry-run",
+      ],
+      {
+        ...io,
+        installFs: fs,
+        argv0: "/abs/pii-remover",
+        selectTargets: targetSelector(["claude-code", "opencode", "codex"]).fn,
+      }
+    );
+    expect(code).toBe(2);
+    expect(io.err.join("")).toContain("[opencode]");
+    const out = io.out.join("");
+    expect(out).toContain("=== claude-code ===");
+    expect(out).toContain("=== codex ===");
+    expect(out).toMatch(/Summary:[\s\S]*opencode\s+FAILED/);
+  });
+
+  test("--proxy-only without opencode -> 64 before config prompts or writes", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const categories = categorySelector();
+    const code = await runCli(["install", "--proxy-only"], {
+      ...io,
+      installFs: fs,
+      selectTargets: targetSelector(["claude-code", "codex"]).fn,
+      selectCategories: categories.fn,
+    });
+    expect(code).toBe(64);
+    expect(fs.files.size).toBe(0);
+    expect(categories.offered).toHaveLength(0);
+    expect(io.prompts).toHaveLength(0);
+    expect(io.err.join("")).toContain("--proxy-only");
+  });
+
+  test("--proxy-only with explicit non-opencode --target -> 64", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      ["install", "--target", "claude-code", "--proxy-only"],
+      { ...io, installFs: fs }
+    );
+    expect(code).toBe(64);
+    expect(fs.files.size).toBe(0);
+  });
+
+  test("a lone target reports its failure on stderr only, unprefixed", async () => {
+    const io = makeIo();
+    const fs = memFs({ [OPENCODE_GLOBAL_CONFIG]: "{ this is not json" });
+    const code = await runCli(
+      [
+        "install",
+        "--target", "opencode",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--dry-run",
+      ],
+      { ...io, installFs: fs }
+    );
+    expect(code).toBe(2);
+    expect(io.out.join("")).toBe("");
+    expect(io.err.join("")).toContain("install failed: Cannot parse");
+    expect(io.err.join("")).not.toContain("[opencode]");
+  });
+
+  test("opencode reports each provider's proxy outcome independently", async () => {
+    const io = makeIo();
+    const fs = memFs({
+      [OPENCODE_GLOBAL_CONFIG]: JSON.stringify({
+        provider: { openai: { options: { baseURL: "https://corp.gateway/v1" } } },
+      }),
+    });
+    const code = await runCli(
+      [
+        "install",
+        "--target", "opencode",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--proxy",
+        "--dry-run",
+      ],
+      { ...io, installFs: fs }
+    );
+    expect(code).toBe(0);
+    const out = io.out.join("");
+    expect(out).toContain(
+      "Proxy mode (anthropic): ENABLED -> http://localhost:8000/anthropic/v1"
+    );
+    expect(out).toContain("Proxy mode (openai): NOT APPLIED");
+  });
+
+  test("--proxy-only applies to opencode only, leaving co-selected targets installed", async () => {
+    const io = makeIo();
+    const fs = memFs();
+    const code = await runCli(
+      [
+        "install",
+        "--command-path", "/abs/pii-remover",
+        "--endpoint", "http://localhost:8000/redact",
+        "--categories", "private_email",
+        "--proxy-only",
+      ],
+      {
+        ...io,
+        installFs: fs,
+        argv0: "/abs/pii-remover",
+        selectTargets: targetSelector(["opencode", "claude-code"]).fn,
+      }
+    );
+    expect(code).toBe(0);
+    const opencode = writtenJson<OpenCodeConfig>(
+      fs,
+      (p) => p === OPENCODE_GLOBAL_CONFIG
+    );
+    expect(opencode.plugin ?? []).toEqual([]);
+    const claude = writtenJson<ClaudeSettings>(fs, (p) =>
+      p.endsWith("settings.json")
+    );
+    expect(JSON.stringify(claude.hooks)).toContain("UserPromptSubmit");
+    expect(claude.env?.ANTHROPIC_BASE_URL).toBe("http://localhost:8000/anthropic/v1");
   });
 });
 
