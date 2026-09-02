@@ -20,8 +20,13 @@ export {
   resolveRoute,
   isChatCompletion,
   ROUTE_PATHS,
+  type MaskedRouteMatch,
+  type PassthroughProvider,
+  type PassthroughRouteMatch,
   type RouteMatch,
   type RouteResolution,
+  type RouteTransform,
+  type UpstreamKey,
 } from "./router.js";
 
 export {
