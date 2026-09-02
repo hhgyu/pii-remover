@@ -147,5 +147,4 @@ Coming in **Phase 4** ([ROADMAP](../../docs/ROADMAP.md#phase-4--claude-code-hook
 
 ## Known limits / v1.x backlog
 
-- Streaming `tool_calls.function.arguments` (fragmented JSON across deltas) — non-streaming path handles tool calls; streaming path passes them through unchanged. Live tool-call restoration ships in v1.x.
 - Real network round-trip (`PII_REMOVER_PROXY_E2E_LIVE=1`) is not yet wired — all tests use mock upstream.
