@@ -49,10 +49,16 @@ const PATHS: string[] = [
   "/openai",
   "/openai/",
   "/openai/v1/chat/completions",
+  // OpenCode's built-in OpenAI provider — must mask, never passthrough.
+  "/openai/v1/responses",
+  // Exact-match only: retrieval siblings carry no prompt to mask.
+  "/openai/v1/responses/resp_123",
   "/openai/v1/embeddings",
   "/openai/v1/models",
   "/codex",
   "/codex/v1/responses",
+  // Exact-match only: retrieval siblings carry no prompt to mask.
+  "/codex/v1/responses/resp_123",
   "/codex/v1/models",
   "/CODEX/v1/responses",
   "/anthropic/v1/messages?beta=true",
@@ -63,7 +69,9 @@ const routes = PATHS.map((pathname) => {
   return {
     pathname,
     kind: r.kind,
+    transform: r.match?.transform ?? null,
     provider: r.match?.provider ?? null,
+    upstream: r.match?.upstream ?? null,
     upstream_path: r.match?.upstreamPath ?? null,
   };
 });
@@ -109,9 +117,12 @@ function toObject(h: Headers): Record<string, string> {
 const payload = {
   _generated_by: "scripts/gen-router-vectors.ts",
   _contract:
-    "A route that flips from a masking target to a passthrough target is a " +
-    "PII leak, not a routing nit. Header sets must match exactly: a relayed " +
-    "content-length disagrees with the re-serialised masked body.",
+    "A route that flips from a masking transform to passthrough is a PII " +
+    "leak, not a routing nit. `transform` selects the body transform and " +
+    "`upstream` selects the base URL; `provider` is identity metadata " +
+    "(audit identity in the TypeScript reference, parity metadata in the Python backend) " +
+    "and selects neither transform nor upstream. Header sets must match " +
+    "exactly: a relayed content-length disagrees with the re-serialised masked body.",
   route_paths: ROUTE_PATHS,
   routes,
   headers: {
@@ -147,6 +158,6 @@ console.log(`wrote ${OUT_PATH}`);
 console.log(`  routes: ${routes.length}`);
 for (const r of routes) {
   console.log(
-    `    ${r.pathname.padEnd(38)} ${r.kind.padEnd(10)} ${String(r.provider).padEnd(22)} ${r.upstream_path ?? ""}`
+    `    ${r.pathname.padEnd(32)} ${r.kind.padEnd(10)} ${String(r.transform).padEnd(20)} ${String(r.provider).padEnd(22)} ${String(r.upstream).padEnd(10)} ${r.upstream_path ?? ""}`
   );
 }

@@ -45,8 +45,47 @@ def test_resolve_route_matches_typescript(case: dict[str, Any]) -> None:
         assert resolution.match is None
     else:
         assert resolution.match is not None
+        assert resolution.match.transform == case["transform"]
         assert resolution.match.provider == case["provider"]
+        assert resolution.match.upstream == case["upstream"]
         assert resolution.match.upstream_path == case["upstream_path"]
+
+
+def test_openai_responses_masks_and_keeps_the_openai_upstream() -> None:
+    """OpenCode's built-in OpenAI provider posts the Responses body here.
+
+    Passthrough would ship the prompt upstream in the clear; borrowing the
+    ``codex`` upstream would send it to whatever base Codex is pointed at.
+    """
+    resolution = resolve_route("/openai/v1/responses")
+    assert resolution.match is not None
+    assert resolution.match.transform == "responses"
+    assert resolution.match.provider == "openai"
+    assert resolution.match.upstream == "openai"
+    assert resolution.match.upstream_path == "/v1/responses"
+
+
+def test_codex_responses_keeps_its_own_upstream_and_audit_identity() -> None:
+    resolution = resolve_route("/codex/v1/responses")
+    assert resolution.match is not None
+    assert resolution.match.transform == "responses"
+    assert resolution.match.provider == "codex"
+    assert resolution.match.upstream == "codex"
+
+
+def test_transform_is_independent_of_audit_provider() -> None:
+    """Both Responses routes share one transform and differ in everything else.
+
+    Deriving the transform from ``provider`` is what dropped
+    ``/openai/v1/responses`` onto the passthrough branch.
+    """
+    openai_responses = resolve_route("/openai/v1/responses").match
+    codex_responses = resolve_route("/codex/v1/responses").match
+    assert openai_responses is not None
+    assert codex_responses is not None
+    assert openai_responses.transform == codex_responses.transform
+    assert openai_responses.provider != codex_responses.provider
+    assert openai_responses.upstream != codex_responses.upstream
 
 
 def test_unrecognised_anthropic_paths_stay_on_the_masking_branch() -> None:
@@ -63,10 +102,12 @@ def test_unrecognised_anthropic_paths_stay_on_the_masking_branch() -> None:
     ):
         resolution = resolve_route(pathname)
         assert resolution.match is not None
+        assert resolution.match.transform == "anthropic_messages", pathname
         assert resolution.match.provider == "anthropic", pathname
 
     account = resolve_route("/anthropic/api/organizations")
     assert account.match is not None
+    assert account.match.transform == "passthrough"
     assert account.match.provider == "passthrough_anthropic"
 
 
