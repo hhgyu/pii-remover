@@ -6,6 +6,11 @@ import {
   loadExistingConfig,
   buildPiiRemoverJson,
   defaultProxyUrl,
+  defaultProxyRoot,
+  normalizeProxyRoot,
+  openCodeProxyUrls,
+  proxyUrlForRoute,
+  proxyUrlForTarget,
   patchClaudeSettingsEnv,
   patchOpenCodeProviderBaseUrl,
   ALL_CATEGORIES,
@@ -26,6 +31,18 @@ function memFs(initial: Record<string, string> = {}): InstallFs & {
     },
     mkdir: async () => {},
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readConfig(files: Map<string, string>, p: string): Record<string, unknown> {
+  const raw = files.get(p);
+  if (raw === undefined) throw new Error(`nothing was written to ${p}`);
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed)) throw new Error(`${p} does not hold a JSON object`);
+  return parsed;
 }
 
 describe("runInstall", () => {
@@ -669,6 +686,191 @@ describe("runOpenCodeInstall split-mode", () => {
     expect(parsed.provider.anthropic.options.baseURL).toBe("https://gateway.corp/v1");
     expect(r.next_steps.join("\n")).toContain("BYPASS");
   });
+
+  test("proxyUrl points both OpenCode LLM providers at their own proxy route", async () => {
+    const fs = memFs();
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8765/anthropic/v1",
+    });
+
+    expect(readConfig(fs.files, r.settings_path).provider).toEqual({
+      anthropic: { options: { baseURL: "http://localhost:8765/anthropic/v1" } },
+      openai: { options: { baseURL: "http://localhost:8765/openai/v1" } },
+    });
+    expect(r.provider_base_urls).toEqual([
+      {
+        provider: "anthropic",
+        url: "http://localhost:8765/anthropic/v1",
+        outcome: { already_set: false, written: true, existing: null },
+      },
+      {
+        provider: "openai",
+        url: "http://localhost:8765/openai/v1",
+        outcome: { already_set: false, written: true, existing: null },
+      },
+    ]);
+  });
+
+  test("a suffix-free proxyUrl still lands both providers on a masking route", async () => {
+    const fs = memFs();
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8000",
+    });
+
+    expect(readConfig(fs.files, r.settings_path).provider).toEqual({
+      anthropic: { options: { baseURL: "http://localhost:8000/anthropic/v1" } },
+      openai: { options: { baseURL: "http://localhost:8000/openai/v1" } },
+    });
+  });
+
+  test("an anthropic gateway conflict does not block the openai write", async () => {
+    const configPath = path.join("/home/u", ".config", "opencode", "opencode.json");
+    const fs = memFs({
+      [configPath]: JSON.stringify({
+        provider: { anthropic: { options: { baseURL: "https://gateway.corp/v1" } } },
+      }),
+    });
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8765/anthropic/v1",
+    });
+
+    expect(readConfig(fs.files, r.settings_path).provider).toEqual({
+      anthropic: { options: { baseURL: "https://gateway.corp/v1" } },
+      openai: { options: { baseURL: "http://localhost:8765/openai/v1" } },
+    });
+    expect(r.provider_base_urls).toEqual([
+      {
+        provider: "anthropic",
+        url: "http://localhost:8765/anthropic/v1",
+        outcome: { already_set: true, written: false, existing: "https://gateway.corp/v1" },
+      },
+      {
+        provider: "openai",
+        url: "http://localhost:8765/openai/v1",
+        outcome: { already_set: false, written: true, existing: null },
+      },
+    ]);
+    expect(r.base_url_written).toBe(false);
+    expect(r.base_url_already_set).toBe(true);
+    expect(r.base_url_existing).toBe("https://gateway.corp/v1");
+  });
+
+  test("an openai gateway conflict does not block the anthropic write", async () => {
+    const configPath = path.join("/home/u", ".config", "opencode", "opencode.json");
+    const fs = memFs({
+      [configPath]: JSON.stringify({
+        provider: { openai: { options: { baseURL: "https://openai-gw/v1" } } },
+      }),
+    });
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8765/anthropic/v1",
+    });
+
+    expect(readConfig(fs.files, r.settings_path).provider).toEqual({
+      anthropic: { options: { baseURL: "http://localhost:8765/anthropic/v1" } },
+      openai: { options: { baseURL: "https://openai-gw/v1" } },
+    });
+    expect(r.base_url_written).toBe(true);
+    expect(r.base_url_already_set).toBe(false);
+    const joined = r.next_steps.join("\n");
+    expect(joined).toContain("provider.openai.options.baseURL");
+    expect(joined).toContain("BYPASS");
+  });
+
+  test("proxyOnly patches both providers", async () => {
+    const fs = memFs();
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8000/anthropic/v1",
+      proxyOnly: true,
+    });
+
+    const written = readConfig(fs.files, r.settings_path);
+    expect(written.provider).toEqual({
+      anthropic: { options: { baseURL: "http://localhost:8000/anthropic/v1" } },
+      openai: { options: { baseURL: "http://localhost:8000/openai/v1" } },
+    });
+    expect(written.plugin).toBeUndefined();
+  });
+
+  test("without proxyUrl no provider is touched", async () => {
+    const fs = memFs();
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+    });
+
+    expect(readConfig(fs.files, r.settings_path).provider).toBeUndefined();
+    expect(r.provider_base_urls).toEqual([]);
+    expect(r.base_url_written).toBe(false);
+    expect(r.base_url_already_set).toBe(false);
+  });
+
+  test("--proxy mode registers plugin first/last and both provider URLs together", async () => {
+    const fs = memFs();
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      scope: "global",
+      homeDir: "/home/u",
+      fs,
+      resolvePluginFile: stubResolver,
+      proxyUrl: "http://localhost:8000",
+    });
+
+    // Plugin ordering: mask first, restore last
+    const config = readConfig(fs.files, r.settings_path);
+    const plugins = config.plugin as string[];
+    expect(plugins).toHaveLength(2);
+    expect(plugins[0]).toMatch(/mask\.js$/);
+    expect(plugins[1]).toMatch(/restore\.js$/);
+
+    // Both provider URLs derived from the bare root
+    expect(config.provider).toEqual({
+      anthropic: { options: { baseURL: "http://localhost:8000/anthropic/v1" } },
+      openai: { options: { baseURL: "http://localhost:8000/openai/v1" } },
+    });
+
+    // Both provider patches recorded as written
+    expect(r.provider_base_urls).toEqual([
+      {
+        provider: "anthropic",
+        url: "http://localhost:8000/anthropic/v1",
+        outcome: { already_set: false, written: true, existing: null },
+      },
+      {
+        provider: "openai",
+        url: "http://localhost:8000/openai/v1",
+        outcome: { already_set: false, written: true, existing: null },
+      },
+    ]);
+  });
 });
 
 describe("defaultProxyUrl", () => {
@@ -680,6 +882,61 @@ describe("defaultProxyUrl", () => {
 
   test("honours a custom port", () => {
     expect(defaultProxyUrl("claude-code", 9999)).toBe("http://localhost:9999/anthropic/v1");
+  });
+});
+
+describe("proxy root normalization", () => {
+  const rootOf = (input: string): string => normalizeProxyRoot(input).value;
+
+  test("strips every known terminal route suffix back to the same root", () => {
+    expect(rootOf("http://localhost:8000/anthropic/v1")).toBe("http://localhost:8000");
+    expect(rootOf("http://localhost:8000/openai/v1")).toBe("http://localhost:8000");
+    expect(rootOf("http://localhost:8000/codex/v1")).toBe("http://localhost:8000");
+  });
+
+  test("treats a suffix-free URL as the root itself", () => {
+    expect(rootOf("http://localhost:8000")).toBe("http://localhost:8000");
+    expect(rootOf("http://localhost:8000/")).toBe("http://localhost:8000");
+    expect(rootOf("  http://localhost:8000/  ")).toBe("http://localhost:8000");
+  });
+
+  test("keeps an unrecognized mount path as part of the root", () => {
+    expect(rootOf("https://gw.corp/pii")).toBe("https://gw.corp/pii");
+    expect(rootOf("https://gw.corp/pii/anthropic/v1")).toBe("https://gw.corp/pii");
+    expect(rootOf("https://gw.corp/anthropic")).toBe("https://gw.corp/anthropic");
+    expect(rootOf("https://gw.corp/v1")).toBe("https://gw.corp/v1");
+  });
+
+  test("strips at most one suffix so a doubled path stays visible", () => {
+    expect(rootOf("http://h:1/anthropic/v1/anthropic/v1")).toBe("http://h:1/anthropic/v1");
+  });
+
+  test("defaultProxyRoot carries no route suffix and honours the port", () => {
+    expect(defaultProxyRoot().value).toBe("http://localhost:8000");
+    expect(defaultProxyRoot(9999).value).toBe("http://localhost:9999");
+  });
+});
+
+describe("proxy URL derivation", () => {
+  test("derives all three routes from one root", () => {
+    const root = normalizeProxyRoot("http://localhost:8765/anthropic/v1");
+    expect(proxyUrlForRoute(root, "anthropic")).toBe("http://localhost:8765/anthropic/v1");
+    expect(proxyUrlForRoute(root, "openai")).toBe("http://localhost:8765/openai/v1");
+    expect(proxyUrlForRoute(root, "codex")).toBe("http://localhost:8765/codex/v1");
+  });
+
+  test("maps each install target to its own route", () => {
+    const root = defaultProxyRoot(9999);
+    expect(proxyUrlForTarget(root, "claude-code")).toBe("http://localhost:9999/anthropic/v1");
+    expect(proxyUrlForTarget(root, "opencode")).toBe("http://localhost:9999/anthropic/v1");
+    expect(proxyUrlForTarget(root, "codex")).toBe("http://localhost:9999/codex/v1");
+  });
+
+  test("openCodeProxyUrls yields one URL per OpenCode LLM provider", () => {
+    expect(openCodeProxyUrls(normalizeProxyRoot("http://localhost:8000/openai/v1"))).toEqual({
+      anthropic: "http://localhost:8000/anthropic/v1",
+      openai: "http://localhost:8000/openai/v1",
+    });
   });
 });
 
@@ -775,6 +1032,44 @@ describe("patchOpenCodeProviderBaseUrl", () => {
     const { patched, outcome } = patchOpenCodeProviderBaseUrl(input, url);
     expect(outcome.written).toBe(false);
     expect(outcome.already_set).toBe(true);
+    expect(patched).toBe(input);
+  });
+
+  test("patches the named provider instead of anthropic", () => {
+    const openaiUrl = "http://localhost:8765/openai/v1";
+    const { patched, outcome } = patchOpenCodeProviderBaseUrl({}, openaiUrl, "openai");
+    expect(outcome.written).toBe(true);
+    expect(patched.provider).toEqual({ openai: { options: { baseURL: openaiUrl } } });
+  });
+
+  test("patching openai preserves an anthropic gateway and openai siblings", () => {
+    const openaiUrl = "http://localhost:8765/openai/v1";
+    const { patched } = patchOpenCodeProviderBaseUrl(
+      {
+        provider: {
+          anthropic: { options: { baseURL: "https://gateway.corp/v1" } },
+          openai: { options: { apiKey: "k" }, models: { "gpt-5": {} } },
+        },
+      },
+      openaiUrl,
+      "openai"
+    );
+    expect(patched.provider).toEqual({
+      anthropic: { options: { baseURL: "https://gateway.corp/v1" } },
+      openai: { options: { apiKey: "k", baseURL: openaiUrl }, models: { "gpt-5": {} } },
+    });
+  });
+
+  test("refuses to clobber a different openai gateway", () => {
+    const input = { provider: { openai: { options: { baseURL: "https://openai-gw/v1" } } } };
+    const { patched, outcome } = patchOpenCodeProviderBaseUrl(
+      input,
+      "http://localhost:8765/openai/v1",
+      "openai"
+    );
+    expect(outcome.written).toBe(false);
+    expect(outcome.already_set).toBe(true);
+    expect(outcome.existing).toBe("https://openai-gw/v1");
     expect(patched).toBe(input);
   });
 });

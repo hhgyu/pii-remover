@@ -19,7 +19,16 @@ import {
   resolveTokenKey,
   defaultKeyPath,
 } from "@pii-remover/core";
+import {
+  defaultProxyRoot,
+  normalizeProxyRoot,
+  proxyUrlForRoute,
+  type ProxyRoot,
+  type ProxyRoute,
+} from "./proxy-url.js";
 export { ALL_CATEGORIES, CATEGORY_LABELS };
+export { defaultProxyRoot, normalizeProxyRoot, proxyUrlForRoute };
+export type { ProxyRoot, ProxyRoute };
 
 export function ensureTokenKey(
   env: NodeJS.ProcessEnv = process.env,
@@ -42,17 +51,41 @@ export const OPENCODE_PLUGIN_RESTORE_SUBPATH = "@pii-remover/opencode-plugin/res
  * root silently bypasses masking. Derived here rather than typed by the user
  * so the prefix cannot be got wrong.
  */
-const PROXY_PATH_BY_TARGET: Readonly<Record<InstallTarget, string>> = {
-  "claude-code": "/anthropic/v1",
-  opencode: "/anthropic/v1",
-  codex: "/codex/v1",
+const PROXY_ROUTE_BY_TARGET: Readonly<Record<InstallTarget, ProxyRoute>> = {
+  "claude-code": "anthropic",
+  opencode: "anthropic",
+  codex: "codex",
 };
+
+export function proxyUrlForTarget(root: ProxyRoot, target: InstallTarget): string {
+  return proxyUrlForRoute(root, PROXY_ROUTE_BY_TARGET[target]);
+}
 
 export function defaultProxyUrl(
   target: InstallTarget,
   port: number = DEFAULT_PROXY_PORT
 ): string {
-  return `http://localhost:${port}${PROXY_PATH_BY_TARGET[target]}`;
+  return proxyUrlForTarget(defaultProxyRoot(port), target);
+}
+
+/**
+ * LLM providers OpenCode picks between per model. Both need pointing at the
+ * proxy: whichever one is left on its vendor default sends plaintext straight
+ * upstream the moment the user switches model. OpenAI models POST `/responses`,
+ * which only reaches the masking branch under the `/openai/v1` route.
+ */
+const OPENCODE_PROVIDER_IDS = ["anthropic", "openai"] as const;
+export type OpenCodeProviderId = (typeof OPENCODE_PROVIDER_IDS)[number];
+
+const LEGACY_SCALAR_PROVIDER: OpenCodeProviderId = "anthropic";
+
+export function openCodeProxyUrls(
+  root: ProxyRoot
+): Readonly<Record<OpenCodeProviderId, string>> {
+  return {
+    anthropic: proxyUrlForRoute(root, "anthropic"),
+    openai: proxyUrlForRoute(root, "openai"),
+  };
 }
 
 /**
@@ -119,13 +152,15 @@ export function patchClaudeSettingsEnv(
 }
 
 /**
- * Patch `provider.anthropic.options.baseURL` in an OpenCode `opencode.json`
- * object. OpenCode feeds this into the AI SDK provider, so the URL is baked
- * into the request before any plugin's custom `fetch` sees it.
+ * Patch `provider.<id>.options.baseURL` in an OpenCode `opencode.json` object.
+ * OpenCode feeds this into the AI SDK provider, so the URL is baked into the
+ * request before any plugin's custom `fetch` sees it. Defaults to `anthropic`,
+ * which is the only provider this patcher handled before OpenAI was added.
  */
 export function patchOpenCodeProviderBaseUrl(
   config: Record<string, unknown>,
-  proxyUrl: string
+  proxyUrl: string,
+  providerId: OpenCodeProviderId = "anthropic"
 ): { patched: Record<string, unknown>; outcome: BaseUrlPatchOutcome } {
   const conflict = (existing: string): {
     patched: Record<string, unknown>;
@@ -136,11 +171,11 @@ export function patchOpenCodeProviderBaseUrl(
   if (rawProvider !== undefined && !isPlainObject(rawProvider)) {
     return conflict(String(rawProvider));
   }
-  const rawAnthropic = isPlainObject(rawProvider) ? rawProvider.anthropic : undefined;
-  if (rawAnthropic !== undefined && !isPlainObject(rawAnthropic)) {
-    return conflict(String(rawAnthropic));
+  const rawTarget = isPlainObject(rawProvider) ? rawProvider[providerId] : undefined;
+  if (rawTarget !== undefined && !isPlainObject(rawTarget)) {
+    return conflict(String(rawTarget));
   }
-  const rawOptions = isPlainObject(rawAnthropic) ? rawAnthropic.options : undefined;
+  const rawOptions = isPlainObject(rawTarget) ? rawTarget.options : undefined;
   if (rawOptions !== undefined && !isPlainObject(rawOptions)) {
     return conflict(String(rawOptions));
   }
@@ -154,8 +189,11 @@ export function patchOpenCodeProviderBaseUrl(
   }
 
   const options = { ...(isPlainObject(rawOptions) ? rawOptions : {}), baseURL: proxyUrl };
-  const anthropic = { ...(isPlainObject(rawAnthropic) ? rawAnthropic : {}), options };
-  const provider = { ...(isPlainObject(rawProvider) ? rawProvider : {}), anthropic };
+  const patchedProvider = { ...(isPlainObject(rawTarget) ? rawTarget : {}), options };
+  const provider = {
+    ...(isPlainObject(rawProvider) ? rawProvider : {}),
+    [providerId]: patchedProvider,
+  };
   return {
     patched: { ...config, provider },
     outcome: { already_set: false, written: true, existing: null },
@@ -189,6 +227,12 @@ export interface InstallFs {
   mkdir: (p: string) => Promise<void>;
 }
 
+export interface ProviderBaseUrlPatch {
+  readonly provider: OpenCodeProviderId;
+  readonly url: string;
+  readonly outcome: BaseUrlPatchOutcome;
+}
+
 export interface InstallResult {
   settings_path: string;
   created: boolean;
@@ -197,9 +241,15 @@ export interface InstallResult {
   config_path: string | null;
   config_written: boolean;
   next_steps: readonly string[];
+  /**
+   * Scalar fields predate multi-provider support and mirror Anthropic, so a
+   * caller that only knows about one base URL keeps reading the same thing.
+   * Read `provider_base_urls` to see every provider independently.
+   */
   base_url_already_set?: boolean;
   base_url_written?: boolean;
   base_url_existing?: string | null;
+  provider_base_urls?: readonly ProviderBaseUrlPatch[];
 }
 
 const DEFAULT_FS: InstallFs = {
@@ -303,9 +353,10 @@ export interface OpenCodeInstallOptions {
   resolvePluginFile?: (subpath: string) => string | null;
   proxyUrl?: string;
   /**
-   * Register no plugin, and strip any this installer previously added.
-   * Exclusive by necessity, not preference: plugin and proxy hold separate
-   * vaults, so a token minted by one cannot be restored by the other.
+   * Minimal proxy-only mode: mask entirely at the proxy, install no plugin,
+   * and strip any plugin entries this installer previously added. Normal
+   * plugin+proxy composition (the default) is supported independently of
+   * this flag.
    */
   proxyOnly?: boolean;
 }
@@ -401,10 +452,18 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
   }
 
   let baseUrl = NO_PROXY_REQUESTED;
+  const providerPatches: ProviderBaseUrlPatch[] = [];
   if (opts.proxyUrl !== undefined) {
-    const patch = patchOpenCodeProviderBaseUrl(parsed, opts.proxyUrl);
-    parsed = patch.patched;
-    baseUrl = patch.outcome;
+    const urls = openCodeProxyUrls(normalizeProxyRoot(opts.proxyUrl));
+    for (const provider of OPENCODE_PROVIDER_IDS) {
+      const url = urls[provider];
+      // Patched against the running result: a conflict on one provider leaves
+      // the config intact for the next instead of aborting both.
+      const patch = patchOpenCodeProviderBaseUrl(parsed, url, provider);
+      parsed = patch.patched;
+      providerPatches.push({ provider, url, outcome: patch.outcome });
+      if (provider === LEGACY_SCALAR_PROVIDER) baseUrl = patch.outcome;
+    }
   }
 
   const serialized = `${JSON.stringify(parsed, null, 2)}\n`;
@@ -451,8 +510,7 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
       strippedPluginCount > 0
         ? `   Removed ${strippedPluginCount} previously installed pii-remover plugin entr${strippedPluginCount === 1 ? "y" : "ies"}.`
         : `   No pii-remover plugin entries were present.`,
-      `   Masking happens at the proxy. Running the plugin as well would break restoration:`,
-      `   the two keep separate vaults, so neither can restore the other's tokens.`,
+      `   Masking happens entirely at the proxy.`,
       ``,
       `2) Restart OpenCode to drop the plugin.`,
     );
@@ -479,15 +537,8 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
     );
   }
 
-  if (opts.proxyUrl !== undefined) {
-    nextSteps.push(
-      "",
-      ...buildProxyNextSteps(
-        baseUrl,
-        opts.proxyUrl,
-        `provider.anthropic.options.baseURL in ${configPath}`
-      )
-    );
+  if (providerPatches.length > 0) {
+    nextSteps.push("", ...buildOpenCodeProxyNextSteps(providerPatches, configPath));
   }
 
   return {
@@ -501,7 +552,31 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
     base_url_already_set: baseUrl.already_set,
     base_url_written: baseUrl.written,
     base_url_existing: baseUrl.existing,
+    provider_base_urls: providerPatches,
   };
+}
+
+function buildOpenCodeProxyNextSteps(
+  patches: readonly ProviderBaseUrlPatch[],
+  configPath: string
+): readonly string[] {
+  const locate = (patch: ProviderBaseUrlPatch): string =>
+    `provider.${patch.provider}.options.baseURL in ${configPath}`;
+
+  const applied = patches.filter((p) => p.outcome.written);
+  const blocks: string[][] = [];
+  if (applied.length > 0) {
+    blocks.push([
+      ...applied.map((p) => `Proxy mode: ${locate(p)} = ${p.url}`),
+      `   Traffic routes through the local proxy on the next start — no manual export needed.`,
+      `   Start it first: docker compose -f packages/backend/docker-compose.yml up -d`,
+    ]);
+  }
+  for (const patch of patches) {
+    if (patch.outcome.written) continue;
+    blocks.push([...buildProxyNextSteps(patch.outcome, patch.url, locate(patch))]);
+  }
+  return blocks.flatMap((block, i) => (i === 0 ? block : ["", ...block]));
 }
 
 function buildProxyNextSteps(
