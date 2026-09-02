@@ -110,7 +110,7 @@ export class OpenAISseTransformer {
           content?: unknown;
           tool_calls?: Array<{
             index?: number;
-            function?: { arguments?: unknown };
+            function?: { arguments?: unknown; [k: string]: unknown };
             [k: string]: unknown;
           }>;
         };
@@ -126,18 +126,22 @@ export class OpenAISseTransformer {
 
       if (Array.isArray(c.delta?.tool_calls)) {
         allHeld = false;
-        for (const tc of c.delta!.tool_calls!) {
+        mutated = true;
+        // Only the arguments fragment is withheld. `id`, `type`, `index` and
+        // `function.name` arrive once, on the first delta, and are what the
+        // client dispatches on — dropping them strands the tool call.
+        const heldToolCalls = c.delta!.tool_calls!.map((tc) => {
           const tcIdx = typeof tc.index === "number" ? tc.index : 0;
           const chunk = tc.function?.arguments;
-          if (typeof chunk === "string") {
-            const key = `${choiceIdx}:${tcIdx}`;
-            this.toolArgAccumulators.set(
-              key,
-              (this.toolArgAccumulators.get(key) ?? "") + chunk
-            );
-          }
-        }
-        return { ...c, delta: { ...c.delta, tool_calls: [] } };
+          if (typeof chunk !== "string") return tc;
+          const key = `${choiceIdx}:${tcIdx}`;
+          this.toolArgAccumulators.set(
+            key,
+            (this.toolArgAccumulators.get(key) ?? "") + chunk
+          );
+          return { ...tc, function: { ...tc.function, arguments: "" } };
+        });
+        return { ...c, delta: { ...c.delta, tool_calls: heldToolCalls } };
       }
 
       const content = c.delta?.content;
@@ -148,6 +152,7 @@ export class OpenAISseTransformer {
       const buf = this.getContentBuffer(choiceIdx);
       const safe = buf.push(content);
       if (safe.length === 0) {
+        mutated = true;
         return { ...c, delta: { ...c.delta, content: "" } };
       }
       allHeld = false;
@@ -157,9 +162,13 @@ export class OpenAISseTransformer {
     });
 
     if (allHeld && obj.choices.length > 0) return "";
+    // Every branch above that rewrites a choice must have set `mutated`, or
+    // this line re-emits the upstream event and the sanitized copy is dropped —
+    // putting the live token back on the wire.
     if (!mutated) return serializeSseEvent(ev);
 
     return serializeSseEvent({
+      event: ev.event,
       data: JSON.stringify({ ...obj, choices: nextChoices }),
       raw: "",
     });

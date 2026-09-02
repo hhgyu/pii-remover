@@ -389,28 +389,118 @@ describe("OpenAISseTransformer — token-restoring delta pipeline", () => {
     const remover = await makeRemover();
     const person = (await remover.mask("김철수")).tokens[0]!.token;
     const email = (await remover.mask("alice@example.com")).tokens[0]!.token;
-    const t = new OpenAISseTransformer(remover);
     const fullArgs = JSON.stringify({
       questions: [{ question: `${person}님 ${email}` }],
     });
-    let out = "";
-    for (const chunk of splitEvery(fullArgs, 6)) {
-      out += t.push(serializeSseEvent({
-        data: JSON.stringify({
-          choices: [{
-            index: 0,
-            delta: { tool_calls: [{ index: 0, function: { arguments: chunk } }] },
-          }],
-        }),
-        raw: "",
-      }));
+    // Both widths are load-bearing. At 6 no token is ever contiguous inside one
+    // delta, so a substring assertion cannot see an event echoed unchanged; at
+    // full width each delta carries whole tokens, which is the shape that puts
+    // a live token on the wire when the sanitized choices are discarded.
+    for (const width of [6, fullArgs.length]) {
+      const t = new OpenAISseTransformer(remover);
+      let preFlush = "";
+      for (const chunk of splitEvery(fullArgs, width)) {
+        preFlush += t.push(serializeSseEvent({
+          data: JSON.stringify({
+            choices: [{
+              index: 0,
+              delta: { tool_calls: [{ index: 0, function: { arguments: chunk } }] },
+            }],
+          }),
+          raw: "",
+        }));
+      }
+      const flushed = t.flush();
+      const out = preFlush + flushed;
+
+      expect(preFlush).not.toContain(person);
+      expect(preFlush).not.toContain(email);
+      expect(out).not.toContain(person);
+      expect(out).not.toContain(email);
+      expect(flushed).toContain("김철수");
+      expect(flushed).toContain("alice@example.com");
+      expect(out.split("김철수").length - 1).toBe(1);
+      expect(out.split("alice@example.com").length - 1).toBe(1);
+      expect(out).toContain("tool_calls");
     }
-    out += t.flush();
-    expect(out).toContain("김철수");
-    expect(out).toContain("alice@example.com");
-    expect(out).not.toContain("{{OPF:PERSON:");
-    expect(out).not.toContain("{{OPF:EMAIL:");
-    expect(out).toContain("tool_calls");
+  });
+
+  test("held content is not echoed when a sibling choice passes through", async () => {
+    const remover = await makeRemover();
+    const email = (await remover.mask("dana@example.com")).tokens[0]!.token;
+    const t = new OpenAISseTransformer(remover);
+    const head = email.slice(0, 20);
+
+    // Choice 1 carries no string content, so the event is not "all held" and
+    // the sanitized copy of choice 0 is the only thing keeping the partial
+    // token off the wire.
+    const first = t.push(serializeSseEvent({
+      data: JSON.stringify({
+        choices: [
+          { index: 0, delta: { content: head } },
+          { index: 1, delta: { role: "assistant" } },
+        ],
+      }),
+      raw: "",
+    }));
+    const rest = t.push(openaiDelta(email.slice(20)));
+    const out = first + rest + t.flush();
+
+    expect(first).not.toContain(head);
+    expect(first).toContain("assistant");
+    expect(out).not.toContain(email);
+    expect(out).toContain("dana@example.com");
+    expect(out.split("dana@example.com").length - 1).toBe(1);
+  });
+
+  test("tool_calls keep their dispatch metadata while arguments are held", async () => {
+    const remover = await makeRemover();
+    const email = (await remover.mask("erin@example.com")).tokens[0]!.token;
+    const t = new OpenAISseTransformer(remover);
+    const args = JSON.stringify({ to: email });
+    const toolDelta = (tc: unknown) => serializeSseEvent({
+      data: JSON.stringify({ choices: [{ index: 0, delta: { tool_calls: [tc] } }] }),
+      raw: "",
+    });
+
+    // Upstream sends id / type / function.name once, on the first delta only.
+    let preFlush = t.push(toolDelta({
+      index: 0,
+      id: "call_abc123",
+      type: "function",
+      function: { name: "send_email", arguments: args.slice(0, 7) },
+    }));
+    preFlush += t.push(toolDelta({ index: 0, function: { arguments: args.slice(7) } }));
+    const flushed = t.flush();
+    const out = preFlush + flushed;
+
+    expect(preFlush).toContain('"id":"call_abc123"');
+    expect(preFlush).toContain('"type":"function"');
+    expect(preFlush).toContain('"name":"send_email"');
+    expect(preFlush).toContain('"index":0');
+    expect(preFlush).toContain('"arguments":""');
+    expect(preFlush).not.toContain(email);
+    expect(preFlush).not.toContain("erin@example.com");
+
+    expect(flushed).toContain("erin@example.com");
+    expect(out).not.toContain(email);
+    expect(out.split("erin@example.com").length - 1).toBe(1);
+  });
+
+  test("a named upstream event keeps its event field when the payload is rewritten", async () => {
+    const remover = await makeRemover();
+    const email = (await remover.mask("finn@example.com")).tokens[0]!.token;
+    const t = new OpenAISseTransformer(remover);
+
+    const out = t.push(serializeSseEvent({
+      event: "chunk",
+      data: JSON.stringify({ choices: [{ index: 0, delta: { content: `Mail ${email}` } }] }),
+      raw: "",
+    })) + t.flush();
+
+    expect(out).toContain("event: chunk");
+    expect(out).toContain("finn@example.com");
+    expect(out).not.toContain(email);
   });
 });
 
