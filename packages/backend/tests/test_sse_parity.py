@@ -143,21 +143,9 @@ def test_transformer_matches_typescript(case: dict[str, Any]) -> None:
     assert "".join(pushes) + flushed == case["expected"]["total"]
 
 
-def _is_openai_tool_call_case(case: dict[str, Any]) -> bool:
-    return case["provider"] == "openai" and "tool-calls" in case["name"]
-
-
-@pytest.mark.parametrize(
-    "case",
-    [c for c in VECTORS["transformers"] if not _is_openai_tool_call_case(c)],
-    ids=lambda c: c["name"],
-)
+@pytest.mark.parametrize("case", VECTORS["transformers"], ids=lambda c: c["name"])
 def test_transformer_output_carries_no_live_tokens(case: dict[str, Any]) -> None:
-    """The point of the whole pipeline: the client never sees a vault token.
-
-    Holds for every path except OpenAI streaming tool calls, which is pinned
-    separately in :func:`test_openai_streaming_tool_calls_pass_tokens_through`.
-    """
+    """The point of the whole pipeline: the client never sees a vault token."""
     transformer = _TRANSFORMERS[case["provider"]](_build_scope(), buffer_window=64)
     out = "".join(transformer.push(chunk) for chunk in case["chunks"])
     out += transformer.flush()
@@ -165,37 +153,80 @@ def test_transformer_output_carries_no_live_tokens(case: dict[str, Any]) -> None
         assert token not in out, f"{token} leaked to the client"
 
 
+def _is_openai_tool_call_case(case: dict[str, Any]) -> bool:
+    return case["provider"] == "openai" and "tool-calls" in case["name"]
+
+
 @pytest.mark.parametrize(
     "case",
     [c for c in VECTORS["transformers"] if _is_openai_tool_call_case(c)],
     ids=lambda c: c["name"],
 )
-def test_openai_streaming_tool_calls_pass_tokens_through(case: dict[str, Any]) -> None:
-    """Pins a known TypeScript defect that this port reproduces on purpose.
+def test_openai_streaming_tool_calls_restore_exactly_once(case: dict[str, Any]) -> None:
+    """A streamed tool call reaches the client restored, at close, and once.
 
-    ``OpenAISseTransformer.handleEvent`` accumulates ``tool_calls`` arguments
-    for the flush-time restore, but leaves ``mutated`` false, so it returns the
-    ORIGINAL event - raw token included. The emptied ``tool_calls: []`` copy it
-    built is discarded. The client therefore receives the masked token inside
-    the live tool call, and a second, restored copy at stream close.
-
-    ``packages/proxy/README.md`` records this under "Known limits / v1.x
-    backlog": "streaming path passes them through unchanged".
-
-    Consequence is a correctness bug, not a privacy leak - the direction that
-    protects PII is the request side, which masks correctly. Here the client
-    executes a tool call carrying ``{{OPF:EMAIL:...`` instead of the address.
-
-    When the TypeScript side is fixed, regenerate the vectors and this test
-    fails loudly, which is the intent: it is a tracked defect, not a baseline.
+    ``tool_calls`` arguments arrive as fragmented JSON, so every delta is held
+    and accumulated and one restored copy is emitted at stream close. Echoing
+    the upstream event as well would hand the client a tool call whose
+    arguments still carry the vault token, followed by a restored duplicate.
     """
     transformer = _TRANSFORMERS[case["provider"]](_build_scope(), buffer_window=64)
-    out = "".join(transformer.push(chunk) for chunk in case["chunks"])
-    out += transformer.flush()
+    pushes = [transformer.push(chunk) for chunk in case["chunks"]]
+    flushed = transformer.flush()
+    pre_flush = "".join(pushes)
+    out = pre_flush + flushed
 
+    assert SETUP["tokens"]["EMAIL"] not in out
+    assert "alice@example.com" in flushed
+    assert out.count("alice@example.com") == 1
+
+    # Holding the arguments must not cost the client the fields it dispatches
+    # on; those arrive once, on the first delta, and are never re-sent.
+    assert '"id":"call_fixture_1"' in pre_flush
+    assert '"type":"function"' in pre_flush
+    assert '"name":"send_email"' in pre_flush
+    assert '"arguments":""' in pre_flush
+
+
+def test_openai_held_content_survives_a_passthrough_sibling_choice() -> None:
+    """A held partial token must not ride out on a sibling choice's event.
+
+    Choice 1 carries no string content, so the event is not "all held" and the
+    early return does not fire. The sanitized copy of choice 0 is then the only
+    thing keeping the partial token off the wire.
+    """
+    transformer = OpenAISseTransformer(_build_scope(), buffer_window=64)
     email_token = SETUP["tokens"]["EMAIL"]
-    assert email_token in out, "expected the documented pass-through leak"
-    assert "alice@example.com" in out, "expected the flush-time restored copy"
+    head = email_token[:20]
+
+    first = transformer.push(
+        serialize_sse_event(
+            SseEvent(
+                data=js_json_dumps(
+                    {
+                        "choices": [
+                            {"index": 0, "delta": {"content": head}},
+                            {"index": 1, "delta": {"role": "assistant"}},
+                        ]
+                    }
+                )
+            )
+        )
+    )
+    rest = transformer.push(
+        serialize_sse_event(
+            SseEvent(
+                data=js_json_dumps(
+                    {"choices": [{"index": 0, "delta": {"content": email_token[20:]}}]}
+                )
+            )
+        )
+    )
+    out = first + rest + transformer.flush()
+
+    assert head not in first
+    assert "assistant" in first
+    assert email_token not in out
     assert out.count("alice@example.com") == 1
 
 

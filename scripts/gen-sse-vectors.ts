@@ -202,10 +202,26 @@ function openaiToolStream(): string {
   const ev = (data: unknown) =>
     serializeSseEvent({ data: JSON.stringify(data), raw: "" });
   const args = JSON.stringify({ email: EMAIL });
+  // Upstream sends the dispatch metadata (id / type / function.name) once, on
+  // the first delta only; every later delta carries an arguments fragment and
+  // nothing else. A transformer that drops it leaves the client unable to route
+  // the call at all, so the fixture has to carry the real two-shape stream.
   return (
     ev({
       choices: [
-        { index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: args.slice(0, 9) } }] } },
+        {
+          index: 0,
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_fixture_1",
+                type: "function",
+                function: { name: "send_email", arguments: args.slice(0, 9) },
+              },
+            ],
+          },
+        },
       ],
     }) +
     ev({
