@@ -49,37 +49,57 @@ docker compose up --build   # 초회 ~5-10분 (모델 weights 다운로드)
 
 ### 2) 호스트 통합 설치
 
-**Claude Code**:
+```bash
+npx @pii-remover/cli install --proxy
+docker compose -f packages/backend/docker-compose.yml up -d
+```
+
+`--target` 없이 실행하면 **Claude Code**, **OpenCode**, **OpenAI Codex CLI**
+세 항목이 모두 체크 해제된 상태로 뜨는 체크박스가 나타납니다 — 원하는 조합을
+고르세요. PII 백엔드 엔드포인트·카테고리 설정은 **한 번만** 물어보고, 선택한
+모든 호스트에 같은 설정을 재사용합니다. 설치는 고정된 순서(Claude Code →
+OpenCode → Codex)로 진행되며, 한 호스트가 실패해도 나머지는 계속 진행합니다 —
+선택한 호스트 중 하나라도 실패하면 최종 종료 코드는 `2`입니다. 아무것도
+선택하지 않으면 종료 코드 `64`로 끝납니다.
+
+`--proxy`는 기본 프록시 루트(`http://localhost:8000`)를 선택한 각 호스트
+설정에 써넣어 따로 export 할 필요가 없게 합니다:
+
+| 호스트 | 설치기가 쓰는 키 | 값 |
+| --- | --- | --- |
+| Claude Code | `settings.json`의 `env.ANTHROPIC_BASE_URL` | `http://localhost:8000/anthropic/v1` |
+| OpenCode | `opencode.json`의 `provider.anthropic.options.baseURL` + `provider.openai.options.baseURL` | `http://localhost:8000/anthropic/v1` + `http://localhost:8000/openai/v1` |
+| Codex | `config.toml`의 `openai_base_url` | `http://localhost:8000/codex/v1` |
+
+**이미 다른 값으로 설정된 base URL은 절대 덮어쓰지 않습니다.** Claude Code,
+Codex, 그리고 OpenCode의 각 provider 항목은 독립적으로 검사·보존되며, 설치기는
+경고만 출력하고 기존 값을 그대로 둡니다 — 사내 게이트웨이나 다른 도구의 설정이
+조용히 대체되는 일은 없습니다.
+
+OpenCode에는 `file://` plugin 두 줄(mask 먼저, restore 마지막)이
+`opencode.json`에 추가되어, 다른 OpenCode plugin이 tool 인자를 읽기 전에 PII를
+마스킹하고 모든 plugin의 `tool.execute.after`가 끝난 뒤 복원합니다 —
+`--proxy-only`를 주면 plugin은 건너뛰고 위 proxy base URL만 씁니다.
+
+Codex는 hook의 fail-closed 게이트가 "프록시가 구성됐는지"를 **프로세스
+환경변수**로만 판단하는데, Codex에는 base URL을 노출하는 환경변수가 없습니다
+([`detectProxy`](./packages/cli/src/protocol/proxy-detection.ts)). 그래서
+`--proxy`로 Codex를 설치한 뒤 셸 프로파일에 한 번만 추가하세요:
+
+```bash
+echo 'export PII_REMOVER_PROXY_TRUST=1' >> ~/.zshrc   # 1회만
+```
+
+### 단일 호스트만 명시적으로 설치
+
+`--target`을 주면 체크박스 없이 호스트 하나만 비대화형으로 설치합니다 — 자동화,
+CI, 또는 한 도구만 쓸 때:
+
 ```bash
 npx @pii-remover/cli install --target claude-code --proxy
-docker compose -f packages/backend/docker-compose.yml up -d
+npx @pii-remover/cli install --target opencode    --proxy
+npx @pii-remover/cli install --target codex       --proxy
 ```
-
-`--proxy`가 `~/.claude/settings.json`의 `env.ANTHROPIC_BASE_URL`을 써넣고, Claude Code는
-세션 시작 시 `env` 키를 전부 프로세스 환경으로 내보냅니다 — 매 실행마다 `export` 할 필요가
-없습니다. 이미 설정된 base URL(사내 게이트웨이 등)은 덮어쓰지 않고 경고만 냅니다.
-
-**OpenCode** (단일 plugin 라인이면 끝):
-```jsonc
-// opencode.json
-{
-  "plugin": ["@pii-remover/opencode-plugin@latest"]
-}
-```
-
-**OpenAI Codex CLI**:
-```bash
-npx @pii-remover/cli install --target codex --proxy
-docker compose -f packages/backend/docker-compose.yml up -d
-echo 'export PII_REMOVER_PROXY_TRUST=1' >> ~/.zshrc   # 1회만, 아래 설명 참고
-```
-
-`--proxy`가 `~/.codex/config.toml`에 `openai_base_url = "http://localhost:8000/codex/v1"`을
-써넣어 라우팅은 영구 적용됩니다. hook의 fail-closed 게이트는 별개로, "프록시가 구성됐는지"를
-**프로세스 환경변수**로 판단하는데 Codex에는 base URL을 노출하는 환경변수가 없습니다
-([`detectProxy`](./packages/cli/src/protocol/proxy-detection.ts)). 그래서
-`PII_REMOVER_PROXY_TRUST=1`은 셸 프로파일에 넣어둬야 합니다 — 최초 1회이고, 실행마다 다시
-export 하는 게 아닙니다.
 
 자세한 설치 가이드는 [`INSTALL.md`](./INSTALL.md).
 
@@ -92,7 +112,7 @@ export 하는 게 아닙니다.
 | [`@pii-remover/core`](./packages/core) | Host-agnostic 코어: detector, vault, restorer, backend strategy |
 | [`@pii-remover/cli`](./packages/cli) | Multi-host CLI: `UserPromptSubmit` hook (Claude Code + Codex) + installer |
 | [`@pii-remover/opencode-plugin`](./packages/opencode-plugin) | OpenCode plugin (in-process tool/message hooks) |
-| [`@pii-remover/proxy`](./packages/proxy) | Local LLM proxy: Anthropic / OpenAI Chat / Codex Responses API 라우팅 |
+| [`@pii-remover/proxy`](./packages/proxy) | Local LLM proxy: Anthropic / OpenAI Chat / OpenAI + Codex Responses API 라우팅 |
 | [`@pii-remover/vision`](./packages/vision) | 이미지 OCR PII 마스킹 클라이언트 (Phase 6) |
 | `packages/backend` | Python FastAPI 백엔드 (OPF + KLUE NER + Tesseract OCR Docker 이미지) |
 

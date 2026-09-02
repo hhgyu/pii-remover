@@ -47,43 +47,61 @@ cd packages/backend
 docker compose up --build   # ~5-10 min the first time (model weights)
 ```
 
-### 2) Install for your host
+### 2) Install for your hosts
 
-**Claude Code**:
+```bash
+npx @pii-remover/cli install --proxy
+docker compose -f packages/backend/docker-compose.yml up -d
+```
+
+Without `--target`, `install` shows a checkbox for **Claude Code**,
+**OpenCode**, and **OpenAI Codex CLI** — all unchecked by default, so you pick
+the combination you want. The PII backend endpoint / category prompt runs
+**once** and that same config is reused for every host you select; the
+selected hosts install in a fixed order (Claude Code → OpenCode → Codex), and
+one target failing doesn't stop the rest — the command exits `2` at the end
+if any selected target failed. Selecting nothing exits `64`.
+
+`--proxy` writes the default proxy root (`http://localhost:8000`) into each
+selected host's own config, so nothing has to be exported by hand:
+
+| Host | Key the installer writes | Value |
+| --- | --- | --- |
+| Claude Code | `env.ANTHROPIC_BASE_URL` in `settings.json` | `http://localhost:8000/anthropic/v1` |
+| OpenCode | `provider.anthropic.options.baseURL` + `provider.openai.options.baseURL` in `opencode.json` | `http://localhost:8000/anthropic/v1` + `http://localhost:8000/openai/v1` |
+| Codex | `openai_base_url` in `config.toml` | `http://localhost:8000/codex/v1` |
+
+**A base URL you (or a corporate gateway) already set is never overwritten.**
+Claude Code, Codex, and each OpenCode provider entry are checked and
+preserved independently — the installer warns and leaves the existing value
+alone rather than replacing it silently.
+
+OpenCode also gets two `file://` plugin entries (mask first, restore last)
+written into `opencode.json` so PII is masked before any other OpenCode
+plugin reads tool args and restored after every plugin's
+`tool.execute.after` has run — unless you pass `--proxy-only`, which skips
+the plugin and relies on the proxy base URLs above instead.
+
+For Codex, the hook's fail-closed gate decides "is a proxy configured?" from
+the process environment, and Codex exposes no base-URL env var for it to
+inspect ([`detectProxy`](./packages/cli/src/protocol/proxy-detection.ts)).
+So after installing Codex with `--proxy`, add this once to your shell
+profile:
+
+```bash
+echo 'export PII_REMOVER_PROXY_TRUST=1' >> ~/.zshrc   # one-time
+```
+
+### Installing a single host explicitly
+
+Pass `--target` to skip the checkbox and install exactly one host
+non-interactively — for automation, CI, or when you only use one tool:
+
 ```bash
 npx @pii-remover/cli install --target claude-code --proxy
-docker compose -f packages/backend/docker-compose.yml up -d
+npx @pii-remover/cli install --target opencode    --proxy
+npx @pii-remover/cli install --target codex       --proxy
 ```
-
-`--proxy` writes `env.ANTHROPIC_BASE_URL` into `~/.claude/settings.json`, and
-Claude Code exports every `env` key at session start — so there is nothing to
-`export` before each run. A base URL you (or a corporate gateway) already set is
-never overwritten; the installer warns and leaves it alone.
-
-**OpenCode**:
-```bash
-npx @pii-remover/cli install --target opencode
-```
-
-Writes two `file://` plugin entries (mask first, restore last) into
-`opencode.json` so PII is masked before any other OpenCode plugin reads
-tool args and restored after every plugin's `tool.execute.after` has run.
-Re-running is idempotent and survives hand-edits to the array.
-
-**OpenAI Codex CLI**:
-```bash
-npx @pii-remover/cli install --target codex --proxy
-docker compose -f packages/backend/docker-compose.yml up -d
-echo 'export PII_REMOVER_PROXY_TRUST=1' >> ~/.zshrc   # one-time, see below
-```
-
-`--proxy` writes `openai_base_url = "http://localhost:8000/codex/v1"` into
-`~/.codex/config.toml`, so routing is persistent. The hook's fail-closed gate is
-separate: it decides "is a proxy configured?" from the process environment, and
-Codex exposes no base-URL env var for it to inspect
-([`detectProxy`](./packages/cli/src/protocol/proxy-detection.ts)). So
-`PII_REMOVER_PROXY_TRUST=1` has to live in your shell profile — added once, not
-re-exported per run.
 
 See [`INSTALL.md`](./INSTALL.md) for the full installation guide.
 
@@ -96,7 +114,7 @@ Bun + TypeScript workspace monorepo:
 | [`@pii-remover/core`](./packages/core) | Host-agnostic core: detector, vault, restorer, backend strategy |
 | [`@pii-remover/cli`](./packages/cli) | Multi-host CLI: `UserPromptSubmit` hook (Claude Code + Codex) + installer |
 | [`@pii-remover/opencode-plugin`](./packages/opencode-plugin) | OpenCode plugin (in-process tool/message hooks) |
-| [`@pii-remover/proxy`](./packages/proxy) | Local LLM proxy: Anthropic / OpenAI Chat / Codex Responses API routing |
+| [`@pii-remover/proxy`](./packages/proxy) | Local LLM proxy: Anthropic / OpenAI Chat / OpenAI + Codex Responses API routing |
 | [`@pii-remover/vision`](./packages/vision) | Image OCR PII redaction client (Phase 6) |
 | `packages/backend` | Python FastAPI backend (OPF + KLUE NER + Tesseract OCR Docker image) |
 

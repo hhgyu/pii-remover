@@ -35,6 +35,22 @@ blocking. So the hook's role is:
 
 ## Install
 
+```bash
+pii-remover install --proxy
+```
+
+Without `--target`, `install` shows a checkbox for **Claude Code**,
+**OpenCode**, and **OpenAI Codex CLI** (all unchecked by default). The PII
+backend endpoint/category prompt runs once and that same config is reused
+for every host you pick; installs run in a fixed order — Claude Code →
+OpenCode → Codex — and one target failing doesn't stop the others (final
+exit code is `2` if any selected target failed). Selecting nothing exits
+`64`.
+
+Pass `--target` to skip the checkbox and install exactly one host
+non-interactively — the path used below for automation and single-host
+setups.
+
 ### Claude Code
 
 ```bash
@@ -77,6 +93,16 @@ the same node_modules tree. If resolution fails (e.g. the plugin package
 isn't installed), the installer falls back to a single bare-package entry
 and prints a warning telling you to install the plugin before re-running.
 
+Add `--proxy` (or `--proxy-url`) alongside `--target opencode` and the
+installer also patches `provider.anthropic.options.baseURL` and
+`provider.openai.options.baseURL` in `opencode.json`, independently of each
+other. `--proxy-only` skips the plugin entries above and writes only those
+two base URLs, masking entirely at the proxy. This is a minimal proxy-only
+mode: the default plugin+proxy combination is supported normally, and
+`--proxy-only` is only for when you don't want the plugin installed at all.
+`--proxy-only` only applies when `opencode` is among the selected targets;
+passing it otherwise exits `64`.
+
 ### OpenAI Codex CLI
 
 ```bash
@@ -113,7 +139,7 @@ Per-host base-URL setup:
 | Host | Setup |
 | --- | --- |
 | Claude Code | `export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic/v1` |
-| OpenCode | proxy optional if the plugin is active (plugin alone covers most cases) |
+| OpenCode | proxy optional if the plugin is active (plugin alone covers most cases); `--proxy` sets `provider.anthropic.options.baseURL` and `provider.openai.options.baseURL` to `http://localhost:8000/anthropic/v1` / `http://localhost:8000/openai/v1` |
 | Codex | set `openai_base_url = "http://localhost:8000/codex/v1"` in `~/.codex/config.toml` |
 
 ## CLI
@@ -121,7 +147,7 @@ Per-host base-URL setup:
 | Command | What it does |
 | --- | --- |
 | `pii-remover hook` | Read `UserPromptSubmit` JSON on stdin, write decision on stdout. Called by Claude Code / Codex. |
-| `pii-remover install --target <t> [--scope <s>] [--proxy-url <u>]` | Register hook/plugin. `<t>` = `claude-code` \| `opencode` \| `codex`. |
+| `pii-remover install [--target <t>] [--scope <s>] [--proxy \| --proxy-url <u>] [--proxy-only]` | No `--target`: interactive checkbox over all three hosts (fixed order, one shared PII config, per-target failure isolation). With `--target`: register hook/plugin for exactly `<t>` = `claude-code` \| `opencode` \| `codex` non-interactively. |
 | `pii-remover detect --text <s>` | Mask a string and print tokens + masked text. |
 | `pii-remover health` | `GET /health` against the proxy. |
 | `pii-remover version` | Print package version. |

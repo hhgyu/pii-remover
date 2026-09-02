@@ -2,7 +2,36 @@
 
 pii-remover detects and masks PII (personally identifiable information) in AI prompts before they reach the API — protecting sensitive data like names, phone numbers, emails, and Korean RRN from being sent to external LLMs.
 
-## Install for Claude Code
+## Install (interactive checkbox)
+
+```bash
+npx @pii-remover/cli install --proxy
+```
+
+Running `install` without `--target` shows a checkbox listing **Claude Code**,
+**OpenCode**, and **OpenAI Codex CLI** — all unchecked by default. Pick any
+combination; the installer asks for the PII backend endpoint and category set
+**once** and reuses that same config for every host you select, then installs
+them in a fixed order: Claude Code → OpenCode → Codex.
+
+- Selecting nothing exits with status `64`.
+- Each target install is isolated — one target failing doesn't stop the
+  others — and the command exits `2` at the end if any selected target
+  failed.
+- `--proxy` writes the default proxy root (`http://localhost:8000`) into
+  every selected host's own config. See
+  [Proxy mode](#proxy-mode-let-the-installer-wire-the-base-url) below.
+- `--proxy-only` masks entirely at the proxy: it skips installing the
+  OpenCode plugin (removing any entries this installer added before) and
+  only wires the proxy base URLs. It only makes sense when OpenCode is among
+  the selected targets; the installer exits `64` if it isn't.
+
+## Install a single host explicitly
+
+Pass `--target` to skip the checkbox and install exactly one host
+non-interactively — for automation, CI, or when you only use one tool.
+
+### Claude Code
 
 ```bash
 npx @pii-remover/cli install --target claude-code \
@@ -18,7 +47,7 @@ npx @pii-remover/cli install --target claude-code --scope project \
   --categories private_person,private_email,private_phone,private_address,account_number,private_date,private_url,secret,rrn,biz_num,card
 ```
 
-## Install for OpenCode
+### OpenCode
 
 ```bash
 npx @pii-remover/cli install --target opencode \
@@ -28,7 +57,15 @@ npx @pii-remover/cli install --target opencode \
 
 This adds `@pii-remover/opencode-plugin` to your `opencode.json` plugin array. The plugin intercepts all prompts via the `experimental.text.complete` hook.
 
-## Install for OpenAI Codex CLI
+Add `--proxy-only` to skip the plugin entirely and only wire the proxy base
+URLs (`provider.anthropic.options.baseURL` + `provider.openai.options.baseURL`).
+Masking then happens entirely at the proxy. This is a minimal proxy-only
+mode: the default combination of the plugin and `--proxy` is supported
+normally, and `--proxy-only` is only for when you don't want the plugin
+installed at all. `--proxy-only` is only valid when `opencode` is the (or one
+of the) selected target(s); passing it otherwise exits `64`.
+
+### OpenAI Codex CLI
 
 ```bash
 npx @pii-remover/cli install --target codex \
@@ -115,11 +152,20 @@ npx @pii-remover/cli install --target codex       --proxy
 | --- | --- | --- |
 | Claude Code | `env.ANTHROPIC_BASE_URL` in `settings.json` | `http://localhost:8000/anthropic/v1` |
 | OpenCode | `provider.anthropic.options.baseURL` in `opencode.json` | `http://localhost:8000/anthropic/v1` |
+| OpenCode | `provider.openai.options.baseURL` in `opencode.json` | `http://localhost:8000/openai/v1` |
 | Codex | `openai_base_url` in `config.toml` | `http://localhost:8000/codex/v1` |
 
-The route prefix differs per upstream API and is derived from `--target`, so it
-cannot be mismatched. Use `--proxy-url <url>` instead of `--proxy` to point at a
-remote or non-default proxy; it overrides `--proxy`.
+OpenCode's two entries are patched independently — a conflict on
+`provider.openai` (an existing value pointing elsewhere) never blocks the
+`provider.anthropic` write, or vice versa; each is warned about and left
+alone on its own.
+
+The route suffix differs per upstream API and is derived from the selected
+host, not typed by hand, so it cannot be mismatched. For OpenCode
+specifically, each provider gets its own suffix: `/anthropic/v1` for the
+Anthropic provider and `/openai/v1` for the OpenAI provider. Use
+`--proxy-url <url>` instead of `--proxy` to point at a remote or non-default
+proxy; it overrides `--proxy`.
 
 **The installer never overwrites a base URL that is already set to something
 else.** It leaves the existing value alone and prints a warning that requests
