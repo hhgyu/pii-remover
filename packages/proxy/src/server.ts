@@ -18,7 +18,7 @@ import {
   forwardableRequestHeaders,
   forwardableResponseHeaders,
 } from "./headers.js";
-import { resolveRoute, ROUTE_PATHS } from "./router.js";
+import { resolveRoute, ROUTE_PATHS, type MaskedRouteMatch } from "./router.js";
 import {
   transformAnthropicRequest,
   restoreAnthropicResponse,
@@ -55,7 +55,7 @@ export interface StartProxyOptions {
   port?: number;
   host?: string;
   config?: PiiRemoverConfig;
-  upstream?: { anthropic?: string; openai?: string };
+  upstream?: { anthropic?: string; openai?: string; codex?: string };
   warn?: (msg: string) => void;
   fetch_impl?: FetchLike;
   backends?: PIIRemoverInitOptions["backends"];
@@ -159,35 +159,16 @@ async function handleRequest(
     });
   }
 
-  const { provider, upstreamPath } = route.match;
-  const upstreamPathWithQuery = `${upstreamPath}${url.search}`;
+  const match = route.match;
+  const upstreamUrl = `${normalizeUpstreamBase(
+    resolved.upstream[match.upstream]
+  )}${match.upstreamPath}${url.search}`;
 
-  if (provider === "passthrough_anthropic") {
-    return passthrough(
-      request,
-      `${normalizeUpstreamBase(resolved.upstream.anthropic)}${upstreamPathWithQuery}`,
-      fetchImpl,
-      warn
-    );
+  if (match.transform === "passthrough") {
+    return passthrough(request, upstreamUrl, fetchImpl, warn);
   }
 
-  if (provider === "passthrough_openai") {
-    return passthrough(
-      request,
-      `${normalizeUpstreamBase(resolved.upstream.openai)}${upstreamPathWithQuery}`,
-      fetchImpl,
-      warn
-    );
-  }
-
-  if (provider === "passthrough_codex") {
-    return passthrough(
-      request,
-      `${normalizeUpstreamBase(resolved.upstream.codex)}${upstreamPathWithQuery}`,
-      fetchImpl,
-      warn
-    );
-  }
+  const provider = match.provider;
 
   if (request.method !== "POST") {
     return jsonResponse(405, {
@@ -215,16 +196,15 @@ async function handleRequest(
     });
   }
 
-  if (provider === "anthropic") {
+  if (match.transform === "anthropic_messages") {
     const result = await transformAnthropicRequest(
       parsedBody as AnthropicRequestBody,
       remover,
-      { provider: "anthropic", requestId, thinkingCache }
+      { provider, requestId, thinkingCache }
     );
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
 
-    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.anthropic)}${upstreamPathWithQuery}`;
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -237,7 +217,8 @@ async function handleRequest(
     }
     if (isStreaming) {
       return streamingResponse(upstreamRes, {
-        provider: "anthropic",
+        transform: match.transform,
+        provider,
         remover,
         resolved,
         requestId,
@@ -247,7 +228,7 @@ async function handleRequest(
     }
     const responseBody = (await upstreamRes.json()) as AnthropicResponseBody;
     const restored = await restoreAnthropicResponse(responseBody, remover, {
-      provider: "anthropic",
+      provider,
       requestId,
       thinkingCache,
     });
@@ -258,16 +239,15 @@ async function handleRequest(
     );
   }
 
-  if (provider === "openai") {
+  if (match.transform === "openai_chat") {
     const result = await transformOpenAIRequest(
       parsedBody as OpenAIRequestBody,
       remover,
-      { provider: "openai", requestId }
+      { provider, requestId }
     );
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
 
-    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.openai)}${upstreamPathWithQuery}`;
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -280,7 +260,8 @@ async function handleRequest(
     }
     if (isStreaming) {
       return streamingResponse(upstreamRes, {
-        provider: "openai",
+        transform: match.transform,
+        provider,
         remover,
         resolved,
         requestId,
@@ -289,7 +270,7 @@ async function handleRequest(
     }
     const responseBody = (await upstreamRes.json()) as OpenAIResponseBody;
     const restored = await restoreOpenAIResponse(responseBody, remover, {
-      provider: "openai",
+      provider,
       requestId,
     });
     return jsonResponse(
@@ -299,16 +280,15 @@ async function handleRequest(
     );
   }
 
-  if (provider === "codex") {
+  if (match.transform === "responses") {
     const result = await transformCodexResponsesRequest(
       parsedBody as CodexResponsesRequestBody,
       remover,
-      { provider: "codex", requestId }
+      { provider, requestId }
     );
     if (result.rejection)
       return jsonResponse(result.rejection.status, result.rejection.body);
 
-    const upstreamUrl = `${normalizeUpstreamBase(resolved.upstream.codex)}${upstreamPathWithQuery}`;
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -321,7 +301,8 @@ async function handleRequest(
     }
     if (isStreaming) {
       return streamingResponse(upstreamRes, {
-        provider: "codex",
+        transform: match.transform,
+        provider,
         remover,
         resolved,
         requestId,
@@ -330,7 +311,7 @@ async function handleRequest(
     }
     const responseBody = (await upstreamRes.json()) as CodexResponsesResponseBody;
     const restored = await restoreCodexResponsesResponse(responseBody, remover, {
-      provider: "codex",
+      provider,
       requestId,
     });
     return jsonResponse(
@@ -340,9 +321,10 @@ async function handleRequest(
     );
   }
 
+  const unhandled: never = match.transform;
   return jsonResponse(500, {
     error: "internal",
-    message: "Unreachable provider branch.",
+    message: `Unreachable route transform: ${JSON.stringify(unhandled)}`,
   });
 }
 
@@ -352,6 +334,9 @@ interface StreamingTransformer {
 }
 
 interface StreamingContext {
+  /** Picks the SSE transformer. `provider` cannot: `/openai/v1/responses` is
+   *  audited as `openai` but streams the Responses event shape. */
+  transform: MaskedRouteMatch["transform"];
   provider: ProviderName;
   remover: PIIRemover;
   resolved: ResolvedProxyConfig;
@@ -362,21 +347,26 @@ interface StreamingContext {
 }
 
 function selectStreamTransformer(ctx: StreamingContext): StreamingTransformer {
-  const { provider, remover, resolved, requestId } = ctx;
+  const { transform, provider, remover, resolved, requestId } = ctx;
   const opts = {
     bufferWindow: resolved.buffer_window,
     flushOnClose: resolved.flush_on_close,
     requestId,
     provider,
   };
-  if (provider === "anthropic") {
-    return new AnthropicSseTransformer(remover, {
-      ...opts,
-      ...(ctx.thinkingCache !== undefined ? { thinkingCache: ctx.thinkingCache } : {}),
-    });
+  switch (transform) {
+    case "anthropic_messages":
+      return new AnthropicSseTransformer(remover, {
+        ...opts,
+        ...(ctx.thinkingCache !== undefined
+          ? { thinkingCache: ctx.thinkingCache }
+          : {}),
+      });
+    case "openai_chat":
+      return new OpenAISseTransformer(remover, opts);
+    case "responses":
+      return new CodexSseTransformer(remover, opts);
   }
-  if (provider === "openai") return new OpenAISseTransformer(remover, opts);
-  return new CodexSseTransformer(remover, opts);
 }
 
 function streamingResponse(
