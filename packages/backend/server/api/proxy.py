@@ -26,24 +26,22 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator, Callable
-from typing import Any, Final, Protocol, assert_never
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import Any, Final, assert_never
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import get_proxy_settings
-from ..pii.codec import VaultTokenCodec
 from ..pii.headers import forwardable_request_headers, forwardable_response_headers
-from ..pii.providers import (
-    TokenCodec,
-    restore_anthropic_response,
-    restore_codex_response,
-    restore_openai_response,
-    transform_anthropic_request,
-    transform_codex_request,
-    transform_openai_request,
+from ..pii.pipeline import (
+    StreamContext,
+    create_stream_transformer,
+    mask_request,
+    replay_request,
+    restore_response,
 )
 from ..pii.router import (
     MaskedRouteMatch,
@@ -52,15 +50,10 @@ from ..pii.router import (
     UpstreamKey,
     resolve_route,
 )
-from ..pii.session_pool import ProxySessionPool
+from ..pii.session_pool import ProxySession
 from ..pii.sse import StreamRestoreScope, js_json_dumps
-from ..pii.stream_transformers import (
-    AnthropicSseTransformer,
-    CodexSseTransformer,
-    OpenAISseTransformer,
-)
-from ..pii.token_hash import resolve_token_key
-from ..pii.types import Detection
+from ..pii.thinking_replay import THINKING_REPLAY_REJECTION, ThinkingUnresolvable
+from .proxy_deps import get_http_client, get_session_pool
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["proxy"])
@@ -68,137 +61,11 @@ router = APIRouter(tags=["proxy"])
 PROXY_PATH_PREFIXES: Final = ("/anthropic", "/openai", "/codex")
 
 
-class SseTransformer(Protocol):
-    def push(self, chunk: str) -> str: ...
-
-    def flush(self) -> str: ...
-
-
-class SseTransformerFactory(Protocol):
-    def __call__(
-        self,
-        scope: StreamRestoreScope,
-        *,
-        buffer_window: int,
-        flush_on_close: bool,
-    ) -> SseTransformer: ...
-
-
-_BodyRewrite = Callable[[dict[str, Any], TokenCodec], dict[str, Any]]
-
-# Keyed by transform, never by route provider: `/openai/v1/responses` and
-# `/codex/v1/responses` carry the same Responses body under two providers.
-_REQUEST_TRANSFORMS: Final[dict[MaskedTransform, _BodyRewrite]] = {
-    "anthropic_messages": transform_anthropic_request,
-    "openai_chat": transform_openai_request,
-    "responses": transform_codex_request,
-}
-_RESPONSE_RESTORES: Final[dict[MaskedTransform, _BodyRewrite]] = {
-    "anthropic_messages": restore_anthropic_response,
-    "openai_chat": restore_openai_response,
-    "responses": restore_codex_response,
-}
-_TRANSFORMERS: Final[dict[MaskedTransform, SseTransformerFactory]] = {
-    "anthropic_messages": AnthropicSseTransformer,
-    "openai_chat": OpenAISseTransformer,
-    "responses": CodexSseTransformer,
-}
-
-
-def _detect_in_process(app: Any, text: str) -> list[Detection]:
-    """Run the same detection pipeline ``/redact`` uses, synchronously.
-
-    Reuses ``redact._merge_spans_and_mask`` rather than reimplementing the
-    merge: if the proxy and ``/redact`` disagreed about what counts as PII, the
-    hook's fail-closed gate and the proxy's masking would apply different rules
-    to the same prompt.
-    """
-    from ..regex_pipeline import find_pii_spans
-    from . import redact as redact_api
-
-    opf = getattr(app.state, "opf_runner", None)
-    if opf is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OPF runner not initialised",
-        )
-
-    opf_result = opf.redact(text)
-    regex_spans = find_pii_spans(text)
-
-    person_spans = []
-    kner = getattr(app.state, "korean_ner_runner", None)
-    if kner is not None and redact_api._HANGUL_RE.search(text):
-        person_spans = [s for s in kner.detect(text) if s.klue_tag == "PS"]
-
-    # MUST run before the merge: the merge keeps the widest overlapping span,
-    # so an over-extended OPF span (private_url swallowing an adjacent email)
-    # would drag the narrower detections out with it and leak them to the LLM.
-    # `/redact` and the hook's fail-closed gate still see every detection.
-    excluded = get_proxy_settings().excluded_categories
-    if excluded:
-        opf_result = opf_result.model_copy(
-            update={
-                "detections": [
-                    d for d in opf_result.detections if d.label.lower() not in excluded
-                ]
-            }
-        )
-        regex_spans = [s for s in regex_spans if s.category.lower() not in excluded]
-        person_spans = [s for s in person_spans if s.category.lower() not in excluded]
-
-    merged = (
-        redact_api._merge_spans_and_mask(text, opf_result, person_spans, regex_spans)
-        if (regex_spans or person_spans)
-        else opf_result
-    )
-    return [
-        Detection(
-            start=d.start,
-            end=d.end,
-            category=d.label,
-            confidence=d.score,
-            text=d.text,
-        )
-        for d in merged.detections
-    ]
-
-
-def get_session_pool(app: Any) -> ProxySessionPool:
-    pool = getattr(app.state, "proxy_session_pool", None)
-    if pool is None:
-        resolution = resolve_token_key()
-        if resolution.warning:
-            log.warning("%s", resolution.warning)
-        if resolution.source == "env":
-            log.info("proxy token key resolved from the environment")
-        else:
-            log.warning(
-                "proxy token key resolved from %s, not PII_REMOVER_TOKEN_KEY. "
-                "The key lives on the container filesystem and is lost when the "
-                "container is recreated, so tokens minted now become "
-                "unrestorable and will not match a host-side hook. Set "
-                "PII_REMOVER_TOKEN_KEY to pin it.",
-                resolution.source,
-            )
-        pool = ProxySessionPool(
-            detect=lambda text: _detect_in_process(app, text),
-            token_key=resolution.key,
-            warn=lambda message: log.warning("%s", message),
-        )
-        app.state.proxy_session_pool = pool
-    return pool
-
-
-def get_http_client(app: Any) -> httpx.AsyncClient:
-    client = getattr(app.state, "proxy_http_client", None)
-    if client is None or client.is_closed:
-        client = httpx.AsyncClient(
-            timeout=httpx.Timeout(get_proxy_settings().timeout_seconds),
-            follow_redirects=False,
-        )
-        app.state.proxy_http_client = client
-    return client
+@dataclass(frozen=True, slots=True)
+class _UpstreamCall:
+    url: str
+    headers: dict[str, str]
+    payload: dict[str, Any]
 
 
 def _upstream_base(target: UpstreamKey) -> str:
@@ -241,25 +108,29 @@ async def _relay_passthrough(
 
 def _stream_upstream(
     request: Request,
-    url: str,
-    headers: dict[str, str],
-    payload: dict[str, Any],
-    codec: VaultTokenCodec,
+    call: _UpstreamCall,
+    session: ProxySession,
     transform: MaskedTransform,
 ) -> StreamingResponse:
     settings = get_proxy_settings()
-    scope = StreamRestoreScope(codec.restore)
-    transformer = _TRANSFORMERS[transform](
-        scope,
-        buffer_window=settings.buffer_window,
-        flush_on_close=settings.flush_on_close,
+    transformer = create_stream_transformer(
+        transform,
+        StreamContext(
+            scope=StreamRestoreScope(session.codec.restore),
+            session=session,
+            buffer_window=settings.buffer_window,
+            flush_on_close=settings.flush_on_close,
+        ),
     )
     client = get_http_client(request.app)
 
     async def body() -> AsyncIterator[bytes]:
         try:
             async with client.stream(
-                "POST", url, headers=headers, content=js_json_dumps(payload).encode()
+                "POST",
+                call.url,
+                headers=call.headers,
+                content=js_json_dumps(call.payload).encode(),
             ) as upstream:
                 if upstream.status_code >= 400:
                     await upstream.aread()
@@ -278,6 +149,13 @@ def _stream_upstream(
     return StreamingResponse(body(), media_type="text/event-stream")
 
 
+def _invalid_json(message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"error": "invalid_json", "message": message},
+    )
+
+
 async def _relay_masked(
     request: Request, match: MaskedRouteMatch, raw_body: bytes
 ) -> Response:
@@ -286,32 +164,36 @@ async def _relay_masked(
         body: Any = json.loads(raw_body) if raw_body else {}
     except ValueError as exc:
         log.warning("proxy received invalid JSON: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": "invalid_json", "message": "Request body must be JSON."},
-        )
+        return _invalid_json("Request body must be JSON.")
     if not isinstance(body, dict):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"error": "invalid_json", "message": "Request body must be a JSON object."},
-        )
+        return _invalid_json("Request body must be a JSON object.")
 
-    codec = get_session_pool(request.app).get(request.headers)
-    transform = _REQUEST_TRANSFORMS[transform_kind]
-    masked = await asyncio.to_thread(transform, body, codec)
+    session = get_session_pool(request.app).get(request.headers)
+    replay = replay_request(transform_kind, body, session)
+    # Refused here rather than sent on: a turn missing one of its thinking
+    # blocks draws an opaque 400 from upstream, and the restored text the client
+    # replayed is the user's plaintext PII.
+    if isinstance(replay, ThinkingUnresolvable):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content=THINKING_REPLAY_REJECTION
+        )
+    masked = await asyncio.to_thread(mask_request, transform_kind, replay.body, session.codec)
 
     url = f"{_upstream_base(match.upstream)}{match.upstream_path}"
     if request.url.query:
         url = f"{url}?{request.url.query}"
     headers = forwardable_request_headers(request.headers.items())
     headers["content-type"] = "application/json"
+    call = _UpstreamCall(url=url, headers=headers, payload=masked)
 
     if masked.get("stream") is True:
-        return _stream_upstream(request, url, headers, masked, codec, transform_kind)
+        return _stream_upstream(request, call, session, transform_kind)
 
     client = get_http_client(request.app)
     try:
-        upstream = await client.post(url, headers=headers, content=js_json_dumps(masked).encode())
+        upstream = await client.post(
+            call.url, headers=call.headers, content=js_json_dumps(call.payload).encode()
+        )
     except httpx.HTTPError as exc:
         log.warning("proxy upstream call failed: %s", exc)
         return JSONResponse(
@@ -336,7 +218,7 @@ async def _relay_masked(
             headers=response_headers,
         )
 
-    restored = _RESPONSE_RESTORES[transform_kind](upstream_body, codec)
+    restored = restore_response(transform_kind, upstream_body, session)
     response_headers.pop("content-type", None)
     return Response(
         content=js_json_dumps(restored).encode(),
