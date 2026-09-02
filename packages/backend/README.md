@@ -77,8 +77,19 @@ Providers are selected by path prefix:
 | --- | --- | --- |
 | `POST /anthropic/v1/messages` | `api.anthropic.com/v1/messages` | masked / restored |
 | `POST /openai/v1/chat/completions` | `api.openai.com/v1/chat/completions` | masked / restored |
+| `POST /openai/v1/responses` | `api.openai.com/v1/responses` | masked / restored |
 | `POST /codex/v1/responses` | `api.openai.com/v1/responses` | masked / restored |
-| `/anthropic/api/*`, other `/openai/*`, `/codex/*` | same host | relayed untouched |
+| `/anthropic/api/*`, other `/openai/*` (e.g. `/openai/v1/responses/resp_123`), other `/codex/*` | same host | relayed untouched |
+
+`/openai/v1/responses` and `/codex/v1/responses` carry the same OpenAI
+Responses API body — OpenCode's built-in OpenAI provider posts to the first,
+Codex CLI to the second — and share the same masking/restoration logic,
+while keeping separate upstream identity and route `provider` (`openai` vs
+`codex`). That split matches the TypeScript proxy's route shape and the
+generated test vectors, which retain both columns — but this backend emits
+no audit records today, so `provider` here is parity metadata, not an
+audited identity. Only that exact path is masked; child paths like
+`/openai/v1/responses/resp_123` pass through untouched.
 
 Point your client at it:
 

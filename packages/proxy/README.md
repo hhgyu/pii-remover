@@ -32,12 +32,23 @@ reproduces. They are the specification the parity tests check against.
 
 Single port `8765`, providers selected by URL prefix (ADR-0004):
 
-| Client sends to | Proxy forwards to |
-| --- | --- |
-| `POST /anthropic/v1/messages` | `https://api.anthropic.com/v1/messages` |
-| `POST /openai/v1/chat/completions` | `https://api.openai.com/v1/chat/completions` |
-| `POST /openai/v1/embeddings` | passthrough (no transform) |
-| `GET /health` | `{ ok, version, providers: ["anthropic", "openai"] }` |
+| Client sends to | Proxy forwards to | Masked? |
+| --- | --- | --- |
+| `POST /anthropic/v1/messages` | `https://api.anthropic.com/v1/messages` | ✅ |
+| `POST /openai/v1/chat/completions` | `https://api.openai.com/v1/chat/completions` | ✅ |
+| `POST /openai/v1/responses` | `https://api.openai.com/v1/responses` | ✅ |
+| `POST /codex/v1/responses` | `https://api.openai.com/v1/responses` | ✅ |
+| `POST /openai/v1/embeddings` | passthrough (no transform) | — |
+| other `/openai/*`, `/codex/*` paths (e.g. `/openai/v1/responses/resp_123`) | same host | passthrough |
+| `GET /health` | `{ ok, version, providers: ["anthropic", "openai"] }` | — |
+
+`/openai/v1/responses` and `/codex/v1/responses` are exact-match routes
+carrying the same OpenAI Responses API body — OpenCode's built-in OpenAI
+provider posts to the first, Codex CLI to the second — so they share one
+**transform** (masking + restoration), but keep distinct upstream bases and
+distinct audit `provider` identity (`openai` vs `codex`). Only that exact
+path is masked; child resource paths such as `/openai/v1/responses/resp_123`
+carry no prompt to mask and stay passthrough.
 
 ## Streaming (SSE)
 
@@ -54,7 +65,7 @@ chars at a time across simulated SSE deltas — all reassemble losslessly.
 
 ## What gets masked
 
-| Direction | Anthropic | OpenAI | Codex Responses API |
+| Direction | Anthropic | OpenAI Chat | Responses API (OpenAI + Codex) |
 | --- | --- | --- | --- |
 | Request → upstream | `messages[].content` (string + `{type:"text"}` parts), `system` (string + array) | `messages[].content` (string + `{type:"text"}` parts) | `instructions`, `input` (string + items) |
 | Response ← upstream (non-streaming) | `content[].text` + **`content[].tool_use.input`** (JSON walk) | `choices[].message.content` (string + array) and `choices[].message.tool_calls[].function.arguments` (JSON walk) | `output[].content[].text` + **`output[].arguments`** (JSON walk) |
