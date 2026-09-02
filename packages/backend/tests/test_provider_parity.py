@@ -20,12 +20,14 @@ from typing import Any
 import pytest
 
 from server.pii.providers import (
-    restore_anthropic_response,
     restore_codex_response,
     restore_openai_response,
-    transform_anthropic_request,
     transform_codex_request,
     transform_openai_request,
+)
+from server.pii.providers_anthropic import (
+    restore_anthropic_response,
+    transform_anthropic_request,
 )
 from server.pii.restorer import RestoreOptions, Restorer
 from server.pii.system_note import OPF_PLACEHOLDER_SYSTEM_NOTE

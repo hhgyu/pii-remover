@@ -1,8 +1,12 @@
-"""Non-streaming request/response transforms — port of ``proxy/src/providers/*.ts``.
+"""Non-streaming OpenAI and Codex transforms — port of ``proxy/src/providers/*.ts``.
 
 Request side masks PII before it leaves the machine; response side restores it
 before the client sees it. Streaming goes through
-:mod:`server.pii.stream_transformers` instead.
+:mod:`server.pii.stream_transformers` instead, and Anthropic lives in
+:mod:`server.pii.providers_anthropic` — signed thinking blocks give it a second
+copy of the assistant's text that this module has no reason to know about.
+:class:`TokenCodec` and :func:`walk_restore` stay here; every provider module
+depends on them.
 
 Depends on a :class:`TokenCodec` rather than the whole detection stack so these
 transforms stay unit-testable against a fixed vault, and so the wiring to the
@@ -39,13 +43,13 @@ class TokenCodec(Protocol):
     def restore(self, text: str) -> str: ...
 
 
-def _walk_restore(value: Any, codec: TokenCodec) -> Any:
+def walk_restore(value: Any, codec: TokenCodec) -> Any:
     if isinstance(value, str):
         return codec.restore(value)
     if isinstance(value, list):
-        return [_walk_restore(v, codec) for v in value]
+        return [walk_restore(v, codec) for v in value]
     if isinstance(value, dict):
-        return {k: _walk_restore(v, codec) for k, v in value.items()}
+        return {k: walk_restore(v, codec) for k, v in value.items()}
     return value
 
 
@@ -62,88 +66,7 @@ def _restore_json_arguments(raw: Any, codec: TokenCodec) -> Any:
         parsed = json.loads(raw)
     except ValueError:
         return codec.restore(raw)
-    return js_json_dumps(_walk_restore(parsed, codec))
-
-
-# ---------------------------------------------------------------------------
-# Anthropic
-# ---------------------------------------------------------------------------
-
-
-def _mask_anthropic_blocks(blocks: list[Any], codec: TokenCodec) -> list[Any]:
-    out: list[Any] = []
-    for block in blocks:
-        if not isinstance(block, dict):
-            out.append(block)
-            continue
-        if block.get("type") == "text" and isinstance(block.get("text"), str):
-            out.append({**block, "text": codec.mask(block["text"])})
-            continue
-        out.append(block)
-    return out
-
-
-def _mask_anthropic_system(system: Any, codec: TokenCodec) -> Any:
-    if system is None:
-        return None
-    if isinstance(system, str):
-        return codec.mask(system)
-    if isinstance(system, list):
-        out: list[Any] = []
-        for entry in system:
-            if isinstance(entry, dict) and isinstance(entry.get("text"), str):
-                out.append({**entry, "text": codec.mask(entry["text"])})
-            else:
-                out.append(entry)
-        return out
-    return system
-
-
-def _with_anthropic_note(system: Any) -> Any:
-    if not isinstance(system, list):
-        return append_placeholder_note(system if isinstance(system, str) else None)
-    if any(isinstance(b, dict) and b.get("text") == OPF_PLACEHOLDER_SYSTEM_NOTE for b in system):
-        return system
-    return [*system, {"type": "text", "text": OPF_PLACEHOLDER_SYSTEM_NOTE}]
-
-
-def transform_anthropic_request(raw: dict[str, Any], codec: TokenCodec) -> dict[str, Any]:
-    messages: list[Any] = []
-    for message in raw.get("messages") or []:
-        if not isinstance(message, dict):
-            messages.append(message)
-            continue
-        content = message.get("content")
-        if isinstance(content, str):
-            messages.append({**message, "content": codec.mask(content)})
-        elif isinstance(content, list):
-            messages.append({**message, "content": _mask_anthropic_blocks(content, codec)})
-        else:
-            messages.append(message)
-
-    out = {**raw, "messages": messages}
-    out["system"] = _with_anthropic_note(_mask_anthropic_system(raw.get("system"), codec))
-    return out
-
-
-def restore_anthropic_response(body: dict[str, Any], codec: TokenCodec) -> dict[str, Any]:
-    content = body.get("content")
-    if not isinstance(content, list):
-        return body
-
-    restored: list[Any] = []
-    for block in content:
-        if not isinstance(block, dict):
-            restored.append(block)
-            continue
-        if block.get("type") == "text" and isinstance(block.get("text"), str):
-            restored.append({**block, "text": codec.restore(block["text"])})
-            continue
-        if block.get("type") == "tool_use" and block.get("input") is not None:
-            restored.append({**block, "input": _walk_restore(block["input"], codec)})
-            continue
-        restored.append(block)
-    return {**body, "content": restored}
+    return js_json_dumps(walk_restore(parsed, codec))
 
 
 # ---------------------------------------------------------------------------
