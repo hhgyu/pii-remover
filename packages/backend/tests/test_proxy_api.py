@@ -204,6 +204,161 @@ def test_codex_round_trip_masks_then_restores(client: TestClient, upstream: _Ups
     assert response.json()["output_text"] == f"contact {EMAIL}"
 
 
+def test_openai_responses_round_trip_masks_then_restores(
+    client: TestClient, upstream: _Upstream
+) -> None:
+    """OpenCode's built-in OpenAI provider posts the Responses body here.
+
+    Passthrough on this path ships the whole prompt upstream in the clear —
+    the production Docker leak this route exists to close.
+    """
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        sent = json.loads(request.content)
+        return httpx.Response(200, json={"output_text": sent["input"]})
+
+    upstream.responder = responder
+
+    response = client.post(
+        "/openai/v1/responses",
+        json={"model": "m", "input": f"contact {EMAIL}"},
+    )
+
+    assert response.status_code == 200
+    assert EMAIL not in upstream.last_body_text, "PII reached the upstream"
+    assert "{{OPF:EMAIL:" in upstream.last_body_text
+    assert response.json()["output_text"] == f"contact {EMAIL}", "token never restored"
+
+
+def test_openai_responses_uses_the_openai_upstream(
+    client: TestClient, upstream: _Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The codex upstream is separately configurable and may point elsewhere."""
+    monkeypatch.setenv("PII_PROXY_OPENAI_UPSTREAM", "https://openai.test")
+    monkeypatch.setenv("PII_PROXY_CODEX_UPSTREAM", "https://codex.test")
+    get_proxy_settings.cache_clear()
+
+    upstream.responder = lambda _r: httpx.Response(200, json={"output_text": "ok"})
+    client.post("/openai/v1/responses", json={"model": "m", "input": "hi"})
+
+    sent = upstream.requests[-1].url
+    assert sent.host == "openai.test"
+    assert sent.path == "/v1/responses"
+
+
+def test_codex_responses_still_uses_the_codex_upstream(
+    client: TestClient, upstream: _Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PII_PROXY_OPENAI_UPSTREAM", "https://openai.test")
+    monkeypatch.setenv("PII_PROXY_CODEX_UPSTREAM", "https://codex.test")
+    get_proxy_settings.cache_clear()
+
+    upstream.responder = lambda _r: httpx.Response(200, json={"output_text": "ok"})
+    client.post("/codex/v1/responses", json={"model": "m", "input": "hi"})
+
+    assert upstream.requests[-1].url.host == "codex.test"
+
+
+def test_openai_responses_stream_restores_tokens_split_across_deltas(
+    client: TestClient, upstream: _Upstream
+) -> None:
+    """The Responses SSE shape, reached under the ``/openai`` prefix."""
+
+    def responder(request: httpx.Request) -> httpx.Response:
+        sent = json.loads(request.content)
+        token = sent["input"].split()[-1]
+        head, tail = token[:10], token[10:]
+
+        def event(delta: str) -> str:
+            payload = {
+                "type": "response.output_text.delta",
+                "output_index": 0,
+                "delta": delta,
+            }
+            return f"event: response.output_text.delta\ndata: {json.dumps(payload)}\n\n"
+
+        stream = event(f"Mail {head}") + event(tail) + "event: response.completed\ndata: {}\n\n"
+        return httpx.Response(
+            200, content=stream.encode(), headers={"content-type": "text/event-stream"}
+        )
+
+    upstream.responder = responder
+
+    response = client.post(
+        "/openai/v1/responses",
+        json={"model": "m", "input": f"mail {EMAIL}", "stream": True},
+    )
+
+    assert response.status_code == 200
+    assert EMAIL not in upstream.last_body_text
+    assert EMAIL in response.text, "split token never reassembled"
+    assert "{{OPF:" not in response.text
+
+
+def test_unrelated_openai_paths_stay_passthrough(
+    client: TestClient, upstream: _Upstream
+) -> None:
+    """Only the two chat surfaces mask; ``/v1/embeddings`` must relay verbatim.
+
+    Byte-identical, not merely PII-free: a masking transform on this path would
+    also inject the placeholder system note into a body that has no room for it.
+    """
+    upstream.responder = lambda _r: httpx.Response(200, json={"ok": True})
+    sent = {"model": "text-embedding-3-small", "input": f"mail {EMAIL}"}
+
+    response = client.post("/openai/v1/embeddings", json=sent)
+
+    assert response.status_code == 200
+    assert upstream.requests[-1].url.path == "/v1/embeddings"
+    assert upstream.last_body == sent, "passthrough must not rewrite the body"
+
+
+def test_openai_responses_child_path_stays_passthrough(
+    client: TestClient, upstream: _Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Child paths under /v1/responses (e.g., /v1/responses/resp_123) must stay passthrough.
+
+    Only the exact /v1/responses path is masked; retrieval siblings carry no
+    prompt to mask and must relay untouched to the OpenAI upstream.
+    """
+    monkeypatch.setenv("PII_PROXY_OPENAI_UPSTREAM", "https://openai.test")
+    monkeypatch.setenv("PII_PROXY_CODEX_UPSTREAM", "https://codex.test")
+    get_proxy_settings.cache_clear()
+
+    upstream.responder = lambda _r: httpx.Response(200, json={"ok": True})
+    sent = {"model": "m", "input": f"contact {EMAIL}"}
+
+    response = client.post("/openai/v1/responses/resp_123", json=sent)
+
+    assert response.status_code == 200
+    assert upstream.requests[-1].url.host == "openai.test", "must use OpenAI upstream"
+    assert upstream.requests[-1].url.path == "/v1/responses/resp_123"
+    assert upstream.last_body == sent, "passthrough must not rewrite the body"
+
+
+def test_codex_responses_child_path_stays_passthrough(
+    client: TestClient, upstream: _Upstream, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Child paths under /v1/responses (e.g., /v1/responses/resp_123) must stay passthrough.
+
+    Only the exact /v1/responses path is masked; retrieval siblings carry no
+    prompt to mask and must relay untouched to the Codex upstream.
+    """
+    monkeypatch.setenv("PII_PROXY_OPENAI_UPSTREAM", "https://openai.test")
+    monkeypatch.setenv("PII_PROXY_CODEX_UPSTREAM", "https://codex.test")
+    get_proxy_settings.cache_clear()
+
+    upstream.responder = lambda _r: httpx.Response(200, json={"ok": True})
+    sent = {"model": "m", "input": f"contact {EMAIL}"}
+
+    response = client.post("/codex/v1/responses/resp_123", json=sent)
+
+    assert response.status_code == 200
+    assert upstream.requests[-1].url.host == "codex.test", "must use Codex upstream"
+    assert upstream.requests[-1].url.path == "/v1/responses/resp_123"
+    assert upstream.last_body == sent, "passthrough must not rewrite the body"
+
+
 def test_system_note_is_injected(client: TestClient, upstream: _Upstream) -> None:
     upstream.responder = lambda _r: httpx.Response(200, json={"content": []})
     client.post("/anthropic/v1/messages", json={"model": "m", "messages": [], "system": "be nice"})

@@ -4,6 +4,7 @@ Path-prefix routing on the same port as ``/redact``::
 
     POST /anthropic/v1/messages       -> api.anthropic.com   (masked)
     POST /openai/v1/chat/completions  -> api.openai.com      (masked)
+    POST /openai/v1/responses         -> api.openai.com      (masked)
     POST /codex/v1/responses          -> api.openai.com      (masked)
 
 Threading model, which is the load-bearing decision here:
@@ -26,7 +27,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Callable
-from typing import Any, Final
+from typing import Any, Final, Protocol, assert_never
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response, status
@@ -36,6 +37,7 @@ from ..config import get_proxy_settings
 from ..pii.codec import VaultTokenCodec
 from ..pii.headers import forwardable_request_headers, forwardable_response_headers
 from ..pii.providers import (
+    TokenCodec,
     restore_anthropic_response,
     restore_codex_response,
     restore_openai_response,
@@ -43,7 +45,13 @@ from ..pii.providers import (
     transform_codex_request,
     transform_openai_request,
 )
-from ..pii.router import RouteMatch, resolve_route
+from ..pii.router import (
+    MaskedRouteMatch,
+    MaskedTransform,
+    PassthroughRouteMatch,
+    UpstreamKey,
+    resolve_route,
+)
 from ..pii.session_pool import ProxySessionPool
 from ..pii.sse import StreamRestoreScope, js_json_dumps
 from ..pii.stream_transformers import (
@@ -59,25 +67,41 @@ router = APIRouter(tags=["proxy"])
 
 PROXY_PATH_PREFIXES: Final = ("/anthropic", "/openai", "/codex")
 
-_REQUEST_TRANSFORMS: Final[dict[str, Callable[..., dict[str, Any]]]] = {
-    "anthropic": transform_anthropic_request,
-    "openai": transform_openai_request,
-    "codex": transform_codex_request,
+
+class SseTransformer(Protocol):
+    def push(self, chunk: str) -> str: ...
+
+    def flush(self) -> str: ...
+
+
+class SseTransformerFactory(Protocol):
+    def __call__(
+        self,
+        scope: StreamRestoreScope,
+        *,
+        buffer_window: int,
+        flush_on_close: bool,
+    ) -> SseTransformer: ...
+
+
+_BodyRewrite = Callable[[dict[str, Any], TokenCodec], dict[str, Any]]
+
+# Keyed by transform, never by route provider: `/openai/v1/responses` and
+# `/codex/v1/responses` carry the same Responses body under two providers.
+_REQUEST_TRANSFORMS: Final[dict[MaskedTransform, _BodyRewrite]] = {
+    "anthropic_messages": transform_anthropic_request,
+    "openai_chat": transform_openai_request,
+    "responses": transform_codex_request,
 }
-_RESPONSE_RESTORES: Final[dict[str, Callable[..., dict[str, Any]]]] = {
-    "anthropic": restore_anthropic_response,
-    "openai": restore_openai_response,
-    "codex": restore_codex_response,
+_RESPONSE_RESTORES: Final[dict[MaskedTransform, _BodyRewrite]] = {
+    "anthropic_messages": restore_anthropic_response,
+    "openai_chat": restore_openai_response,
+    "responses": restore_codex_response,
 }
-_TRANSFORMERS: Final[dict[str, Any]] = {
-    "anthropic": AnthropicSseTransformer,
-    "openai": OpenAISseTransformer,
-    "codex": CodexSseTransformer,
-}
-_PASSTHROUGH_TARGET: Final[dict[str, str]] = {
-    "passthrough_anthropic": "anthropic",
-    "passthrough_openai": "openai",
-    "passthrough_codex": "codex",
+_TRANSFORMERS: Final[dict[MaskedTransform, SseTransformerFactory]] = {
+    "anthropic_messages": AnthropicSseTransformer,
+    "openai_chat": OpenAISseTransformer,
+    "responses": CodexSseTransformer,
 }
 
 
@@ -177,7 +201,7 @@ def get_http_client(app: Any) -> httpx.AsyncClient:
     return client
 
 
-def _upstream_base(target: str) -> str:
+def _upstream_base(target: UpstreamKey) -> str:
     settings = get_proxy_settings()
     base = {
         "anthropic": settings.anthropic_upstream,
@@ -187,9 +211,10 @@ def _upstream_base(target: str) -> str:
     return base.rstrip("/")
 
 
-async def _relay_passthrough(request: Request, match: RouteMatch, raw_body: bytes) -> Response:
-    target = _PASSTHROUGH_TARGET[match.provider]
-    url = f"{_upstream_base(target)}{match.upstream_path}"
+async def _relay_passthrough(
+    request: Request, match: PassthroughRouteMatch, raw_body: bytes
+) -> Response:
+    url = f"{_upstream_base(match.upstream)}{match.upstream_path}"
     if request.url.query:
         url = f"{url}?{request.url.query}"
 
@@ -220,11 +245,11 @@ def _stream_upstream(
     headers: dict[str, str],
     payload: dict[str, Any],
     codec: VaultTokenCodec,
-    provider: str,
+    transform: MaskedTransform,
 ) -> StreamingResponse:
     settings = get_proxy_settings()
     scope = StreamRestoreScope(codec.restore)
-    transformer = _TRANSFORMERS[provider](
+    transformer = _TRANSFORMERS[transform](
         scope,
         buffer_window=settings.buffer_window,
         flush_on_close=settings.flush_on_close,
@@ -253,8 +278,10 @@ def _stream_upstream(
     return StreamingResponse(body(), media_type="text/event-stream")
 
 
-async def _relay_masked(request: Request, match: RouteMatch, raw_body: bytes) -> Response:
-    provider = match.provider
+async def _relay_masked(
+    request: Request, match: MaskedRouteMatch, raw_body: bytes
+) -> Response:
+    transform_kind = match.transform
     try:
         body: Any = json.loads(raw_body) if raw_body else {}
     except ValueError as exc:
@@ -270,17 +297,17 @@ async def _relay_masked(request: Request, match: RouteMatch, raw_body: bytes) ->
         )
 
     codec = get_session_pool(request.app).get(request.headers)
-    transform = _REQUEST_TRANSFORMS[provider]
+    transform = _REQUEST_TRANSFORMS[transform_kind]
     masked = await asyncio.to_thread(transform, body, codec)
 
-    url = f"{_upstream_base(provider)}{match.upstream_path}"
+    url = f"{_upstream_base(match.upstream)}{match.upstream_path}"
     if request.url.query:
         url = f"{url}?{request.url.query}"
     headers = forwardable_request_headers(request.headers.items())
     headers["content-type"] = "application/json"
 
     if masked.get("stream") is True:
-        return _stream_upstream(request, url, headers, masked, codec, provider)
+        return _stream_upstream(request, url, headers, masked, codec, transform_kind)
 
     client = get_http_client(request.app)
     try:
@@ -309,7 +336,7 @@ async def _relay_masked(request: Request, match: RouteMatch, raw_body: bytes) ->
             headers=response_headers,
         )
 
-    restored = _RESPONSE_RESTORES[provider](upstream_body, codec)
+    restored = _RESPONSE_RESTORES[transform_kind](upstream_body, codec)
     response_headers.pop("content-type", None)
     return Response(
         content=js_json_dumps(restored).encode(),
@@ -345,18 +372,21 @@ async def proxy_entrypoint(request: Request, provider_prefix: str) -> Response:
     if resolution.kind != "provider" or resolution.match is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
 
-    match = resolution.match
+    route_match = resolution.match
     raw_body = await request.body()
 
-    if match.provider in _PASSTHROUGH_TARGET:
-        return await _relay_passthrough(request, match, raw_body)
-
-    if request.method != "POST":
-        return JSONResponse(
-            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
-            content={
-                "error": "method_not_allowed",
-                "message": "Only POST is supported on provider chat routes.",
-            },
-        )
-    return await _relay_masked(request, match, raw_body)
+    match route_match:
+        case PassthroughRouteMatch():
+            return await _relay_passthrough(request, route_match, raw_body)
+        case MaskedRouteMatch():
+            if request.method != "POST":
+                return JSONResponse(
+                    status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+                    content={
+                        "error": "method_not_allowed",
+                        "message": "Only POST is supported on provider chat routes.",
+                    },
+                )
+            return await _relay_masked(request, route_match, raw_body)
+        case unreachable:
+            assert_never(unreachable)
