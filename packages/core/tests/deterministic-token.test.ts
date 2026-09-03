@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PIIRemover } from "../src/pii-remover.js";
 import { DEFAULT_CONFIG } from "../src/config/schema.js";
 import type { PiiRemoverConfig } from "../src/config/schema.js";
 import {
   tokenHash,
   deriveTokenKey,
+  resolveTokenKey,
+  resolveTokenSecret,
   TOKEN_HASH_LENGTH,
 } from "../src/redaction/token-hash.js";
 
@@ -43,6 +48,55 @@ describe("tokenHash — deterministic base36", () => {
     expect(tokenHash(key, "EMAIL", "value")).not.toBe(
       tokenHash(key, "SECRET", "value"),
     );
+  });
+});
+
+describe("resolveTokenSecret", () => {
+  function withTempKeyDir<T>(fn: (keyPath: string) => T): T {
+    const dir = mkdtempSync(join(tmpdir(), "pii-token-key-"));
+    try {
+      return fn(join(dir, "key"));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  test("returns the env value verbatim so a child process can rederive it", () => {
+    withTempKeyDir((keyPath) => {
+      const r = resolveTokenSecret({
+        env: { PII_REMOVER_TOKEN_KEY: "from-env" },
+        keyPath,
+      });
+      expect(r).toEqual({ secret: "from-env", source: "env" });
+    });
+  });
+
+  test("reads an existing key file", () => {
+    withTempKeyDir((keyPath) => {
+      writeFileSync(keyPath, "  persisted-secret\n", "utf8");
+      const r = resolveTokenSecret({ env: {}, keyPath });
+      expect(r).toEqual({ secret: "persisted-secret", source: "file" });
+    });
+  });
+
+  test("generates and persists a secret when neither env nor file has one", () => {
+    withTempKeyDir((keyPath) => {
+      const r = resolveTokenSecret({ env: {}, keyPath });
+      expect(r.source).toBe("generated");
+      expect(r.secret.length).toBeGreaterThan(0);
+      expect(readFileSync(keyPath, "utf8")).toBe(r.secret);
+
+      const again = resolveTokenSecret({ env: {}, keyPath });
+      expect(again).toEqual({ secret: r.secret, source: "file" });
+    });
+  });
+
+  test("resolveTokenKey derives from exactly this secret", () => {
+    withTempKeyDir((keyPath) => {
+      const secret = resolveTokenSecret({ env: {}, keyPath }).secret;
+      const resolved = resolveTokenKey({ env: {}, keyPath });
+      expect(resolved.key).toEqual(deriveTokenKey(secret));
+    });
   });
 });
 

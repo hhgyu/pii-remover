@@ -92,9 +92,22 @@ export function tokenHash(
   return tokenEpoch(key) + base36Digest(digest, TOKEN_BODY_LENGTH);
 }
 
+export type TokenKeySource = "env" | "file" | "generated" | "ephemeral";
+
 export interface TokenKeyResolution {
   key: Buffer;
-  source: "env" | "file" | "generated" | "ephemeral";
+  source: TokenKeySource;
+  warning?: string;
+}
+
+/**
+ * The same resolution, before HKDF. Handing the raw secret to a child process
+ * (`docker compose up -d`) is the only way the container can derive the *same*
+ * key — it runs its own HKDF over the string, not over our Buffer.
+ */
+export interface TokenSecretResolution {
+  secret: string;
+  source: TokenKeySource;
   warning?: string;
 }
 
@@ -104,7 +117,9 @@ export interface ResolveTokenKeyOptions {
   keyPath?: string;
 }
 
-const DEFAULT_ENV_NAME = "PII_REMOVER_TOKEN_KEY";
+export const TOKEN_KEY_ENV_NAME = "PII_REMOVER_TOKEN_KEY";
+
+const DEFAULT_ENV_NAME = TOKEN_KEY_ENV_NAME;
 
 export function defaultKeyPath(): string {
   return join(homedir(), ".config", "pii-remover", "key");
@@ -121,20 +136,31 @@ export function defaultKeyPath(): string {
 export function resolveTokenKey(
   opts: ResolveTokenKeyOptions = {},
 ): TokenKeyResolution {
+  const resolution = resolveTokenSecret(opts);
+  const key = deriveTokenKey(resolution.secret);
+  return resolution.warning === undefined
+    ? { key, source: resolution.source }
+    : { key, source: resolution.source, warning: resolution.warning };
+}
+
+/** Same resolution order as {@link resolveTokenKey}, stopping before HKDF. */
+export function resolveTokenSecret(
+  opts: ResolveTokenKeyOptions = {},
+): TokenSecretResolution {
   const env = opts.env ?? process.env;
   const envName = opts.envName ?? DEFAULT_ENV_NAME;
   const keyPath = opts.keyPath ?? defaultKeyPath();
 
   const envValue = env[envName];
   if (typeof envValue === "string" && envValue.length > 0) {
-    return { key: deriveTokenKey(envValue), source: "env" };
+    return { secret: envValue, source: "env" };
   }
 
   try {
     if (existsSync(keyPath)) {
       const raw = readFileSync(keyPath, "utf8").trim();
       if (raw.length > 0) {
-        return { key: deriveTokenKey(raw), source: "file" };
+        return { secret: raw, source: "file" };
       }
     }
   } catch {
@@ -145,11 +171,11 @@ export function resolveTokenKey(
   try {
     mkdirSync(join(keyPath, ".."), { recursive: true, mode: 0o700 });
     writeFileSync(keyPath, generated, { encoding: "utf8", mode: 0o600 });
-    return { key: deriveTokenKey(generated), source: "generated" };
+    return { secret: generated, source: "generated" };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     return {
-      key: deriveTokenKey(generated),
+      secret: generated,
       source: "ephemeral",
       warning:
         `[pii-remover] could not persist token key to ${keyPath} (${reason}); ` +

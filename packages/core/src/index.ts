@@ -34,12 +34,16 @@ export {
   tokenEpoch,
   deriveTokenKey,
   resolveTokenKey,
+  resolveTokenSecret,
   defaultKeyPath,
   TOKEN_HASH_LENGTH,
   TOKEN_EPOCH_LENGTH,
+  TOKEN_KEY_ENV_NAME,
 } from "./redaction/token-hash.js";
 export type {
   TokenKeyResolution,
+  TokenSecretResolution,
+  TokenKeySource,
   ResolveTokenKeyOptions,
 } from "./redaction/token-hash.js";
 
