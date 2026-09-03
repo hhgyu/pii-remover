@@ -18,7 +18,9 @@ services:
       # Empty = mask everything detected.
       PII_PROXY_EXCLUDED_CATEGORIES: "${PII_PROXY_EXCLUDED_CATEGORIES:-}"
       # Must match the host-side hook's key, or neither side can restore the
-      # other's tokens. Unset = fresh key per start, nothing survives a restart.
+      # other's tokens. Unset = the container generates its own key, which no
+      # host process holds and which dies with the container. `bun run
+      # backend:up` writes this into packages/backend/.env for you.
       PII_REMOVER_TOKEN_KEY: "${PII_REMOVER_TOKEN_KEY:-}"
       OPF_IDLE_TIMEOUT_SECONDS: "${OPF_IDLE_TIMEOUT_SECONDS:-1800}"
       OPF_IDLE_CHECK_INTERVAL_SECONDS: "${OPF_IDLE_CHECK_INTERVAL_SECONDS:-60}"

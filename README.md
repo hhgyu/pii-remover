@@ -43,15 +43,20 @@
 ### 1) Start the detection backend
 
 ```bash
-cd packages/backend
-docker compose up --build   # ~5-10 min the first time (model weights)
+bun run backend:up   # ~5-10 min the first time (model weights)
 ```
+
+This pins the host's token key into `packages/backend/.env` before starting
+compose, so the container and the host-side hook derive the same key and can
+restore each other's tokens ([token key](./packages/backend/README.md#token-key)).
+A bare `docker compose up` skips that step and the container generates a key
+nothing else holds.
 
 ### 2) Install for your hosts
 
 ```bash
 npx @pii-remover/cli install --proxy
-docker compose -f packages/backend/docker-compose.yml up -d
+bun run backend:up
 ```
 
 Without `--target`, `install` shows a checkbox for **Claude Code**,

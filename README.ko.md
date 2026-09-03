@@ -43,15 +43,19 @@
 ### 1) 백엔드 가동 (PII 검출 서버)
 
 ```bash
-cd packages/backend
-docker compose up --build   # 초회 ~5-10분 (모델 weights 다운로드)
+bun run backend:up   # 초회 ~5-10분 (모델 weights 다운로드)
 ```
+
+컴포즈를 띄우기 전에 호스트의 토큰 키를 `packages/backend/.env`에 고정하므로,
+컨테이너와 호스트 훅이 같은 키를 파생해 서로의 토큰을 복원할 수 있습니다
+([토큰 키](./packages/backend/README.md#token-key)). 그냥 `docker compose up`을
+쓰면 이 단계가 생략되어 컨테이너가 아무도 갖고 있지 않은 키를 새로 만듭니다.
 
 ### 2) 호스트 통합 설치
 
 ```bash
 npx @pii-remover/cli install --proxy
-docker compose -f packages/backend/docker-compose.yml up -d
+bun run backend:up
 ```
 
 `--target` 없이 실행하면 **Claude Code**, **OpenCode**, **OpenAI Codex CLI**

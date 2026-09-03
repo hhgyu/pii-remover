@@ -26,6 +26,16 @@ The corresponding Dockerfiles are `Dockerfile`, `Dockerfile.gpu`, and
 ## Quick start (CPU, default)
 
 ```bash
+bun run backend:up        # from the repo root
+```
+
+This resolves the host's token key first (see [Token key](#token-key)) and
+writes it to `packages/backend/.env`, then runs `docker compose up -d`. To
+build from source or watch the logs, run compose directly — the `.env` written
+above is picked up automatically:
+
+```bash
+bun run backend:env       # once, to create packages/backend/.env
 cd packages/backend
 docker compose up --build
 ```
@@ -106,7 +116,7 @@ before restoration, so the client never sees a half-token.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PII_PROXY_ENABLED` | `0` | Master switch. **Off by default** — this image also ships as a standalone shared detection backend, and enabling an outbound proxy there would start relaying callers' API keys. The bundled compose sets it to `1`. |
-| `PII_REMOVER_TOKEN_KEY` | (unset) | Secret the token HMAC is derived from. Must match the host-side hook's key. |
+| `PII_REMOVER_TOKEN_KEY` | (auto-injected) | Secret the token HMAC is derived from. Must match the host-side hook's key — see [Token key](#token-key). |
 | `PII_PROXY_ANTHROPIC_UPSTREAM` | `https://api.anthropic.com` | Upstream override |
 | `PII_PROXY_OPENAI_UPSTREAM` | `https://api.openai.com` | Upstream override |
 | `PII_PROXY_CODEX_UPSTREAM` | `https://api.openai.com` | Upstream override |
@@ -192,11 +202,33 @@ environment:
   PII_PROXY_ENABLED: "0"    # shared server: detection only, as before
 ```
 
-**Set `PII_REMOVER_TOKEN_KEY`.** Tokens are `HMAC(key, category + text)`, so the
-key decides the token. The TypeScript hook running on the host and this
-container must derive the same key or neither can restore the other's tokens.
-Leave it unset and the container mints a fresh key on every start, so nothing
-survives a restart.
+**Don't start this container with a bare `docker compose up`.** See
+[Token key](#token-key) — without the host's key injected, the container mints
+one of its own and every token it produces is unrestorable on the host.
+
+## Token key
+
+Tokens are `HMAC(key, category + text)`, so the key decides the token. The
+TypeScript hook running on the host and this container must derive the same key
+or neither can restore the other's tokens.
+
+Both sides resolve the key the same way — `PII_REMOVER_TOKEN_KEY` env var, then
+`~/.config/pii-remover/key`, then generate-and-persist. The trap is that the
+container's filesystem is its own: left to itself it generates a *different*
+key, which no host process holds and which dies with the container.
+
+So the host's key is injected instead, automatically, on both start paths:
+
+| Start path | How the key gets in |
+| --- | --- |
+| `bun run backend:up` / `bun run backend:env` | `scripts/ensure-backend-env.ts` writes `PII_REMOVER_TOKEN_KEY` into `packages/backend/.env`, which compose interpolates |
+| `backend.auto_start: true` ([ADR-0019](../../docs/ADR/0019-backend-auto-start-and-idle-unload.md)) | injected straight into the `docker compose up -d` child environment |
+
+Both reuse an already-set `PII_REMOVER_TOKEN_KEY` and are idempotent, so an
+explicit key — a shared team key, a secrets manager — always wins.
+
+`packages/backend/.env` holds a plaintext secret. It is gitignored; keep it
+that way.
 
 ## HTTP API
 
