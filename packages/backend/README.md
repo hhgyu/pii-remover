@@ -39,7 +39,7 @@ When healthy, exercise the API:
 
 ```bash
 curl -s http://localhost:8000/health
-# {"ok":true,"version":"0.0.4","model":"openai/privacy-filter","device":"cpu","model_loaded":true}
+# {"ok":true,"version":"0.0.5","model":"openai/privacy-filter","device":"cpu","model_loaded":true}
 
 curl -s -X POST http://localhost:8000/redact \
   -H 'content-type: application/json' \
@@ -207,7 +207,7 @@ All endpoints accept and return `application/json` unless noted otherwise.
 ```json
 {
   "ok": true,
-  "version": "0.0.4",
+  "version": "0.0.5",
   "model": "openai/privacy-filter",
   "device": "cpu",
   "model_loaded": true
