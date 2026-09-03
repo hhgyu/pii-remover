@@ -4,6 +4,10 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { FailClosedError } from "../policy/failure.js";
+import {
+  resolveTokenSecret,
+  TOKEN_KEY_ENV_NAME,
+} from "../redaction/token-hash.js";
 
 /**
  * Backend auto-start: optionally spawn `docker compose up -d` for the
@@ -37,6 +41,7 @@ export interface AutoStartOptions {
   ) => Promise<Response>;
   spawnImpl?: typeof spawn;
   composePathResolver?: (selector: string) => string | null;
+  env?: NodeJS.ProcessEnv;
 }
 
 const HEALTH_POLL_INTERVAL_MS = 1000;
@@ -111,7 +116,11 @@ export async function maybeAutoStartBackend(opts: AutoStartOptions): Promise<voi
     );
 
     try {
-      await runComposeUp(composePath, opts.spawnImpl ?? spawn);
+      await runComposeUp(
+        composePath,
+        opts.spawnImpl ?? spawn,
+        composeEnv(opts.env ?? process.env, opts.warn)
+      );
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       throw new FailClosedError(
@@ -238,15 +247,37 @@ async function safeReadDetail(res: Response): Promise<string | null> {
   }
 }
 
+/**
+ * Pin the host's token secret for the container we are about to start.
+ *
+ * Left unset, the container resolves a key of its own on the container
+ * filesystem — a key this host never holds, so every token the proxy mints is
+ * unrestorable here, and it dies with the container anyway. Both ends run the
+ * same HKDF over this string, so passing it makes them agree.
+ */
+function composeEnv(
+  env: NodeJS.ProcessEnv,
+  warn: (msg: string) => void
+): NodeJS.ProcessEnv {
+  const existing = env[TOKEN_KEY_ENV_NAME];
+  if (typeof existing === "string" && existing.length > 0) return env;
+
+  const resolution = resolveTokenSecret({ env });
+  if (resolution.warning) warn(resolution.warning);
+  return { ...env, [TOKEN_KEY_ENV_NAME]: resolution.secret };
+}
+
 function runComposeUp(
   composePath: string,
-  spawnImpl: typeof spawn
+  spawnImpl: typeof spawn,
+  env: NodeJS.ProcessEnv
 ): Promise<void> {
   return new Promise<void>((resolvePromise, reject) => {
     const args = ["compose", "-f", composePath, "up", "-d"];
     const spawnOpts: SpawnOptionsWithoutStdio = {
       cwd: dirname(composePath),
       windowsHide: true,
+      env,
     };
     let child;
     try {

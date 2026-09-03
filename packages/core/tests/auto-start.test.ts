@@ -105,6 +105,8 @@ describe("maybeAutoStartBackend", () => {
       startTimeoutMs: 4000,
       warn: silentWarn(),
       bypassEnv: "PII_REMOVER_BYPASS",
+      // Pins the token secret so the suite never touches ~/.config/pii-remover/key.
+      env: { PII_REMOVER_TOKEN_KEY: "auto-start-test-key" },
     };
 
   test("no-op when disabled", async () => {
@@ -330,5 +332,32 @@ describe("maybeAutoStartBackend", () => {
     expect(r2.status).toBe("fulfilled");
     expect(spawnCalls).toBe(1);
     expect(logs.some((l) => l.includes("auto-start already in progress"))).toBe(true);
+  });
+
+  test("passes the host token secret to docker compose", async () => {
+    _resetAutoStartDedup();
+    let spawnEnv: NodeJS.ProcessEnv | undefined;
+    const capturingSpawn = (
+      _cmd: unknown,
+      _args: unknown,
+      opts: { env?: NodeJS.ProcessEnv }
+    ) => {
+      spawnEnv = opts.env;
+      const fn = mkSpawn({ exitCode: 0 }) as (...a: unknown[]) => unknown;
+      return fn();
+    };
+
+    await maybeAutoStartBackend({
+      ...base,
+      fetchImpl: mkFetch([
+        { ok: false, loaded: false },
+        { ok: false, loaded: false },
+        { ok: true, loaded: true },
+      ]),
+      spawnImpl: capturingSpawn as never,
+      composePathResolver: () => "/fake/docker-compose.yml",
+    });
+
+    expect(spawnEnv?.PII_REMOVER_TOKEN_KEY).toBe("auto-start-test-key");
   });
 });
