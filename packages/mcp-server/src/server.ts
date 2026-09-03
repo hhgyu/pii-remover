@@ -34,7 +34,7 @@ import {
 } from "./tools/analyze.js";
 
 const DEFAULT_NAME = "pii-remover";
-const DEFAULT_VERSION = "0.0.5";
+const DEFAULT_VERSION = "0.0.6";
 
 export interface PiiRemoverMcpServer {
   readonly mcp: McpServer;
