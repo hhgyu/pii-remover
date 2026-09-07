@@ -180,6 +180,45 @@ def test_a_fresh_session_pool_refuses_a_stale_replay(
     assert len(proxy_upstream.requests) == forwarded_before
 
 
+def test_a_fresh_session_pool_still_serves_a_replay_whose_thinking_is_empty(
+    proxy_app: FastAPI, proxy_client: TestClient, proxy_upstream: ProxyUpstream
+) -> None:
+    """The 89-message session this guard cost: adaptive-thinking models sign an
+    empty ``thinking``, so every block was unresolvable after a restart and the
+    conversation could never be resumed — to substitute "" for ""."""
+    # Given: a pool that never saw the signature the client is about to replay
+    proxy_app.state.proxy_session_pool = None
+    proxy_upstream.responder = lambda _r: httpx.Response(200, json={"content": []})
+
+    # When: the client replays a signed block whose thinking is empty
+    response = proxy_client.post(MESSAGES_PATH, json=_replay_turn("", STALE_SIGNATURE))
+
+    # Then: the turn is forwarded intact instead of being refused
+    assert response.status_code == 200
+    forwarded = proxy_upstream.last_body["messages"][1]["content"]
+    assert forwarded[0] == {"type": "thinking", "thinking": "", "signature": STALE_SIGNATURE}
+    assert forwarded[1] == {"type": "text", "text": "Working on it."}
+
+
+def test_adaptive_thinking_drops_an_unresolvable_block_instead_of_refusing(
+    proxy_app: FastAPI, proxy_client: TestClient, proxy_upstream: ProxyUpstream
+) -> None:
+    # Given: a restarted pool and a replay carrying restored PII
+    proxy_app.state.proxy_session_pool = None
+    proxy_upstream.responder = lambda _r: httpx.Response(200, json={"content": []})
+    body = _replay_turn(f"Reply to {PERSON} about it.", STALE_SIGNATURE)
+    body["thinking"] = {"type": "adaptive"}
+
+    # When: the turn is replayed under adaptive thinking
+    response = proxy_client.post(MESSAGES_PATH, json=body)
+
+    # Then: the session survives, the block is gone, and the PII never travels
+    assert response.status_code == 200
+    forwarded = proxy_upstream.last_body["messages"][1]["content"]
+    assert forwarded == [{"type": "text", "text": "Working on it."}]
+    assert PERSON not in proxy_upstream.last_body_text
+
+
 def test_non_streaming_thinking_is_restored_then_replayed(
     proxy_client: TestClient, proxy_upstream: ProxyUpstream
 ) -> None:

@@ -11,15 +11,18 @@ import type {
  * put those exact bytes back on the way in.
  *
  * Anthropic verifies a replayed `thinking` block against its opaque signature
- * and requires the assistant turn to be echoed back whole — a request that
- * quietly omits one block is answered with a 400 the user cannot diagnose. The
- * proxy, meanwhile, shows the user *restored* thinking, so the bytes the client
- * replays are not the bytes that were signed and no masking pass can rebuild
- * them (the token hash is minted per vault entry).
+ * and rejects the request unless the bytes are identical to what it emitted.
+ * The proxy, meanwhile, shows the user *restored* thinking, so the bytes the
+ * client replays are not the bytes that were signed. Re-masking is not a way
+ * back either: detection is a model, and one span it fails to re-detect on the
+ * second pass would put plaintext PII on the wire.
  *
- * Hence the two rules this module encodes:
+ * Hence the rules this module encodes:
  * - Restore for display **only** when the signed bytes were cached first.
- * - Resolve a replayed turn **all or nothing** — never drop a block.
+ * - **Never forward** a block that cannot be resolved.
+ * - An empty `thinking` was never restored, so it bypasses the cache.
+ * - Dropping an unresolvable block beats refusing the turn where upstream
+ *   allows it — see {@link thinkingDropAllowed}.
  */
 
 export function isAnthropicThinkingBlock(
@@ -66,7 +69,8 @@ type BlockReplay =
  */
 export function replayThinking(
   msgs: AnthropicMessage[] | undefined,
-  cache: ThinkingCache | undefined
+  cache: ThinkingCache | undefined,
+  allowDrop = false
 ): ThinkingReplay {
   const messages = Array.isArray(msgs) ? msgs : [];
   if (cache === undefined) return { kind: "replayed", messages };
@@ -80,12 +84,27 @@ export function replayThinking(
     const blocks: AnthropicContentBlock[] = [];
     for (const block of message.content) {
       const replay = resolveThinkingBlock(block, cache);
-      if (replay.kind === "unresolvable") return { kind: "unresolvable" };
+      if (replay.kind === "unresolvable") {
+        if (!allowDrop) return { kind: "unresolvable" };
+        continue;
+      }
       blocks.push(replay.block);
     }
     out.push({ ...message, content: blocks });
   }
   return { kind: "replayed", messages: out };
+}
+
+/**
+ * Verified against the live API for `adaptive`: an assistant turn with its
+ * thinking blocks removed is accepted. Manual mode still requires the final
+ * assistant turn to begin with a thinking block, so dropping stays off there.
+ */
+export function thinkingDropAllowed(body: unknown): boolean {
+  if (typeof body !== "object" || body === null) return false;
+  const thinking = (body as { thinking?: unknown }).thinking;
+  if (typeof thinking !== "object" || thinking === null) return false;
+  return (thinking as { type?: unknown }).type === "adaptive";
 }
 
 /**
@@ -100,6 +119,11 @@ function resolveThinkingBlock(
     return { kind: "forward", block };
   }
   if (!isAnthropicThinkingBlock(block)) return { kind: "unresolvable" };
+  // Safe because `restore` only swaps a token for its original and never
+  // empties a string: "" on the way in proves "" is what upstream signed, so
+  // there is no plaintext to leak. Adaptive-thinking models return this shape
+  // for *every* block, which makes a cache miss here fatal for nothing.
+  if (block.thinking === "") return { kind: "forward", block };
   const signed = cache.get(block.signature);
   if (signed === undefined) return { kind: "unresolvable" };
   return { kind: "forward", block: { ...block, thinking: signed } };

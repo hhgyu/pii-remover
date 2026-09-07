@@ -10,6 +10,10 @@ import {
   restoreAnthropicResponse,
   transformAnthropicRequest,
 } from "../src/providers/anthropic.js";
+import {
+  replayThinking,
+  thinkingDropAllowed,
+} from "../src/providers/thinking-replay.js";
 import type {
   AnthropicContentBlock,
   AnthropicMessage,
@@ -537,5 +541,66 @@ describe("thinking round trip — stream out, replay in", () => {
     const thinking = onlyThinkingBlock(blocksOf(out.body.messages[0]));
     expect(thinking.thinking).toBe("");
     expect(thinking.signature).toBe(SIGNATURE);
+  });
+});
+
+describe("replayThinking — empty thinking needs no cache", () => {
+  test("an empty block survives a cache it was never stored in", () => {
+    // Given: an empty cache and a signed block whose thinking is empty
+    const cache = createThinkingCache();
+    const messages: AnthropicMessage[] = [
+      assistantTurn([
+        { type: "thinking", thinking: "", signature: OTHER_SIGNATURE },
+        { type: "text", text: "Working on it." },
+      ]),
+    ];
+
+    // When: the turn is resolved against a signature nobody cached
+    const replay = replayThinking(messages, cache);
+
+    // Then: the block is forwarded verbatim rather than killing the turn
+    expect(replay.kind).toBe("replayed");
+    if (replay.kind !== "replayed") throw new Error("unreachable");
+    expect(blocksOf(replay.messages[0])).toEqual(messages[0]!.content as AnthropicContentBlock[]);
+  });
+});
+
+describe("replayThinking — dropping where upstream allows it", () => {
+  test("dropping is offered only for adaptive thinking", () => {
+    // Given / When / Then: manual mode keeps the final-turn thinking requirement
+    expect(thinkingDropAllowed({ thinking: { type: "adaptive" } })).toBe(true);
+    expect(thinkingDropAllowed({ thinking: { type: "enabled" } })).toBe(false);
+    expect(thinkingDropAllowed({ thinking: "adaptive" })).toBe(false);
+    expect(thinkingDropAllowed({})).toBe(false);
+    expect(thinkingDropAllowed(null)).toBe(false);
+  });
+
+  test("an unresolvable block is dropped and the rest of the turn survives", async () => {
+    // Given: a cache holding the first of two replayed signatures
+    const remover = await makeRemover();
+    const { raw, restored } = await thinkingPair(remover);
+    const cache = createThinkingCache();
+    cache.set(SIGNATURE, raw);
+
+    // When: the turn is resolved with dropping permitted
+    const replay = replayThinking(
+      [
+        assistantTurn([
+          { type: "thinking", thinking: restored, signature: SIGNATURE },
+          { type: "thinking", thinking: restored, signature: OTHER_SIGNATURE },
+          { type: "text", text: "Working on it." },
+        ]),
+      ],
+      cache,
+      true
+    );
+
+    // Then: the resolvable block and the text survive, and no PII travels
+    expect(replay.kind).toBe("replayed");
+    if (replay.kind !== "replayed") throw new Error("unreachable");
+    const blocks = blocksOf(replay.messages[0]);
+    expect(blocks.map((b) => b.type)).toEqual(["thinking", "text"]);
+    expect(onlyThinkingBlock(blocks).thinking).toBe(raw);
+    expect(JSON.stringify(replay.messages)).not.toContain(PII);
   });
 });

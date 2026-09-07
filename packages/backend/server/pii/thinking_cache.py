@@ -5,11 +5,13 @@ Anthropic verifies a replayed ``thinking`` block against its opaque
 ``signature`` and rejects the request with 400 unless the bytes are identical to
 what it emitted. The proxy, however, hands the client *restored* thinking so the
 user can read their own PII — so the bytes the client replays are not the bytes
-that were signed, and no masking pass can reconstruct them (the token hash is
-minted per vault entry, and the signature covers the exact original string).
+that were signed. Re-masking them is not a sound way back: detection is a model,
+and a single span it fails to re-detect on the second pass would put plaintext
+PII on the wire.
 
 The only sound answer is to remember the original: cache the upstream bytes
 under their signature on the way out, and substitute them back on the way in.
+Blocks whose ``thinking`` is empty were never restored and bypass this cache.
 
 Invariants:
 

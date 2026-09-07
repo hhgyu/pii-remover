@@ -5,16 +5,19 @@ Cache what Anthropic signed on the way out, put those exact bytes back on the
 way in.
 
 Anthropic verifies a replayed ``thinking`` block against its opaque signature
-and requires the assistant turn to be echoed back whole — a request that quietly
-omits one block is answered with a 400 the user cannot diagnose. The proxy,
-meanwhile, shows the user *restored* thinking, so the bytes the client replays
-are not the bytes that were signed and no masking pass can rebuild them (the
-token hash is minted per vault entry).
+and rejects the request unless the bytes are identical to what it emitted. The
+proxy, meanwhile, shows the user *restored* thinking, so the bytes the client
+replays are not the bytes that were signed. Re-masking is not a way back either:
+detection is a model, and one span it fails to re-detect on the second pass
+would put plaintext PII on the wire.
 
-Hence the two rules this module encodes:
+Hence the rules this module encodes:
 
 - Restore for display **only** when the signed bytes were cached first.
-- Resolve a replayed turn **all or nothing** — never drop a block.
+- **Never forward** a block that cannot be resolved.
+- An empty ``thinking`` was never restored, so it bypasses the cache.
+- Dropping an unresolvable block beats refusing the turn where upstream allows
+  it — see :func:`thinking_drop_allowed`.
 """
 
 from __future__ import annotations
@@ -78,13 +81,17 @@ def is_anthropic_thinking_block(block: Any) -> bool:
     )
 
 
-def replay_thinking(messages: Any, cache: ThinkingCache | None) -> ThinkingReplay:
+def replay_thinking(
+    messages: Any, cache: ThinkingCache | None, *, allow_drop: bool = False
+) -> ThinkingReplay:
     """Swap every replayed thinking block back to the bytes Anthropic signed.
 
     With no cache nothing was ever restored, so there is nothing to undo and the
-    messages pass through untouched. With a cache, a block that cannot be
-    resolved fails the whole request: dropping it would draw an opaque 400 from
-    upstream, and forwarding it would put the user's plaintext PII on the wire.
+    messages pass through untouched.
+
+    An unresolvable block is never forwarded — that would put the user's
+    plaintext PII on the wire. ``allow_drop`` decides what happens instead:
+    drop the block and keep the turn alive, or refuse the whole request.
     """
     msgs: list[Any] = messages if isinstance(messages, list) else []
     if cache is None:
@@ -100,13 +107,25 @@ def replay_thinking(messages: Any, cache: ThinkingCache | None) -> ThinkingRepla
             replay = _resolve_thinking_block(block, cache)
             match replay:
                 case ThinkingUnresolvable():
-                    return ThinkingUnresolvable()
+                    if not allow_drop:
+                        return ThinkingUnresolvable()
                 case _ForwardBlock(block=resolved):
                     blocks.append(resolved)
                 case unreachable:
                     assert_never(unreachable)
         out.append({**message, "content": blocks})
     return ThinkingReplayed(messages=out)
+
+
+def thinking_drop_allowed(body: Any) -> bool:
+    """Verified against the live API for ``adaptive``: an assistant turn with its
+    thinking blocks removed is accepted. Manual mode still requires the final
+    assistant turn to begin with a thinking block, so dropping stays off there.
+    """
+    if not isinstance(body, dict):
+        return False
+    thinking = body.get("thinking")
+    return isinstance(thinking, dict) and thinking.get("type") == "adaptive"
 
 
 def restore_thinking_block(
@@ -151,6 +170,12 @@ def _resolve_thinking_block(block: Any, cache: ThinkingCache) -> _BlockReplay:
         return _ForwardBlock(block=block)
     if not is_anthropic_thinking_block(block):
         return ThinkingUnresolvable()
+    # Safe because ``restore`` only swaps a token for its original and never
+    # empties a string: "" on the way in proves "" is what upstream signed, so
+    # there is no plaintext to leak. Adaptive-thinking models return this shape
+    # for *every* block, which makes a cache miss here fatal for nothing.
+    if block["thinking"] == "":
+        return _ForwardBlock(block=block)
     signed = cache.get(block["signature"])
     if signed is None:
         return ThinkingUnresolvable()

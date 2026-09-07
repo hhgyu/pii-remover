@@ -35,6 +35,7 @@ from .thinking_replay import (
     ThinkingReplayed,
     ThinkingUnresolvable,
     replay_thinking,
+    thinking_drop_allowed,
 )
 
 
@@ -68,7 +69,11 @@ def replay_request(
     """Resolve replayed thinking back to the bytes upstream signed, or refuse."""
     match transform:
         case "anthropic_messages":
-            replay = replay_thinking(body.get("messages"), session.thinking_cache)
+            replay = replay_thinking(
+                body.get("messages"),
+                session.thinking_cache,
+                allow_drop=thinking_drop_allowed(body),
+            )
             match replay:
                 case ThinkingUnresolvable():
                     return ThinkingUnresolvable()

@@ -17,6 +17,7 @@ from server.pii.thinking_replay import (
     ThinkingReplayed,
     ThinkingUnresolvable,
     replay_thinking,
+    thinking_drop_allowed,
 )
 from tests.conftest import EMAIL, ThinkingPair
 from tests.fixtures.anthropic_sse import aggregate, block_stop, signature_delta, thinking_delta
@@ -212,6 +213,109 @@ def test_non_anthropic_bodies_are_forwarded_untouched(thinking_pair: ThinkingPai
     # Then: the body is the same object's content, unmodified
     assert isinstance(replay, ReplayedRequest)
     assert replay.body == body
+
+
+# --------------------------------------------------------------------------
+# an empty thinking block was never restored, so it needs no cache
+# --------------------------------------------------------------------------
+
+
+def test_an_empty_thinking_block_survives_a_cache_it_was_never_stored_in() -> None:
+    """Adaptive-thinking models sign an empty ``thinking`` for every block, so a
+    lookup here would refuse whole sessions for a substitution of "" by ""."""
+    # Given: an empty cache and a signed block whose thinking is empty
+    cache = ThinkingCache()
+    messages = [
+        _assistant_turn(
+            [
+                {"type": "thinking", "thinking": "", "signature": OTHER_SIGNATURE},
+                {"type": "text", "text": "Working on it."},
+            ]
+        )
+    ]
+
+    # When: the turn is resolved against a signature nobody cached
+    replay = replay_thinking(messages, cache)
+
+    # Then: the block is forwarded verbatim rather than killing the turn
+    blocks = _replayed_blocks(replay)
+    assert blocks[0] == {"type": "thinking", "thinking": "", "signature": OTHER_SIGNATURE}
+    assert blocks[1] == {"type": "text", "text": "Working on it."}
+
+
+# --------------------------------------------------------------------------
+# dropping an unresolvable block where upstream allows it
+# --------------------------------------------------------------------------
+
+
+def test_dropping_is_offered_only_for_adaptive_thinking() -> None:
+    # Given / When / Then: manual mode keeps the final-turn thinking requirement
+    assert thinking_drop_allowed({"thinking": {"type": "adaptive"}}) is True
+    assert thinking_drop_allowed({"thinking": {"type": "enabled"}}) is False
+    assert thinking_drop_allowed({"thinking": "adaptive"}) is False
+    assert thinking_drop_allowed({}) is False
+    assert thinking_drop_allowed(None) is False
+
+
+def test_allow_drop_removes_the_unresolvable_block_and_keeps_the_turn_alive(
+    thinking_pair: ThinkingPair,
+) -> None:
+    # Given: a cache holding the first of two replayed signatures
+    cache = ThinkingCache()
+    cache.set(SIGNATURE, thinking_pair.raw)
+    messages = [
+        _assistant_turn(
+            [
+                {"type": "thinking", "thinking": thinking_pair.restored, "signature": SIGNATURE},
+                {
+                    "type": "thinking",
+                    "thinking": thinking_pair.restored,
+                    "signature": OTHER_SIGNATURE,
+                },
+                {"type": "text", "text": "Working on it."},
+            ]
+        )
+    ]
+
+    # When: the turn is resolved with dropping permitted
+    replay = replay_thinking(messages, cache, allow_drop=True)
+
+    # Then: the resolvable block and the text survive, the unresolvable one is gone
+    blocks = _replayed_blocks(replay)
+    assert [b["type"] for b in blocks] == ["thinking", "text"]
+    assert blocks[0]["thinking"] == thinking_pair.raw
+    assert blocks[1] == {"type": "text", "text": "Working on it."}
+
+
+def test_allow_drop_still_never_puts_restored_plaintext_on_the_wire(
+    thinking_pair: ThinkingPair,
+) -> None:
+    """Dropping replaces refusal, not the leak guard: the block goes, the PII
+    does not travel."""
+    # Given: an empty cache and a block carrying live PII
+    cache = ThinkingCache()
+
+    # When: the turn is resolved with dropping permitted
+    replay = replay_thinking(
+        [
+            _assistant_turn(
+                [
+                    {
+                        "type": "thinking",
+                        "thinking": thinking_pair.restored,
+                        "signature": OTHER_SIGNATURE,
+                    }
+                ]
+            )
+        ],
+        cache,
+        allow_drop=True,
+    )
+
+    # Then: the turn survives with no thinking block and no plaintext
+    assert isinstance(replay, ThinkingReplayed)
+    assert _replayed_blocks(replay) == []
+    assert EMAIL not in json.dumps(replay.messages, ensure_ascii=False)
 
 
 # --------------------------------------------------------------------------
