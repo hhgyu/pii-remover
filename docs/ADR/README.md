@@ -35,6 +35,7 @@
 | 0020 | [결정론적 해시 토큰 `__OPF_<CATEGORY>__<HASH>__`](./0020-deterministic-hash-token.md) | Accepted (문법만 0022가 대체) | 2026-06-12 |
 | 0021 | [토큰 epoch 접두 + vault 경계 복구](./0021-token-epoch-and-bounded-repair.md) | Accepted | 2026-08-10 |
 | 0022 | [Markdown 중립 토큰 구분자 `{{OPF:<CATEGORY>:<HASH>}}`](./0022-markdown-inert-token-delimiters.md) | Accepted | 2026-08-21 |
+| 0023 | [재생 불가 thinking 블록 처리 — 빈 블록 우회 + 미스 시 드롭](./0023-thinking-replay-bypass-and-drop.md) | Accepted | 2026-09-07 |
 
 ## ADR 카테고리별 그룹
 
@@ -60,6 +61,7 @@
 - **ADR-0005**: Backend Strategy 인터페이스 + 4-Tier 신뢰 모델
 - **ADR-0006**: fail-closed default + opt-in bypass
 - **ADR-0008**: Detection 백엔드 — 자체 Docker 이미지 빌드 (gh0stkey API 호환)
+- **ADR-0023**: adaptive thinking은 본문이 빈 블록을 서명해 반환하므로 캐시 미스가 no-op을 위해 세션을 죽이고 있었음 — 빈 블록은 캐시를 우회하고, 해석 불가 블록은 상류가 허용하는 곳에서 드롭한다
 
 ### 한국 PII / 범위 결정
 - **ADR-0007**: 한국 PII v1 휴리스틱, v2 KLUE-NER
@@ -70,7 +72,7 @@
 
 | 가상 # | Title | 트리거 시점 |
 |---|---|---|
-| TBD | Vault 영속 (encrypted) — 세션 재개 fast-path | 사용자 요구 시 |
+| TBD | Vault 영속 (encrypted) — 세션 재개 fast-path | 사용자 요구 시. ADR-0023은 캐시 영속화를 기각했다 (adaptive 모델의 캐시 값이 빈 문자열) — 본문 있는 thinking을 반환하는 모델이 실제로 쓰일 때 재검토 |
 | TBD | Custom recognizer 인터페이스 (Presidio 스타일) | 카테고리 확장 요청 |
 | TBD | Transformers.js 백엔드 없는 임베드 모드 | Docker 의존 회피 요청 |
 | TBD | 응답 무결성 HMAC (vault 변조 탐지) | 원격 백엔드 위협 분석 후 |
