@@ -106,12 +106,21 @@ async def _relay_passthrough(
     )
 
 
-def _stream_upstream(
+async def _stream_upstream(
     request: Request,
     call: _UpstreamCall,
     session: ProxySession,
     transform: MaskedTransform,
-) -> StreamingResponse:
+) -> Response:
+    """Open the upstream stream eagerly so status and headers reach the client.
+
+    The upstream status must be known before StreamingResponse is constructed:
+    downstream clients detect quota exhaustion by reading the
+    ``anthropic-ratelimit-unified-*`` headers off the response. Opening the
+    stream lazily inside the body generator flattened every upstream error into
+    a 200 SSE body and dropped the headers entirely, which silently disabled
+    multi-account failover in opencode-anthropic-auth on this path.
+    """
     settings = get_proxy_settings()
     transformer = create_stream_transformer(
         transform,
@@ -123,30 +132,51 @@ def _stream_upstream(
         ),
     )
     client = get_http_client(request.app)
+    tx = client.build_request(
+        "POST",
+        call.url,
+        headers=call.headers,
+        content=js_json_dumps(call.payload).encode(),
+    )
+    try:
+        upstream = await client.send(tx, stream=True)
+    except httpx.HTTPError as exc:
+        log.warning("proxy upstream call failed: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={"error": "bad_gateway", "message": "Upstream call failed."},
+        )
+
+    forwarded = forwardable_response_headers(upstream.headers.items())
+
+    if upstream.status_code >= 400:
+        await upstream.aread()
+        return Response(
+            content=upstream.content,
+            status_code=upstream.status_code,
+            headers=forwarded,
+        )
 
     async def body() -> AsyncIterator[bytes]:
         try:
-            async with client.stream(
-                "POST",
-                call.url,
-                headers=call.headers,
-                content=js_json_dumps(call.payload).encode(),
-            ) as upstream:
-                if upstream.status_code >= 400:
-                    await upstream.aread()
-                    yield upstream.content
-                    return
-                async for chunk in upstream.aiter_text():
-                    out = transformer.push(chunk)
-                    if out:
-                        yield out.encode()
-                tail = transformer.flush()
-                if tail:
-                    yield tail.encode()
+            async for chunk in upstream.aiter_text():
+                out = transformer.push(chunk)
+                if out:
+                    yield out.encode()
+            tail = transformer.flush()
+            if tail:
+                yield tail.encode()
         except httpx.HTTPError as exc:
             log.warning("proxy stream failed: %s", exc)
+        finally:
+            await upstream.aclose()
 
-    return StreamingResponse(body(), media_type="text/event-stream")
+    return StreamingResponse(
+        body(),
+        media_type="text/event-stream",
+        status_code=upstream.status_code,
+        headers=forwarded,
+    )
 
 
 def _invalid_json(message: str) -> JSONResponse:
@@ -187,7 +217,7 @@ async def _relay_masked(
     call = _UpstreamCall(url=url, headers=headers, payload=masked)
 
     if masked.get("stream") is True:
-        return _stream_upstream(request, call, session, transform_kind)
+        return await _stream_upstream(request, call, session, transform_kind)
 
     client = get_http_client(request.app)
     try:

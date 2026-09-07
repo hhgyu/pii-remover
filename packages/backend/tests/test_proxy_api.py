@@ -456,6 +456,62 @@ def test_streaming_restores_tokens_split_across_deltas(
     assert "{{OPF:" not in response.text
 
 
+def test_streaming_error_relays_status_and_ratelimit_headers(
+    client: TestClient, upstream: _Upstream
+) -> None:
+    """A quota-exhausted 429 must arrive as a 429 with its headers intact.
+
+    Downstream (opencode-anthropic-auth) drives multi-account failover off the
+    ``anthropic-ratelimit-unified-*`` family read from the response status and
+    header block. Yielding the error body into a 200 SSE stream hid both, so
+    the failover never triggered behind this proxy.
+    """
+    upstream.responder = lambda _r: httpx.Response(
+        429,
+        json={"type": "error", "error": {"type": "rate_limit_error", "message": "quota"}},
+        headers={
+            "anthropic-ratelimit-unified-status": "rejected",
+            "anthropic-ratelimit-unified-representative-claim": "five_hour",
+            "anthropic-ratelimit-unified-reset": "4102444800",
+            "retry-after": "120",
+        },
+    )
+
+    response = client.post(
+        "/anthropic/v1/messages",
+        json={"model": "m", "messages": [], "stream": True},
+    )
+
+    assert response.status_code == 429
+    assert response.headers["anthropic-ratelimit-unified-status"] == "rejected"
+    assert response.headers["anthropic-ratelimit-unified-representative-claim"] == "five_hour"
+    assert response.headers["retry-after"] == "120"
+    assert response.json()["error"]["type"] == "rate_limit_error"
+
+
+def test_streaming_success_forwards_ratelimit_headers(
+    client: TestClient, upstream: _Upstream
+) -> None:
+    """A 200 SSE must also carry the unified headers, or passive usage
+    observation dies for every request that goes through the proxy."""
+    upstream.responder = lambda _r: httpx.Response(
+        200,
+        content=b"event: message_stop\ndata: {}\n\n",
+        headers={
+            "content-type": "text/event-stream",
+            "anthropic-ratelimit-unified-5h-utilization": "0.42",
+        },
+    )
+
+    response = client.post(
+        "/anthropic/v1/messages",
+        json={"model": "m", "messages": [], "stream": True},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["anthropic-ratelimit-unified-5h-utilization"] == "0.42"
+
+
 # --------------------------------------------------------------------------
 # routing + toggle
 # --------------------------------------------------------------------------
