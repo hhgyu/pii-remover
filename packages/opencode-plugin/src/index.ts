@@ -13,6 +13,13 @@ export {
   isDisplayTool,
   resolveDisplayToolConfig,
 } from "./hooks.js";
+export {
+  classifyPluginEntry,
+  inspectPluginOrder,
+  openCodeConfigPaths,
+  pluginArrayFrom,
+  warnOnPluginOrder,
+} from "./plugin-order.js";
 export type {
   MaskOptions,
   PiiRemoverConfig,
@@ -20,3 +27,8 @@ export type {
   PluginMode,
   DisplayToolConfig,
 } from "./hooks.js";
+export type {
+  PluginOrderIssue,
+  PluginOrderIssueKind,
+  PluginRole,
+} from "./plugin-order.js";

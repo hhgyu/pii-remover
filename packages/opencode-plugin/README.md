@@ -71,10 +71,26 @@ guarantee of running before/after other plugins.
 
 ### Runtime ordering check
 
-Both entry points log a `WARNING` via the OpenCode plugin `warn`
-channel if the array order is wrong (e.g. restore registered before
-mask). The check is cheap, runs once at plugin init, and helps catch
-hand-edited `opencode.json` files where the entries drifted apart.
+Once per process, plugin init reads the effective `opencode.json`
+(`~/.config/opencode/`, `<project>/.opencode/`, `<project>/`) and warns
+via the OpenCode `warn` channel when the ordering invariant is broken:
+
+| Issue | Why it matters |
+| --- | --- |
+| `plugins_before_mask` | Those plugins' `tool.execute.before` sees **unmasked PII**. |
+| `plugins_after_restore` | Those plugins' `tool.execute.after` sees **restored plaintext PII**. |
+| `restore_before_mask` | Masking never runs ahead of the other plugins. |
+| `double_registration` | A `full`-mode entry (bare package or `dist/index.js`) coexists with the split pair, so hooks fire twice. |
+
+The installer enforces the order when it writes the file; this catches
+drift introduced afterwards by a hand edit or by another tool appending
+to the `plugin` array. It is **advisory** — it warns and never blocks,
+because throwing at plugin init would take the host down. An array
+holding neither split entry produces no output.
+
+The older in-process `trackMode` check remains as a cheap fallback: it
+sees only the import order of our own two entries, so it cannot observe
+foreign plugins on either side.
 
 ## Backend requirement
 

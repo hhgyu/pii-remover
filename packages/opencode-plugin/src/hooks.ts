@@ -15,6 +15,7 @@ import {
 } from "@pii-remover/core";
 
 import { loadPluginConfig } from "./config-loader.js";
+import { warnOnPluginOrder } from "./plugin-order.js";
 import {
   DEFAULT_SKIP_FIELDS,
   MIN_MASK_LENGTH,
@@ -241,9 +242,37 @@ function isMaskBypassed(result: MaskResult): boolean {
 let singletonRemover: PIIRemover | null = null;
 let singletonInitPromise: Promise<PIIRemover> | null = null;
 const initializedModes: PluginMode[] = [];
+let pluginOrderChecked = false;
 
 export function __resetTrackedModesForTests(): void {
   initializedModes.length = 0;
+  pluginOrderChecked = false;
+}
+
+function pluginDirectory(ctx: unknown): string | undefined {
+  if (!isPluginInputLike(ctx)) return undefined;
+  if (typeof ctx.worktree === "string" && ctx.worktree.length > 0) {
+    return ctx.worktree;
+  }
+  if (typeof ctx.directory === "string" && ctx.directory.length > 0) {
+    return ctx.directory;
+  }
+  return undefined;
+}
+
+// Unlike trackMode this reads the real plugin array. Advisory on purpose:
+// throwing at plugin init would take the OpenCode host down.
+async function checkPluginOrderOnce(
+  ctx: unknown,
+  warn: (msg: string) => void
+): Promise<void> {
+  if (pluginOrderChecked) return;
+  pluginOrderChecked = true;
+  try {
+    await warnOnPluginOrder({ directory: pluginDirectory(ctx), warn });
+  } catch {
+    return;
+  }
 }
 
 export function trackMode(mode: PluginMode, warn: (msg: string) => void): void {
@@ -680,6 +709,7 @@ async function buildPluginFromCtx(
 
   const mode = pluginOptions.mode ?? "full";
   trackMode(mode, warn);
+  await checkPluginOrderOnce(ctx, warn);
 
   if (config.backend.auto_start === true) {
     await maybeAutoStartBackend({
