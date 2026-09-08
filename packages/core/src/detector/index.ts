@@ -5,6 +5,8 @@ import type {
   PIICategory,
 } from "../types.js";
 import type { BackendStrategy } from "../backend/strategy.js";
+import { mergeDetections } from "../backend/strategy.js";
+import { expandPersonWordBoundaries } from "./word-boundary.js";
 
 export interface DetectorOptions {
   strategy: BackendStrategy;
@@ -32,7 +34,14 @@ export class Detector {
       (this.defaultCategories ? [...this.defaultCategories] : undefined);
     if (cats) merged.categories = cats;
     if (typeof opts.timeout_ms === "number") merged.timeout_ms = opts.timeout_ms;
-    return this.strategy.resolve(text, merged);
+    const result = await this.strategy.resolve(text, merged);
+    // Widening can create overlaps, which VaultManager.assign rejects.
+    return {
+      ...result,
+      detections: mergeDetections(
+        expandPersonWordBoundaries(text, result.detections)
+      ),
+    };
   }
 }
 
