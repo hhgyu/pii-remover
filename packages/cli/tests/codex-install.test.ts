@@ -249,4 +249,86 @@ describe("runCodexInstall", () => {
       'openai_base_url = "http://localhost:8765/codex/v1"'
     );
   });
+
+  test("re-installing from a different path rewrites the block instead of adding one", async () => {
+    const fs = memFs();
+    await runCodexInstall({
+      target: "codex",
+      scope: "global",
+      commandPath: "/old/npx/pii-remover.js",
+      homeDir: "/home/u",
+      fs,
+    });
+    const r = await runCodexInstall({
+      target: "codex",
+      scope: "global",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      fs,
+    });
+    const written = fs.files.get(r.settings_path)!;
+    expect(written.match(/\[\[hooks\.UserPromptSubmit\]\]/g)).toHaveLength(1);
+    expect(written).toContain("/usr/local/bin/pii-remover");
+    expect(written).not.toContain("/old/npx/pii-remover.js");
+    expect(r.hook_stale_commands_rewritten).toHaveLength(1);
+    expect(r.next_steps.join("\n")).toContain("rewrote a stale pii-remover hook");
+  });
+
+  test("a foreign UserPromptSubmit hook is left alone and ours is appended", async () => {
+    const existing = [
+      "[[hooks.UserPromptSubmit]]",
+      "  [[hooks.UserPromptSubmit.hooks]]",
+      '  type = "command"',
+      '  command = "/opt/other/guard.sh hook"',
+      "",
+    ].join("\n");
+    const r = patchCodexConfigToml(existing, {
+      commandPath: 'node "/usr/local/bin/pii-remover" hook',
+      timeoutSeconds: 30,
+    });
+    expect(r.patched).toContain('command = "/opt/other/guard.sh hook"');
+    expect(r.patched.match(/\[\[hooks\.UserPromptSubmit\]\]/g)).toHaveLength(2);
+    expect(r.rewrittenStaleCommands).toEqual([]);
+  });
+
+  test("extra owned blocks are reported rather than silently deleted", () => {
+    const existing = [
+      "[[hooks.UserPromptSubmit]]",
+      "  [[hooks.UserPromptSubmit.hooks]]",
+      '  command = "node \\"/a/pii-remover.js\\" hook"',
+      "",
+      "[[hooks.UserPromptSubmit]]",
+      "  [[hooks.UserPromptSubmit.hooks]]",
+      '  command = "node \\"/b/pii-remover.js\\" hook"',
+      "",
+    ].join("\n");
+    const r = patchCodexConfigToml(existing, {
+      commandPath: 'node "/b/pii-remover.js" hook',
+      timeoutSeconds: 30,
+    });
+    expect(r.hookAlreadyPresent).toBe(true);
+    expect(r.duplicateCommands).toEqual(['node "/a/pii-remover.js" hook']);
+  });
+
+  test("a hook left in the project config is reported while installing globally", async () => {
+    const projectConfig = join("/proj", ".codex", "config.toml");
+    const fs = memFs({
+      [projectConfig]: [
+        "[[hooks.UserPromptSubmit]]",
+        "  [[hooks.UserPromptSubmit.hooks]]",
+        '  command = "/usr/local/bin/pii-remover hook"',
+        "",
+      ].join("\n"),
+    });
+    const r = await runCodexInstall({
+      target: "codex",
+      scope: "global",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      projectDir: "/proj",
+      fs,
+    });
+    expect(r.conflicts?.join("\n")).toContain(projectConfig);
+    expect(r.next_steps.join("\n")).toContain("Codex loads both configs");
+  });
 });

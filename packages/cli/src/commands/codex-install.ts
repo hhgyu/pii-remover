@@ -9,8 +9,9 @@
  * TOML editing is intentionally surgical (no full TOML parser dependency,
  * ADR-0013 §Alternatives (d)). The function:
  *   - Preserves existing content verbatim.
- *   - Detects an already-registered identical `pii-remover hook` command and
- *     skips re-adding (idempotent).
+ *   - Detects an already-registered `pii-remover hook` command by ownership,
+ *     rewriting it in place when the path/runner drifted so a re-install never
+ *     appends a second block (idempotent).
  *   - Refuses to overwrite a pre-existing different `openai_base_url`
  *     (writes a comment-flagged "skipped" note in the result instead).
  */
@@ -30,6 +31,10 @@ import {
   type InstallResult,
   type PiiRemoverConfigSlice,
 } from "./install.js";
+import {
+  isPiiRemoverHookCommand,
+  isSameHookCommand,
+} from "./hook-ownership.js";
 
 export const CODEX_HOOK_EVENT_NAME = "UserPromptSubmit";
 export const CODEX_HOOK_TYPE = "command";
@@ -69,6 +74,9 @@ export interface CodexPatchResult {
   hookAlreadyPresent: boolean;
   baseUrlAlreadySet: boolean;
   baseUrlWritten: boolean;
+  rewrittenStaleCommands: readonly string[];
+  /** Extra owned blocks: reported only, since block deletion needs a TOML parser. */
+  duplicateCommands: readonly string[];
 }
 
 /**
@@ -84,7 +92,12 @@ export function patchCodexConfigToml(
   }
 ): CodexPatchResult {
   const normalizedCmd = quoteCommandPath(opts.commandPath);
-  const hookAlreadyPresent = hasOurHook(current, normalizedCmd);
+  const all = findHookCommandLines(current);
+  const exact = all.find((o) => isSameHookCommand(o.command, opts.commandPath));
+  const owned = all.filter(
+    (o) => o === exact || isPiiRemoverHookCommand(o.command)
+  );
+  const hookAlreadyPresent = exact !== undefined;
 
   let out = current;
   let baseUrlAlreadySet = false;
@@ -103,8 +116,13 @@ export function patchCodexConfigToml(
     }
   }
 
-  if (!hookAlreadyPresent) {
+  const primary = exact ?? owned[0];
+  const rewrittenStaleCommands: string[] = [];
+  if (primary === undefined) {
     out = appendHookBlock(out, normalizedCmd, opts.timeoutSeconds);
+  } else if (exact === undefined) {
+    out = replaceCommandLine(out, primary, normalizedCmd);
+    rewrittenStaleCommands.push(primary.command);
   }
 
   return {
@@ -112,22 +130,21 @@ export function patchCodexConfigToml(
     hookAlreadyPresent,
     baseUrlAlreadySet,
     baseUrlWritten,
+    rewrittenStaleCommands,
+    duplicateCommands: owned
+      .filter((o) => o !== primary)
+      .map((o) => o.command),
   };
 }
 
-function quoteCommandPath(p: string): string {
-  // TOML basic string — escape backslashes (Windows paths) and double quotes.
-  const escaped = p.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  return `"${escaped}"`;
+interface HookCommandLine {
+  readonly lineIndex: number;
+  readonly command: string;
 }
 
-/**
- * Returns true if the file already contains a `[[hooks.UserPromptSubmit.hooks]]`
- * entry whose `command` matches ours. Conservative scan: looks for the literal
- * `command = <quoted>` line within a window after `[[hooks.UserPromptSubmit`.
- */
-function hasOurHook(content: string, quotedCmd: string): boolean {
+function findHookCommandLines(content: string): readonly HookCommandLine[] {
   const lines = content.split(/\r?\n/);
+  const out: HookCommandLine[] = [];
   let inHookSection = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
@@ -142,10 +159,30 @@ function hasOurHook(content: string, quotedCmd: string): boolean {
     if (!inHookSection) continue;
     const m = /^\s*command\s*=\s*(.+?)\s*$/.exec(line);
     if (!m) continue;
-    const value = stripInlineComment(m[1] ?? "").trim();
-    if (value === quotedCmd) return true;
+    const command = parseTomlBasicString(stripInlineComment(m[1] ?? "").trim());
+    if (command === null) continue;
+    out.push({ lineIndex: i, command });
   }
-  return false;
+  return out;
+}
+
+function replaceCommandLine(
+  content: string,
+  target: HookCommandLine,
+  quotedCmd: string
+): string {
+  const eol = content.includes("\r\n") ? "\r\n" : "\n";
+  const lines = content.split(/\r?\n/);
+  const original = lines[target.lineIndex] ?? "";
+  const indent = /^\s*/.exec(original)?.[0] ?? "";
+  lines[target.lineIndex] = `${indent}command = ${quotedCmd}`;
+  return lines.join(eol);
+}
+
+function quoteCommandPath(p: string): string {
+  // TOML basic string — escape backslashes (Windows paths) and double quotes.
+  const escaped = p.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escaped}"`;
 }
 
 function stripInlineComment(s: string): string {
@@ -290,6 +327,14 @@ export async function runCodexInstall(
     piiConfigWritten = true;
   }
 
+  const conflicts = await detectCodexRivalInstalls({
+    fs,
+    homeDir: home,
+    projectDir: project,
+    settingsPath,
+    desiredCommand: patchOpts.commandPath,
+  });
+
   return {
     settings_path: settingsPath,
     created: !existed,
@@ -299,12 +344,85 @@ export async function runCodexInstall(
     config_written: piiConfigWritten,
     base_url_already_set: result.baseUrlAlreadySet,
     base_url_written: result.baseUrlWritten,
-    next_steps: buildCodexNextSteps(
-      opts.commandPath,
-      opts.proxyUrl,
-      result.baseUrlAlreadySet
-    ),
+    hook_stale_commands_rewritten: result.rewrittenStaleCommands,
+    hook_duplicates_removed: 0,
+    conflicts,
+    next_steps: [
+      ...conflicts,
+      ...codexHookHygieneLines(result, settingsPath),
+      ...buildCodexNextSteps(
+        opts.commandPath,
+        opts.proxyUrl,
+        result.baseUrlAlreadySet
+      ),
+    ],
   };
+}
+
+async function codexConfigHasOurHook(
+  fs: InstallFs,
+  path: string,
+  desiredCommand: string
+): Promise<boolean> {
+  if (!fs.exists(path)) return false;
+  try {
+    return findHookCommandLines(await fs.readFile(path)).some(
+      (line) =>
+        isSameHookCommand(line.command, desiredCommand) ||
+        isPiiRemoverHookCommand(line.command)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Codex merges the global and project config, so a stray hook fires twice. */
+async function detectCodexRivalInstalls(args: {
+  fs: InstallFs;
+  homeDir: string;
+  projectDir: string;
+  settingsPath: string;
+  desiredCommand: string;
+}): Promise<readonly string[]> {
+  const candidates = [
+    join(args.homeDir, ".codex", "config.toml"),
+    join(args.projectDir, ".codex", "config.toml"),
+  ];
+  const lines: string[] = [];
+  for (const candidate of candidates) {
+    if (candidate === args.settingsPath) continue;
+    if (
+      !(await codexConfigHasOurHook(args.fs, candidate, args.desiredCommand))
+    ) {
+      continue;
+    }
+    lines.push(
+      `WARNING: a pii-remover hook is also registered in ${candidate}.`,
+      `Codex loads both configs, so the prompt gate runs more than once.`,
+      `Remove the [[hooks.${CODEX_HOOK_EVENT_NAME}]] block there, or install only into that scope.`,
+      ``
+    );
+  }
+  return lines;
+}
+
+function codexHookHygieneLines(
+  result: CodexPatchResult,
+  settingsPath: string
+): readonly string[] {
+  const lines: string[] = [];
+  for (const stale of result.rewrittenStaleCommands) {
+    lines.push(`NOTE: rewrote a stale pii-remover hook command: ${stale}`);
+  }
+  if (result.duplicateCommands.length > 0) {
+    lines.push(
+      `WARNING: ${result.duplicateCommands.length} extra pii-remover hook block(s) remain in ${settingsPath}:`,
+      ...result.duplicateCommands.map((c) => `   ${c}`),
+      `Delete them by hand — removing a TOML block automatically is not safe here.`
+    );
+  }
+  if (lines.length > 0) lines.push("");
+  return lines;
 }
 
 /**

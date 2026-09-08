@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { join, sep } from "node:path";
 
 import {
   runInstall,
@@ -1126,5 +1127,236 @@ describe("runInstall proxy mode", () => {
     expect(r.base_url_written).toBe(false);
     expect(r.next_steps.join("\n")).toContain("export ANTHROPIC_BASE_URL=");
     expect(JSON.parse(fs.files.get(r.settings_path)!).env).toBeUndefined();
+  });
+});
+
+const CLAUDE_GLOBAL = join("/home/u", ".claude", "settings.json");
+const CLAUDE_LOCAL = join("/home/u", ".claude", "settings.local.json");
+const CLAUDE_PROJECT = join("/repo", ".claude", "settings.json");
+
+function settingsWithHooks(commands: readonly string[]): string {
+  return JSON.stringify({
+    hooks: {
+      UserPromptSubmit: commands.map((command) => ({
+        hooks: [{ type: "command", command, timeout: 30 }],
+      })),
+    },
+  });
+}
+
+function hookEntries(files: Map<string, string>, p: string): { command: string }[] {
+  const parsed = readConfig(files, p);
+  const hooks = parsed.hooks as Record<string, { hooks: { command: string }[] }[]>;
+  return (hooks.UserPromptSubmit ?? []).flatMap((g) => g.hooks ?? []);
+}
+
+describe("runInstall install-method conflicts", () => {
+  test("a hook installed under a different path is rewritten, not duplicated", async () => {
+    const fs = memFs({
+      [CLAUDE_GLOBAL]: settingsWithHooks([
+        'node "/old/npx/cache/pii-remover.js" hook',
+      ]),
+    });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      fs,
+    });
+    const entries = hookEntries(fs.files, r.settings_path);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.command).toBe('node "/usr/local/bin/pii-remover" hook');
+    expect(r.hook_stale_commands_rewritten).toEqual([
+      'node "/old/npx/cache/pii-remover.js" hook',
+    ]);
+    expect(r.next_steps.join("\n")).toContain("rewrote a stale pii-remover hook");
+  });
+
+  test("an npx-style registration is recognised as ours", async () => {
+    const fs = memFs({
+      [CLAUDE_GLOBAL]: settingsWithHooks(["npx @pii-remover/cli hook"]),
+    });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      fs,
+    });
+    expect(hookEntries(fs.files, r.settings_path)).toHaveLength(1);
+    expect(r.hook_stale_commands_rewritten).toHaveLength(1);
+  });
+
+  test("pre-existing duplicates collapse to a single entry", async () => {
+    const fs = memFs({
+      [CLAUDE_GLOBAL]: settingsWithHooks([
+        'node "/a/pii-remover.js" hook',
+        'node "/b/pii-remover.js" hook',
+        "/usr/local/bin/pii-remover hook",
+      ]),
+    });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      fs,
+    });
+    expect(hookEntries(fs.files, r.settings_path)).toHaveLength(1);
+    expect(r.hook_duplicates_removed).toBe(2);
+    expect(r.next_steps.join("\n")).toContain("removed 2 duplicate");
+  });
+
+  test("a foreign UserPromptSubmit hook is never touched", async () => {
+    const fs = memFs({
+      [CLAUDE_GLOBAL]: settingsWithHooks(["/opt/other-tool/guard.sh hook"]),
+    });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      fs,
+    });
+    const commands = hookEntries(fs.files, r.settings_path).map((e) => e.command);
+    expect(commands).toContain("/opt/other-tool/guard.sh hook");
+    expect(commands).toContain('node "/usr/local/bin/pii-remover" hook');
+    expect(r.hook_stale_commands_rewritten).toEqual([]);
+  });
+
+  test("a hook left in the project scope is reported while installing globally", async () => {
+    const fs = memFs({
+      [CLAUDE_PROJECT]: settingsWithHooks(["/usr/local/bin/pii-remover hook"]),
+    });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      projectDir: "/repo",
+      fs,
+    });
+    expect(r.conflicts?.join("\n")).toContain(CLAUDE_PROJECT);
+    expect(r.next_steps.join("\n")).toContain("merges every settings file");
+  });
+
+  test("settings.local.json in the same scope is reported too", async () => {
+    const fs = memFs({
+      [CLAUDE_LOCAL]: settingsWithHooks(["/usr/local/bin/pii-remover hook"]),
+    });
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      projectDir: "/repo",
+      fs,
+    });
+    expect(r.conflicts?.join("\n")).toContain(CLAUDE_LOCAL);
+  });
+
+  test("no rival install means no conflict noise", async () => {
+    const fs = memFs();
+    const r = await runInstall({
+      target: "claude-code",
+      commandPath: "/usr/local/bin/pii-remover",
+      homeDir: "/home/u",
+      projectDir: "/repo",
+      fs,
+    });
+    expect(r.conflicts).toEqual([]);
+    expect(r.next_steps.join("\n")).not.toContain("WARNING");
+  });
+});
+
+describe("runOpenCodeInstall install-method conflicts", () => {
+  const OPENCODE_GLOBAL = join("/home/u", ".config", "opencode", "opencode.json");
+  const OPENCODE_PROJECT = join("/repo", ".opencode", "opencode.json");
+  const PLUGIN_DIR = join("/repo", ".opencode", "plugins");
+
+  function resolver(subpath: string): string {
+    return subpath.endsWith("/mask") ? "/n/plugin/dist/mask.js" : "/n/plugin/dist/restore.js";
+  }
+
+  function dirFs(initial: Record<string, string>): InstallFs & {
+    files: Map<string, string>;
+  } {
+    const base = memFs(initial);
+    return {
+      ...base,
+      exists: (p) =>
+        base.files.has(p) ||
+        [...base.files.keys()].some((k) => k.startsWith(`${p}${sep}`)),
+      readdir: async (p) =>
+        [...base.files.keys()]
+          .filter((k) => k.startsWith(`${p}${sep}`))
+          .map((k) => k.slice(p.length + 1)),
+    };
+  }
+
+  test("a full-mode entry is replaced by the split pair", async () => {
+    const fs = memFs({
+      [OPENCODE_GLOBAL]: JSON.stringify({
+        plugin: [
+          "file:///n/@pii-remover/opencode-plugin/dist/index.js",
+          "other@1",
+        ],
+      }),
+    });
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      homeDir: "/home/u",
+      projectDir: "/repo",
+      fs,
+      resolvePluginFile: resolver,
+    });
+    const plugins = readConfig(fs.files, r.settings_path).plugin as string[];
+    expect(plugins).toHaveLength(3);
+    expect(plugins[0]).toContain("mask.js");
+    expect(plugins[1]).toBe("other@1");
+    expect(plugins[2]).toContain("restore.js");
+  });
+
+  test("plugin entries left in the other scope are reported", async () => {
+    const fs = memFs({
+      [OPENCODE_PROJECT]: JSON.stringify({
+        plugin: ["@pii-remover/opencode-plugin"],
+      }),
+    });
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      homeDir: "/home/u",
+      projectDir: "/repo",
+      fs,
+      resolvePluginFile: resolver,
+    });
+    expect(r.conflicts?.join("\n")).toContain(OPENCODE_PROJECT);
+    expect(r.next_steps.join("\n")).toContain("the vault splits");
+  });
+
+  test("a hand-written plugins/ registration is reported", async () => {
+    const fs = dirFs({
+      [join(PLUGIN_DIR, "pii-remover.ts")]:
+        'export const plugin = configurePiiRemoverPlugin({ healthCheck: false })',
+      [join(PLUGIN_DIR, "unrelated.ts")]: "export const plugin = () => ({})",
+    });
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      homeDir: "/home/u",
+      projectDir: "/repo",
+      fs,
+      resolvePluginFile: resolver,
+    });
+    const joined = r.conflicts?.join("\n") ?? "";
+    expect(joined).toContain(join(PLUGIN_DIR, "pii-remover.ts"));
+    expect(joined).not.toContain("unrelated.ts");
+    expect(joined).toContain('"full" mode');
+  });
+
+  test("an fs without readdir simply skips the directory scan", async () => {
+    const fs = memFs();
+    const r = await runOpenCodeInstall({
+      target: "opencode",
+      homeDir: "/home/u",
+      projectDir: "/repo",
+      fs,
+      resolvePluginFile: resolver,
+    });
+    expect(r.conflicts).toEqual([]);
   });
 });

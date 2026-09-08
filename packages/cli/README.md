@@ -119,6 +119,25 @@ Writes:
 TOML editing is surgical (no parser dependency): idempotent and preserves
 existing content. See [ADR-0013].
 
+### Conflicting installs
+
+A prior install is recognised by **ownership**, not by exact command
+text, so switching install method — npx → global binary, a bumped
+version directory, `bun` instead of `node` — rewrites the existing entry
+instead of registering the hook a second time. Extra pii-remover entries
+are collapsed into one; foreign hooks are never touched.
+
+Registrations the installer cannot safely rewrite are reported instead:
+
+| Detected | Reported because |
+| --- | --- |
+| A hook in the other scope, or in `settings.local.json` | Claude Code and Codex merge every config they load, so the prompt gate runs twice and every block is reported twice. |
+| Plugin entries in the other OpenCode scope | The plugin loads twice and the vault splits across module instances — restoration can silently stop working. |
+| `.opencode/plugins/*.ts` calling `configurePiiRemoverPlugin` | OpenCode auto-loads that directory on top of the `plugin` array, adding a `full`-mode registration that voids the mask-first / restore-last ordering. |
+
+Extra Codex hook blocks are listed rather than deleted: removing a TOML
+block without a parser risks eating adjacent content.
+
 ### Local development install
 
 ```bash

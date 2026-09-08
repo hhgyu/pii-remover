@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { createRequire } from "node:module";
@@ -11,6 +11,10 @@ import {
   HOOK_EVENT_NAME,
   CLAUDE_HOOK_TYPE,
 } from "../constants.js";
+import {
+  isPiiRemoverHookCommand,
+  isSameHookCommand,
+} from "./hook-ownership.js";
 import type { PIICategory } from "@pii-remover/core";
 import {
   ALL_CATEGORIES,
@@ -225,6 +229,8 @@ export interface InstallFs {
   readFile: (p: string) => Promise<string>;
   writeFile: (p: string, data: string) => Promise<void>;
   mkdir: (p: string) => Promise<void>;
+  /** Optional; omitting it only skips the `plugins/` directory conflict scan. */
+  readdir?: (p: string) => Promise<string[]>;
 }
 
 export interface ProviderBaseUrlPatch {
@@ -250,6 +256,10 @@ export interface InstallResult {
   base_url_written?: boolean;
   base_url_existing?: string | null;
   provider_base_urls?: readonly ProviderBaseUrlPatch[];
+  hook_stale_commands_rewritten?: readonly string[];
+  hook_duplicates_removed?: number;
+  /** Rival registrations found outside the file this run wrote. */
+  conflicts?: readonly string[];
 }
 
 const DEFAULT_FS: InstallFs = {
@@ -261,6 +271,13 @@ const DEFAULT_FS: InstallFs = {
   },
   mkdir: async (p) => {
     await mkdir(p, { recursive: true });
+  },
+  readdir: async (p) => {
+    try {
+      return await readdir(p);
+    } catch {
+      return [];
+    }
   },
 };
 
@@ -381,12 +398,20 @@ function fileUrlFor(absPath: string): string {
   return pathToFileURL(absPath).href;
 }
 
+const SPLIT_ENTRY_FILE = /\/(?:dist|src)\/(?:mask|restore)\.(?:js|ts)(?:$|\?)/;
+
+// Scoped to our package path on purpose: a bare `/dist/index.js` is the default
+// entry of nearly every plugin, so matching that alone would strip somebody else's.
+const FULL_ENTRY_FILE =
+  /@pii-remover\/opencode-plugin\/(?:dist|src)\/index\.(?:js|ts)(?:$|\?)/;
+
 function isPiiRemoverEntry(spec: string): boolean {
   return (
     spec === OPENCODE_PLUGIN_PACKAGE ||
     spec.startsWith(`${OPENCODE_PLUGIN_PACKAGE}@`) ||
     spec.startsWith(`${OPENCODE_PLUGIN_PACKAGE}/`) ||
-    /\/(?:dist|src)\/(?:mask|restore)\.(?:js|ts)(?:$|\?)/.test(spec)
+    SPLIT_ENTRY_FILE.test(spec) ||
+    FULL_ENTRY_FILE.test(spec)
   );
 }
 
@@ -484,7 +509,14 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
     piiConfigWritten = true;
   }
 
-  const nextSteps: string[] = [];
+  const conflicts = await detectOpenCodeRivalInstalls({
+    fs,
+    homeDir: home,
+    projectDir: project,
+    configPath,
+  });
+
+  const nextSteps: string[] = [...conflicts];
   if (!opts.dryRun) {
     const { key_path, source } = ensureTokenKey();
     if (source === "generated") {
@@ -553,6 +585,7 @@ export async function runOpenCodeInstall(opts: OpenCodeInstallOptions): Promise<
     base_url_written: baseUrl.written,
     base_url_existing: baseUrl.existing,
     provider_base_urls: providerPatches,
+    conflicts,
   };
 }
 
@@ -616,7 +649,8 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
   const parsed = parseSettings(current, settingsPath);
 
   const desiredCommand = buildCommand(opts.commandPath);
-  const { patched, alreadyPresent } = ensureHook(parsed, desiredCommand);
+  const hookPatch = ensureHook(parsed, desiredCommand);
+  const { patched, alreadyPresent } = hookPatch;
 
   let withProxy: Record<string, unknown> = patched;
   let baseUrl = NO_PROXY_REQUESTED;
@@ -668,17 +702,31 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
         );
 
   const legacyHomePath = join(home, ".pii-remover.json");
-  const nextSteps =
+  const legacyNote =
     fs.exists(legacyHomePath) && scope === "global"
       ? [
           `WARNING: legacy config detected at ${legacyHomePath}.`,
           `This path is NOT in the loader candidate list and is silently ignored.`,
           `Migrate any custom values to ${configPath ?? "~/.config/pii-remover/config.json"}.`,
           ``,
-          ...tokenKeyNote,
-          ...buildNextSteps(opts.commandPath, proxyStep),
         ]
-      : [...tokenKeyNote, ...buildNextSteps(opts.commandPath, proxyStep)];
+      : [];
+
+  const conflicts = await detectClaudeRivalInstalls({
+    fs,
+    homeDir: home,
+    projectDir: project,
+    settingsPath,
+    desiredCommand,
+  });
+
+  const nextSteps = [
+    ...conflicts,
+    ...hookHygieneLines(hookPatch),
+    ...legacyNote,
+    ...tokenKeyNote,
+    ...buildNextSteps(opts.commandPath, proxyStep),
+  ];
 
   return {
     settings_path: settingsPath,
@@ -691,6 +739,9 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
     base_url_already_set: baseUrl.already_set,
     base_url_written: baseUrl.written,
     base_url_existing: baseUrl.existing,
+    hook_stale_commands_rewritten: hookPatch.rewrittenStaleCommands,
+    hook_duplicates_removed: hookPatch.droppedDuplicateHooks,
+    conflicts,
   };
 }
 
@@ -709,54 +760,99 @@ function parseSettings(raw: string, path: string): SettingsJson {
   return parsed as SettingsJson;
 }
 
+interface HookPatchOutcome {
+  patched: SettingsJson;
+  alreadyPresent: boolean;
+  rewrittenStaleCommands: readonly string[];
+  droppedDuplicateHooks: number;
+}
+
+function hookEntryCommand(entry: HookEntry): string | null {
+  return entry.type === CLAUDE_HOOK_TYPE && typeof entry.command === "string"
+    ? entry.command
+    : null;
+}
+
+// Exact match outranks ownership so a hook installed at a path that happens not
+// to spell "pii-remover" still registers as already present.
+function isOurHookCommand(existing: string, desired: string): boolean {
+  return (
+    isSameHookCommand(existing, desired) || isPiiRemoverHookCommand(existing)
+  );
+}
+
+// Ownership, not exact command text, decides what counts as a prior install —
+// otherwise a re-install from another path/runner stacks a second hook.
 function ensureHook(
   settings: SettingsJson,
   command: string
-): { patched: SettingsJson; alreadyPresent: boolean } {
+): HookPatchOutcome {
   const out: SettingsJson = { ...settings };
   const hooks: HooksMap = isHooksMap(out.hooks) ? { ...out.hooks } : {};
   const eventGroups: HookGroup[] = Array.isArray(hooks[HOOK_EVENT_NAME])
     ? [...(hooks[HOOK_EVENT_NAME] as HookGroup[])]
     : [];
 
+  const rewrittenStaleCommands: string[] = [];
+  let droppedDuplicateHooks = 0;
+  let alreadyPresent = false;
+  let ownedSeen = false;
+
+  const rewritten: HookGroup[] = [];
   for (const group of eventGroups) {
     const entries = Array.isArray(group.hooks) ? group.hooks : [];
-    for (const entry of entries) {
-      if (
-        entry.type === CLAUDE_HOOK_TYPE &&
-        typeof entry.command === "string" &&
-        normalizeCommand(entry.command) === normalizeCommand(command)
-      ) {
-        out.hooks = { ...hooks, [HOOK_EVENT_NAME]: eventGroups };
-        return { patched: out, alreadyPresent: true };
-      }
+    if (entries.length === 0) {
+      rewritten.push(group);
+      continue;
     }
-  }
-
-  const newGroup: HookGroup = {
-    hooks: [
-      {
-        type: CLAUDE_HOOK_TYPE,
+    const kept: HookEntry[] = [];
+    for (const entry of entries) {
+      const existing = hookEntryCommand(entry);
+      if (existing === null || !isOurHookCommand(existing, command)) {
+        kept.push(entry);
+        continue;
+      }
+      if (ownedSeen) {
+        droppedDuplicateHooks++;
+        continue;
+      }
+      ownedSeen = true;
+      if (isSameHookCommand(existing, command)) {
+        alreadyPresent = true;
+        kept.push(entry);
+        continue;
+      }
+      rewrittenStaleCommands.push(existing);
+      kept.push({
+        ...entry,
         command,
-        timeout: DEFAULT_HOOK_TIMEOUT_SECONDS,
-      },
-    ],
-  };
-  eventGroups.push(newGroup);
-  hooks[HOOK_EVENT_NAME] = eventGroups;
-  out.hooks = hooks;
-  return { patched: out, alreadyPresent: false };
-}
-
-function normalizeCommand(c: string): string {
-  let s = c.trim().replace(/\s+/g, " ");
-  // Strip optional leading "node " so "node path.js hook" matches "path.js hook"
-  if (s.toLowerCase().startsWith("node ")) {
-    s = s.slice(5).trimStart();
+        timeout: entry.timeout ?? DEFAULT_HOOK_TIMEOUT_SECONDS,
+      });
+    }
+    // Intentional: a group left empty held only our duplicates, so it goes away.
+    if (kept.length > 0) rewritten.push({ ...group, hooks: kept });
   }
-  // Strip surrounding quotes from the path portion: node "/path" hook → /path hook
-  s = s.replace(/^"([^"]+)"\s/, "$1 ");
-  return s;
+
+  if (!ownedSeen) {
+    rewritten.push({
+      hooks: [
+        {
+          type: CLAUDE_HOOK_TYPE,
+          command,
+          timeout: DEFAULT_HOOK_TIMEOUT_SECONDS,
+        },
+      ],
+    });
+  }
+
+  hooks[HOOK_EVENT_NAME] = rewritten;
+  out.hooks = hooks;
+  return {
+    patched: out,
+    alreadyPresent,
+    rewrittenStaleCommands,
+    droppedDuplicateHooks,
+  };
 }
 
 function buildCommand(binPath: string): string {
@@ -791,6 +887,171 @@ function buildNextSteps(
     `4) Verify the hook can see the proxy:`,
     `   ${runCmd} health`,
   ];
+}
+
+const CLAUDE_SETTINGS_FILENAMES = ["settings.json", "settings.local.json"] as const;
+const PLUGIN_SOURCE_FILE = /\.(?:ts|js|mjs|cjs)$/i;
+const PLUGIN_SELF_REFERENCE =
+  /@pii-remover\/opencode-plugin|configurePiiRemoverPlugin/;
+
+async function readJsonObject(
+  fs: InstallFs,
+  path: string
+): Promise<Record<string, unknown> | null> {
+  if (!fs.exists(path)) return null;
+  try {
+    const parsed: unknown = JSON.parse(await fs.readFile(path));
+    return isPlainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function claudeSettingsHasOurHook(
+  fs: InstallFs,
+  path: string,
+  desiredCommand: string
+): Promise<boolean> {
+  const parsed = await readJsonObject(fs, path);
+  if (parsed === null) return false;
+  const hooks = parsed.hooks;
+  if (!isPlainObject(hooks)) return false;
+  const groups = hooks[HOOK_EVENT_NAME];
+  if (!Array.isArray(groups)) return false;
+  return (groups as HookGroup[]).some((group) =>
+    (Array.isArray(group?.hooks) ? group.hooks : []).some((entry) => {
+      const existing = hookEntryCommand(entry);
+      return existing !== null && isOurHookCommand(existing, desiredCommand);
+    })
+  );
+}
+
+/**
+ * Claude Code merges every settings file it loads, so a hook in the other scope
+ * runs the gate twice. Warned about, never edited — this run was not asked to
+ * touch that file and the entry there may be deliberate.
+ */
+export async function detectClaudeRivalInstalls(args: {
+  fs: InstallFs;
+  homeDir: string;
+  projectDir: string;
+  settingsPath: string;
+  desiredCommand: string;
+}): Promise<readonly string[]> {
+  const candidates = [
+    ...CLAUDE_SETTINGS_FILENAMES.map((f) => join(args.homeDir, ".claude", f)),
+    ...CLAUDE_SETTINGS_FILENAMES.map((f) => join(args.projectDir, ".claude", f)),
+  ];
+  const lines: string[] = [];
+  for (const candidate of candidates) {
+    if (candidate === args.settingsPath) continue;
+    if (
+      !(await claudeSettingsHasOurHook(args.fs, candidate, args.desiredCommand))
+    ) {
+      continue;
+    }
+    lines.push(
+      `WARNING: a pii-remover hook is also registered in ${candidate}.`,
+      `Claude Code merges every settings file it loads, so the hook will run more than`,
+      `once per prompt and every block will be reported twice.`,
+      `Remove the ${HOOK_EVENT_NAME} entry there, or install only into that scope.`,
+      ``
+    );
+  }
+  return lines;
+}
+
+async function openCodeConfigHasOurPlugin(
+  fs: InstallFs,
+  path: string
+): Promise<boolean> {
+  const parsed = await readJsonObject(fs, path);
+  if (parsed === null) return false;
+  const plugins = parsed.plugin;
+  return (
+    Array.isArray(plugins) &&
+    plugins.some((p) => typeof p === "string" && isPiiRemoverEntry(p))
+  );
+}
+
+async function pluginDirRegistrations(
+  fs: InstallFs,
+  dir: string
+): Promise<readonly string[]> {
+  if (fs.readdir === undefined || !fs.exists(dir)) return [];
+  const found: string[] = [];
+  for (const name of await fs.readdir(dir)) {
+    if (!PLUGIN_SOURCE_FILE.test(name)) continue;
+    const path = join(dir, name);
+    try {
+      if (PLUGIN_SELF_REFERENCE.test(await fs.readFile(path))) found.push(path);
+    } catch {
+      continue;
+    }
+  }
+  return found;
+}
+
+/**
+ * OpenCode loads `plugins/*.ts` on top of the `plugin` array, so the documented
+ * `configurePiiRemoverPlugin` escape hatch survives an installer run as a second
+ * `full`-mode registration that the in-process order check cannot see.
+ */
+export async function detectOpenCodeRivalInstalls(args: {
+  fs: InstallFs;
+  homeDir: string;
+  projectDir: string;
+  configPath: string;
+}): Promise<readonly string[]> {
+  const lines: string[] = [];
+  const configs = [
+    join(args.homeDir, ".config", "opencode", "opencode.json"),
+    join(args.projectDir, ".opencode", "opencode.json"),
+  ];
+  for (const candidate of configs) {
+    if (candidate === args.configPath) continue;
+    if (!(await openCodeConfigHasOurPlugin(args.fs, candidate))) continue;
+    lines.push(
+      `WARNING: pii-remover plugin entries also exist in ${candidate}.`,
+      `OpenCode merges both scopes, so the plugin loads twice and the vault splits`,
+      `across two module instances — restoration can silently stop working.`,
+      `Remove the entries there, or install only into that scope.`,
+      ``
+    );
+  }
+
+  const dirs = [
+    join(args.projectDir, ".opencode", "plugins"),
+    join(args.homeDir, ".config", "opencode", "plugins"),
+  ];
+  for (const dir of dirs) {
+    for (const path of await pluginDirRegistrations(args.fs, dir)) {
+      lines.push(
+        `WARNING: a hand-written pii-remover registration is also present: ${path}.`,
+        `OpenCode auto-loads that directory in addition to the plugin array, so the`,
+        `plugin runs in "full" mode alongside the split mask/restore entries and the`,
+        `mask-first / restore-last ordering guarantee no longer holds.`,
+        `Delete that file, or skip the installer and keep configuring it there.`,
+        ``
+      );
+    }
+  }
+  return lines;
+}
+
+function hookHygieneLines(patch: HookPatchOutcome): readonly string[] {
+  const lines: string[] = [];
+  for (const stale of patch.rewrittenStaleCommands) {
+    lines.push(`NOTE: rewrote a stale pii-remover hook command: ${stale}`);
+  }
+  if (patch.droppedDuplicateHooks > 0) {
+    const n = patch.droppedDuplicateHooks;
+    lines.push(
+      `NOTE: removed ${n} duplicate pii-remover hook ${n === 1 ? "entry" : "entries"}.`
+    );
+  }
+  if (lines.length > 0) lines.push("");
+  return lines;
 }
 
 type HookEntry = {
