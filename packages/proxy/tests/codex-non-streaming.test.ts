@@ -27,7 +27,6 @@ describe("transformCodexResponsesRequest", () => {
       },
       remover
     );
-    expect(out.rejection).toBeUndefined();
     expect(typeof out.body.input).toBe("string");
     expect(out.body.input as string).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
     expect(out.body.input as string).not.toContain("carol@example.com");
@@ -65,7 +64,6 @@ describe("transformCodexResponsesRequest", () => {
       },
       remover
     );
-    expect(out.rejection).toBeUndefined();
     const items = out.body.input as Array<{
       content?: Array<{ type: string; text?: string }>;
     }>;

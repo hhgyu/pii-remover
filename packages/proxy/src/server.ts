@@ -202,9 +202,6 @@ async function handleRequest(
       remover,
       { provider, requestId, thinkingCache }
     );
-    if (result.rejection)
-      return jsonResponse(result.rejection.status, result.rejection.body);
-
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -245,9 +242,6 @@ async function handleRequest(
       remover,
       { provider, requestId }
     );
-    if (result.rejection)
-      return jsonResponse(result.rejection.status, result.rejection.body);
-
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,
@@ -286,9 +280,6 @@ async function handleRequest(
       remover,
       { provider, requestId }
     );
-    if (result.rejection)
-      return jsonResponse(result.rejection.status, result.rejection.body);
-
     const isStreaming = result.body.stream === true;
     const upstreamRes = await callUpstream(
       upstreamUrl,

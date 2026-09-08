@@ -52,7 +52,6 @@ from ..pii.router import (
 )
 from ..pii.session_pool import ProxySession
 from ..pii.sse import StreamRestoreScope, js_json_dumps
-from ..pii.thinking_replay import THINKING_REPLAY_REJECTION, ThinkingUnresolvable
 from .proxy_deps import get_http_client, get_session_pool
 
 log = logging.getLogger(__name__)
@@ -199,15 +198,8 @@ async def _relay_masked(
         return _invalid_json("Request body must be a JSON object.")
 
     session = get_session_pool(request.app).get(request.headers)
-    replay = replay_request(transform_kind, body, session)
-    # Refused here rather than sent on: a turn missing one of its thinking
-    # blocks draws an opaque 400 from upstream, and the restored text the client
-    # replayed is the user's plaintext PII.
-    if isinstance(replay, ThinkingUnresolvable):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content=THINKING_REPLAY_REJECTION
-        )
-    masked = await asyncio.to_thread(mask_request, transform_kind, replay.body, session.codec)
+    replayed = replay_request(transform_kind, body, session)
+    masked = await asyncio.to_thread(mask_request, transform_kind, replayed, session.codec)
 
     url = f"{_upstream_base(match.upstream)}{match.upstream_path}"
     if request.url.query:

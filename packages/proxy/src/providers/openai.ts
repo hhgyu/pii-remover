@@ -21,7 +21,6 @@ export interface OpenAITransformOptions {
 
 export interface OpenAITransformResult {
   body: OpenAIRequestBody;
-  rejection?: { status: number; body: { error: string; message: string } };
 }
 
 export async function transformOpenAIRequest(

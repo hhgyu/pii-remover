@@ -12,7 +12,6 @@ import type {
 
 export interface CodexTransformResult {
   body: CodexResponsesRequestBody;
-  rejection?: { status: number; body: { error: string; message: string } };
 }
 
 export interface CodexTransformOptions {

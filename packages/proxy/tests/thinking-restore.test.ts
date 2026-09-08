@@ -10,10 +10,7 @@ import {
   restoreAnthropicResponse,
   transformAnthropicRequest,
 } from "../src/providers/anthropic.js";
-import {
-  replayThinking,
-  thinkingDropAllowed,
-} from "../src/providers/thinking-replay.js";
+import { replayThinking } from "../src/providers/thinking-replay.js";
 import type {
   AnthropicContentBlock,
   AnthropicMessage,
@@ -146,7 +143,7 @@ describe("transformAnthropicRequest — signature-safe thinking replay", () => {
     expect(JSON.stringify(out.body)).not.toContain(PII);
   });
 
-  test("cache miss rejects the request locally instead of dropping the block", async () => {
+  test("a cache miss drops the block and keeps the rest of the turn", async () => {
     // Given: an empty cache and a replayed turn whose thinking carries live PII
     const remover = await makeRemover();
     const { restored } = await thinkingPair(remover);
@@ -167,14 +164,13 @@ describe("transformAnthropicRequest — signature-safe thinking replay", () => {
       { thinkingCache }
     );
 
-    // Then: the caller is handed an explicit local refusal that names no secret
-    expect(out.rejection?.status).toBe(400);
-    expect(out.rejection?.body.error).toBe("thinking_replay_unavailable");
-    expect(JSON.stringify(out.rejection)).not.toContain(PII);
-    expect(JSON.stringify(out.rejection)).not.toContain(OTHER_SIGNATURE);
+    // Then: the unresolvable block is gone, the turn survives, no PII travels
+    const blocks = blocksOf(out.body.messages[0]);
+    expect(blocks.map((b) => b.type)).toEqual(["text"]);
+    expect(JSON.stringify(out.body)).not.toContain(PII);
   });
 
-  test("thinking without a usable signature is rejected, not dropped", async () => {
+  test("thinking without a usable signature is dropped, never forwarded", async () => {
     // Given: a thinking block the model cannot have signed
     const remover = await makeRemover();
     const { raw, restored } = await thinkingPair(remover);
@@ -186,20 +182,22 @@ describe("transformAnthropicRequest — signature-safe thinking replay", () => {
       {
         model: "claude-test",
         messages: [
-          assistantTurn([{ type: "thinking", thinking: restored, signature: "" }]),
+          assistantTurn([
+            { type: "thinking", thinking: restored, signature: "" },
+            { type: "text", text: "Working on it." },
+          ]),
         ],
       },
       remover,
       { thinkingCache }
     );
 
-    // Then: unsigned thinking is unreplayable, so the turn is refused whole
-    expect(out.rejection?.status).toBe(400);
-    expect(out.rejection?.body.error).toBe("thinking_replay_unavailable");
-    expect(JSON.stringify(out.rejection)).not.toContain(PII);
+    // Then: unsigned thinking is unreplayable, so it is removed
+    expect(blocksOf(out.body.messages[0]).map((b) => b.type)).toEqual(["text"]);
+    expect(JSON.stringify(out.body)).not.toContain(PII);
   });
 
-  test("a resolvable turn is forwarded with no rejection", async () => {
+  test("a resolvable turn is forwarded intact", async () => {
     // Given: a cache holding the signed bytes for every replayed block
     const remover = await makeRemover();
     const { raw, restored } = await thinkingPair(remover);
@@ -223,7 +221,6 @@ describe("transformAnthropicRequest — signature-safe thinking replay", () => {
     );
 
     // Then: nothing is refused and both blocks survive, the redacted one verbatim
-    expect(out.rejection).toBeUndefined();
     const blocks = blocksOf(out.body.messages[0]);
     expect(blocks).toHaveLength(2);
     expect(blocks[1]).toEqual(redacted);
@@ -505,7 +502,6 @@ describe("thinking round trip — stream out, replay in", () => {
     // Then: display stayed masked, so the replay is already signature-exact
     expect(displayed).toBe(raw);
     expect(displayed).not.toContain(PII);
-    expect(out.rejection).toBeUndefined();
     const thinking = onlyThinkingBlock(blocksOf(out.body.messages[0]));
     expect(thinking.thinking).toBe(raw);
     expect(thinking.signature).toBe(SIGNATURE);
@@ -537,7 +533,6 @@ describe("thinking round trip — stream out, replay in", () => {
     // Then: the empty signed string is cached and replays instead of being refused
     expect(aggregate(sse).signature).toBe(SIGNATURE);
     expect(thinkingCache.get(SIGNATURE)).toBe("");
-    expect(out.rejection).toBeUndefined();
     const thinking = onlyThinkingBlock(blocksOf(out.body.messages[0]));
     expect(thinking.thinking).toBe("");
     expect(thinking.signature).toBe(SIGNATURE);
@@ -556,23 +551,10 @@ describe("replayThinking — empty thinking needs no cache", () => {
     ];
 
     // When: the turn is resolved against a signature nobody cached
-    const replay = replayThinking(messages, cache);
+    const replayed = replayThinking(messages, cache);
 
     // Then: the block is forwarded verbatim rather than killing the turn
-    expect(replay.kind).toBe("replayed");
-    if (replay.kind !== "replayed") throw new Error("unreachable");
-    expect(blocksOf(replay.messages[0])).toEqual(messages[0]!.content as AnthropicContentBlock[]);
-  });
-});
-
-describe("replayThinking — dropping where upstream allows it", () => {
-  test("dropping is offered only for adaptive thinking", () => {
-    // Given / When / Then: manual mode keeps the final-turn thinking requirement
-    expect(thinkingDropAllowed({ thinking: { type: "adaptive" } })).toBe(true);
-    expect(thinkingDropAllowed({ thinking: { type: "enabled" } })).toBe(false);
-    expect(thinkingDropAllowed({ thinking: "adaptive" })).toBe(false);
-    expect(thinkingDropAllowed({})).toBe(false);
-    expect(thinkingDropAllowed(null)).toBe(false);
+    expect(blocksOf(replayed[0])).toEqual(messages[0]!.content as AnthropicContentBlock[]);
   });
 
   test("an unresolvable block is dropped and the rest of the turn survives", async () => {
@@ -582,8 +564,8 @@ describe("replayThinking — dropping where upstream allows it", () => {
     const cache = createThinkingCache();
     cache.set(SIGNATURE, raw);
 
-    // When: the turn is resolved with dropping permitted
-    const replay = replayThinking(
+    // When: the turn is resolved
+    const replayed = replayThinking(
       [
         assistantTurn([
           { type: "thinking", thinking: restored, signature: SIGNATURE },
@@ -591,16 +573,13 @@ describe("replayThinking — dropping where upstream allows it", () => {
           { type: "text", text: "Working on it." },
         ]),
       ],
-      cache,
-      true
+      cache
     );
 
     // Then: the resolvable block and the text survive, and no PII travels
-    expect(replay.kind).toBe("replayed");
-    if (replay.kind !== "replayed") throw new Error("unreachable");
-    const blocks = blocksOf(replay.messages[0]);
+    const blocks = blocksOf(replayed[0]);
     expect(blocks.map((b) => b.type)).toEqual(["thinking", "text"]);
     expect(onlyThinkingBlock(blocks).thinking).toBe(raw);
-    expect(JSON.stringify(replay.messages)).not.toContain(PII);
+    expect(JSON.stringify(replayed)).not.toContain(PII);
   });
 });

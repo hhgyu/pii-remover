@@ -33,7 +33,6 @@ describe("transformAnthropicRequest — non-streaming masking", () => {
       },
       remover
     );
-    expect(out.rejection).toBeUndefined();
     const masked = (out.body.messages[0]!.content as string);
     expect(masked).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
     expect(masked).not.toContain("alice@example.com");
@@ -104,7 +103,6 @@ describe("transformAnthropicRequest — non-streaming masking", () => {
       },
       remover
     );
-    expect(out.rejection).toBeUndefined();
     expect(out.body.stream).toBe(true);
     const masked = out.body.messages[0]!.content as string;
     expect(masked).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);

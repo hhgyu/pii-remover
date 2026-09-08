@@ -31,12 +31,7 @@ from .stream_transformers import (
     CodexSseTransformer,
     OpenAISseTransformer,
 )
-from .thinking_replay import (
-    ThinkingReplayed,
-    ThinkingUnresolvable,
-    replay_thinking,
-    thinking_drop_allowed,
-)
+from .thinking_replay import replay_thinking
 
 
 class SseTransformer(Protocol):
@@ -55,35 +50,17 @@ class StreamContext:
     flush_on_close: bool
 
 
-@dataclass(frozen=True, slots=True)
-class ReplayedRequest:
-    body: dict[str, Any]
-
-
-RequestReplay = ReplayedRequest | ThinkingUnresolvable
-
-
 def replay_request(
     transform: MaskedTransform, body: dict[str, Any], session: ProxySession
-) -> RequestReplay:
-    """Resolve replayed thinking back to the bytes upstream signed, or refuse."""
+) -> dict[str, Any]:
+    """Resolve replayed thinking back to the bytes upstream signed."""
     match transform:
         case "anthropic_messages":
-            replay = replay_thinking(
-                body.get("messages"),
-                session.thinking_cache,
-                allow_drop=thinking_drop_allowed(body),
-            )
-            match replay:
-                case ThinkingUnresolvable():
-                    return ThinkingUnresolvable()
-                case ThinkingReplayed(messages=messages):
-                    return ReplayedRequest(body={**body, "messages": messages})
-                case unreachable:
-                    assert_never(unreachable)
+            messages = replay_thinking(body.get("messages"), session.thinking_cache)
+            return {**body, "messages": messages}
         case "openai_chat" | "responses":
             # Only Anthropic mints signed thinking; these bodies carry none.
-            return ReplayedRequest(body=body)
+            return body
         case unreachable:
             assert_never(unreachable)
 

@@ -117,7 +117,7 @@ def test_the_next_turn_replays_the_bytes_upstream_signed(
     assert PERSON not in proxy_upstream.last_body_text
 
 
-def test_a_replay_the_proxy_cannot_match_is_refused_locally(
+def test_a_replay_the_proxy_cannot_match_is_dropped_not_forwarded(
     proxy_client: TestClient, proxy_upstream: ProxyUpstream
 ) -> None:
     # Given: nothing cached under the signature the client is about to replay
@@ -128,13 +128,13 @@ def test_a_replay_the_proxy_cannot_match_is_refused_locally(
         MESSAGES_PATH, json=_replay_turn(f"Reply to {PERSON} about it.", STALE_SIGNATURE)
     )
 
-    # Then: the proxy refuses locally, forwards nothing, and echoes nothing back
-    assert response.status_code == 400
-    assert response.json()["error"] == "thinking_replay_unavailable"
-    assert proxy_upstream.requests == [], "an unresolvable turn must not reach upstream"
-    assert PERSON not in response.text
-    assert STALE_SIGNATURE not in response.text
-    assert "Reply to" not in response.text
+    # Then: the turn survives without the block, and no plaintext rides along
+    assert response.status_code == 200
+    assert proxy_upstream.last_body["messages"][1]["content"] == [
+        {"type": "text", "text": "Working on it."}
+    ]
+    assert PERSON not in proxy_upstream.last_body_text
+    assert STALE_SIGNATURE not in proxy_upstream.last_body_text
 
 
 def test_the_thinking_cache_is_isolated_per_session(
@@ -151,33 +151,38 @@ def test_the_thinking_cache_is_isolated_per_session(
 
     # When: bob replays her signature, then alice replays her own
     for_bob = proxy_client.post(MESSAGES_PATH, json=replay, headers={"X-PII-Session": "bob"})
+    bob_forwarded = proxy_upstream.last_body["messages"][1]["content"]
+    bob_text = proxy_upstream.last_body_text
     for_alice = proxy_client.post(MESSAGES_PATH, json=replay, headers={"X-PII-Session": "alice"})
 
-    # Then: only alice's session can resolve it
-    assert for_bob.status_code == 400
+    # Then: bob's turn loses the block entirely; only alice's session resolves it
+    assert for_bob.status_code == 200
+    assert bob_forwarded == [{"type": "text", "text": "Working on it."}]
+    assert PERSON not in bob_text
     assert for_alice.status_code == 200
     assert proxy_upstream.last_body["messages"][1]["content"][0]["thinking"] == raw
 
 
-def test_a_fresh_session_pool_refuses_a_stale_replay(
+def test_a_fresh_session_pool_drops_a_stale_replay_instead_of_leaking_it(
     proxy_app: FastAPI, proxy_client: TestClient, proxy_upstream: ProxyUpstream
 ) -> None:
     """The cache is in-memory and never persisted, so a restart makes every
-    outstanding thinking block unreplayable — which has to surface as this
-    proxy's own 400 and not as restored PII on the wire."""
+    outstanding body-bearing thinking block unreplayable. Losing the block beats
+    losing the session, but the restored text must not reach the wire either."""
     # Given: a thinking block cached by the pool that served the first turn
     _raw, displayed = _stream_thinking_turn(proxy_client, proxy_upstream)
     proxy_upstream.responder = lambda _r: httpx.Response(200, json={"content": []})
-    forwarded_before = len(proxy_upstream.requests)
 
     # When: the process restarts, i.e. a new pool with an empty cache takes over
     proxy_app.state.proxy_session_pool = None
     response = proxy_client.post(MESSAGES_PATH, json=_replay_turn(displayed, SIGNATURE))
 
-    # Then: the turn is refused rather than forwarded with restored text
-    assert response.status_code == 400
-    assert response.json()["error"] == "thinking_replay_unavailable"
-    assert len(proxy_upstream.requests) == forwarded_before
+    # Then: the conversation continues without the block, carrying no plaintext
+    assert response.status_code == 200
+    assert proxy_upstream.last_body["messages"][1]["content"] == [
+        {"type": "text", "text": "Working on it."}
+    ]
+    assert PERSON not in proxy_upstream.last_body_text
 
 
 def test_a_fresh_session_pool_still_serves_a_replay_whose_thinking_is_empty(

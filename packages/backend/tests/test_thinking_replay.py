@@ -8,17 +8,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from server.pii.pipeline import ReplayedRequest, replay_request
+from server.pii.pipeline import replay_request
 from server.pii.providers_anthropic import restore_anthropic_response
 from server.pii.session_pool import ProxySession
 from server.pii.stream_transformers import AnthropicSseTransformer
 from server.pii.thinking_cache import ThinkingCache
-from server.pii.thinking_replay import (
-    ThinkingReplayed,
-    ThinkingUnresolvable,
-    replay_thinking,
-    thinking_drop_allowed,
-)
+from server.pii.thinking_replay import replay_thinking
 from tests.conftest import EMAIL, ThinkingPair
 from tests.fixtures.anthropic_sse import aggregate, block_stop, signature_delta, thinking_delta
 
@@ -31,9 +26,8 @@ def _assistant_turn(blocks: list[Any]) -> dict[str, Any]:
     return {"role": "assistant", "content": blocks}
 
 
-def _replayed_blocks(replay: object) -> list[Any]:
-    assert isinstance(replay, ThinkingReplayed)
-    content = replay.messages[-1]["content"]
+def _replayed_blocks(messages: list[Any]) -> list[Any]:
+    content = messages[-1]["content"]
     assert isinstance(content, list)
     return content
 
@@ -68,11 +62,10 @@ def test_a_cache_hit_replays_the_exact_signed_bytes_and_leaves_the_signature_alo
     assert blocks[0]["thinking"] == thinking_pair.raw
     assert blocks[0]["signature"] == SIGNATURE
     assert blocks[1] == {"type": "text", "text": "Working on it."}
-    assert isinstance(replay, ThinkingReplayed)
-    assert EMAIL not in json.dumps(replay.messages, ensure_ascii=False)
+    assert EMAIL not in json.dumps(replay, ensure_ascii=False)
 
 
-def test_a_cache_miss_refuses_the_turn_instead_of_dropping_the_block(
+def test_a_cache_miss_drops_the_block_and_keeps_the_turn_alive(
     thinking_pair: ThinkingPair,
 ) -> None:
     # Given: an empty cache and a replayed turn whose thinking carries live PII
@@ -87,18 +80,20 @@ def test_a_cache_miss_refuses_the_turn_instead_of_dropping_the_block(
                         "type": "thinking",
                         "thinking": thinking_pair.restored,
                         "signature": OTHER_SIGNATURE,
-                    }
+                    },
+                    {"type": "text", "text": "Working on it."},
                 ]
             )
         ],
         cache,
     )
 
-    # Then: the whole turn is unresolvable — never forwarded, never trimmed
-    assert isinstance(replay, ThinkingUnresolvable)
+    # Then: the block is gone, the turn survives, and no plaintext travels
+    assert _replayed_blocks(replay) == [{"type": "text", "text": "Working on it."}]
+    assert EMAIL not in json.dumps(replay, ensure_ascii=False)
 
 
-def test_thinking_without_a_usable_signature_is_refused_not_dropped(
+def test_thinking_without_a_usable_signature_is_dropped(
     thinking_pair: ThinkingPair,
 ) -> None:
     # Given: a cache that could resolve a real signature
@@ -107,18 +102,29 @@ def test_thinking_without_a_usable_signature_is_refused_not_dropped(
 
     # When: a block arrives with an empty signature, which nothing can have signed
     replay = replay_thinking(
-        [_assistant_turn([{"type": "thinking", "thinking": thinking_pair.restored, "signature": ""}])],
+        [
+            _assistant_turn(
+                [
+                    {
+                        "type": "thinking",
+                        "thinking": thinking_pair.restored,
+                        "signature": "",
+                    },
+                    {"type": "text", "text": "Working on it."},
+                ]
+            )
+        ],
         cache,
     )
 
-    # Then: unsigned thinking is unreplayable, so the turn is refused whole
-    assert isinstance(replay, ThinkingUnresolvable)
+    # Then: unsigned thinking is unreplayable, so it is removed
+    assert _replayed_blocks(replay) == [{"type": "text", "text": "Working on it."}]
+    assert EMAIL not in json.dumps(replay, ensure_ascii=False)
 
 
-def test_one_unresolvable_block_refuses_the_turn_that_also_holds_a_resolvable_one(
+def test_an_unresolvable_block_does_not_take_a_resolvable_one_with_it(
     thinking_pair: ThinkingPair,
 ) -> None:
-    """All-or-nothing: a turn Anthropic verifies partially is a turn it rejects."""
     # Given: a cache holding only the first of two replayed signatures
     cache = ThinkingCache()
     cache.set(SIGNATURE, thinking_pair.raw)
@@ -144,8 +150,11 @@ def test_one_unresolvable_block_refuses_the_turn_that_also_holds_a_resolvable_on
         cache,
     )
 
-    # Then: the resolvable block does not rescue the turn
-    assert isinstance(replay, ThinkingUnresolvable)
+    # Then: only the unresolvable block is removed
+    blocks = _replayed_blocks(replay)
+    assert len(blocks) == 1
+    assert blocks[0]["thinking"] == thinking_pair.raw
+    assert EMAIL not in json.dumps(replay, ensure_ascii=False)
 
 
 def test_redacted_thinking_and_user_turns_survive_unchanged(
@@ -175,8 +184,7 @@ def test_redacted_thinking_and_user_turns_survive_unchanged(
     )
 
     # Then: only the assistant's signed block was rewritten
-    assert isinstance(replay, ThinkingReplayed)
-    assert replay.messages[0] == user_turn
+    assert replay[0] == user_turn
     blocks = _replayed_blocks(replay)
     assert blocks[1] == REDACTED
     assert cache.size() == 1
@@ -196,8 +204,7 @@ def test_without_a_cache_the_thinking_block_is_left_exactly_as_it_arrived(
     replay = replay_thinking(messages, None)
 
     # Then: passthrough is preserved for callers that never restore
-    assert isinstance(replay, ThinkingReplayed)
-    assert replay.messages == messages
+    assert replay == messages
 
 
 def test_non_anthropic_bodies_are_forwarded_untouched(thinking_pair: ThinkingPair) -> None:
@@ -211,8 +218,7 @@ def test_non_anthropic_bodies_are_forwarded_untouched(thinking_pair: ThinkingPai
     replay = replay_request("responses", body, session)
 
     # Then: the body is the same object's content, unmodified
-    assert isinstance(replay, ReplayedRequest)
-    assert replay.body == body
+    assert replay == body
 
 
 # --------------------------------------------------------------------------
@@ -241,81 +247,6 @@ def test_an_empty_thinking_block_survives_a_cache_it_was_never_stored_in() -> No
     blocks = _replayed_blocks(replay)
     assert blocks[0] == {"type": "thinking", "thinking": "", "signature": OTHER_SIGNATURE}
     assert blocks[1] == {"type": "text", "text": "Working on it."}
-
-
-# --------------------------------------------------------------------------
-# dropping an unresolvable block where upstream allows it
-# --------------------------------------------------------------------------
-
-
-def test_dropping_is_offered_only_for_adaptive_thinking() -> None:
-    # Given / When / Then: manual mode keeps the final-turn thinking requirement
-    assert thinking_drop_allowed({"thinking": {"type": "adaptive"}}) is True
-    assert thinking_drop_allowed({"thinking": {"type": "enabled"}}) is False
-    assert thinking_drop_allowed({"thinking": "adaptive"}) is False
-    assert thinking_drop_allowed({}) is False
-    assert thinking_drop_allowed(None) is False
-
-
-def test_allow_drop_removes_the_unresolvable_block_and_keeps_the_turn_alive(
-    thinking_pair: ThinkingPair,
-) -> None:
-    # Given: a cache holding the first of two replayed signatures
-    cache = ThinkingCache()
-    cache.set(SIGNATURE, thinking_pair.raw)
-    messages = [
-        _assistant_turn(
-            [
-                {"type": "thinking", "thinking": thinking_pair.restored, "signature": SIGNATURE},
-                {
-                    "type": "thinking",
-                    "thinking": thinking_pair.restored,
-                    "signature": OTHER_SIGNATURE,
-                },
-                {"type": "text", "text": "Working on it."},
-            ]
-        )
-    ]
-
-    # When: the turn is resolved with dropping permitted
-    replay = replay_thinking(messages, cache, allow_drop=True)
-
-    # Then: the resolvable block and the text survive, the unresolvable one is gone
-    blocks = _replayed_blocks(replay)
-    assert [b["type"] for b in blocks] == ["thinking", "text"]
-    assert blocks[0]["thinking"] == thinking_pair.raw
-    assert blocks[1] == {"type": "text", "text": "Working on it."}
-
-
-def test_allow_drop_still_never_puts_restored_plaintext_on_the_wire(
-    thinking_pair: ThinkingPair,
-) -> None:
-    """Dropping replaces refusal, not the leak guard: the block goes, the PII
-    does not travel."""
-    # Given: an empty cache and a block carrying live PII
-    cache = ThinkingCache()
-
-    # When: the turn is resolved with dropping permitted
-    replay = replay_thinking(
-        [
-            _assistant_turn(
-                [
-                    {
-                        "type": "thinking",
-                        "thinking": thinking_pair.restored,
-                        "signature": OTHER_SIGNATURE,
-                    }
-                ]
-            )
-        ],
-        cache,
-        allow_drop=True,
-    )
-
-    # Then: the turn survives with no thinking block and no plaintext
-    assert isinstance(replay, ThinkingReplayed)
-    assert _replayed_blocks(replay) == []
-    assert EMAIL not in json.dumps(replay.messages, ensure_ascii=False)
 
 
 # --------------------------------------------------------------------------

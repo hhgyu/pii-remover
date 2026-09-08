@@ -41,7 +41,6 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
       },
       remover
     );
-    expect(out.rejection).toBeUndefined();
     const masked = userMessage(out.body.messages).content as string;
     expect(masked).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);
   });
@@ -84,7 +83,6 @@ describe("transformOpenAIRequest — non-streaming masking", () => {
       },
       remover
     );
-    expect(out.rejection).toBeUndefined();
     expect(out.body.stream).toBe(true);
     const masked = userMessage(out.body.messages).content as string;
     expect(masked).toMatch(/{{OPF:EMAIL:[a-z0-9]{16}}}/);

@@ -4,11 +4,7 @@ import {
   appendPlaceholderNote,
 } from "@pii-remover/core";
 import type { ThinkingCache } from "../stream/thinking-cache.js";
-import {
-  replayThinking,
-  restoreThinkingBlock,
-  THINKING_REPLAY_REJECTION,
-} from "./thinking-replay.js";
+import { replayThinking, restoreThinkingBlock } from "./thinking-replay.js";
 import type {
   AnthropicContentBlock,
   AnthropicMessage,
@@ -34,10 +30,7 @@ export interface AnthropicTransformOptions {
 }
 
 export interface AnthropicTransformResult {
-  /** Masked request to forward. Meaningless when `rejection` is set — the
-   *  caller answers with the rejection and forwards nothing. */
   body: AnthropicRequestBody;
-  rejection?: { status: number; body: { error: string; message: string } };
 }
 
 export async function transformAnthropicRequest(
@@ -45,14 +38,8 @@ export async function transformAnthropicRequest(
   remover: PIIRemover,
   opts: AnthropicTransformOptions = {}
 ): Promise<AnthropicTransformResult> {
-  const replay = replayThinking(raw.messages, opts.thinkingCache);
-  // Refused here rather than sent on: a turn missing one of its thinking blocks
-  // draws an opaque 400 from upstream, and the restored text the client replayed
-  // is the user's plaintext PII.
-  if (replay.kind === "unresolvable") {
-    return { body: raw, rejection: THINKING_REPLAY_REJECTION };
-  }
-  const messages = await maskMessages(replay.messages, remover, opts);
+  const replayed = replayThinking(raw.messages, opts.thinkingCache);
+  const messages = await maskMessages(replayed, remover, opts);
   const system = await maskSystem(raw.system, remover, opts);
   const out: AnthropicRequestBody = { ...raw, messages };
   out.system = withPlaceholderNote(system);
