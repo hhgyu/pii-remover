@@ -260,8 +260,9 @@ when the container is up but the model has been idle-unloaded, the
 client calls `/warmup` with a generous timeout so the user's first
 `/redact` hits a warm model.
 
-Idempotent — already-loaded runners return immediately. `/warmup` does
-not count as `/redact` activity (the idle timer is not bumped).
+Idempotent — already-loaded runners return immediately. `/warmup` **does**
+bump the idle timer (unlike `/health`), so the model it just loaded survives
+a full idle window instead of being unloaded on the monitor's next tick.
 
 Response (success):
 ```json

@@ -363,6 +363,10 @@ class OpfRunner:
         Used by the idle-timeout monitor to free OPF weights when the
         backend has been inactive. ``detect()`` will lazy-reload on the
         next request via ``load()``. Idempotent and thread-safe.
+
+        Safe to call while an inference is in flight: ``_detect_raw`` holds
+        its own references to the session and tokenizer, so the running call
+        completes against the old session and only later calls reload.
         """
 
         if self._session is None:
@@ -418,19 +422,30 @@ class OpfRunner:
     def _detect_raw(self, text: str) -> list[RawSpan]:
         if not text:
             return []
-        if self._session is None:
+        # Snapshot the loaded state under the lock, then run inference off the
+        # locals only. The idle-unload monitor ticks on the event loop while
+        # this call holds a worker thread, so re-reading ``self._session``
+        # mid-inference can observe the ``None`` that a concurrent ``unload()``
+        # just wrote and blow up with AttributeError/AssertionError (a 500 on a
+        # live request). These locals keep the ONNX session alive until the call
+        # finishes; the next call lazy-reloads.
+        with self._load_lock:
             self.load()
-        assert self._session is not None
-        assert self._tokenizer is not None
-        assert self._id2label is not None
-        assert self._viterbi_biases is not None
+            session = self._session
+            tokenizer = self._tokenizer
+            id2label = self._id2label
+            viterbi_biases = self._viterbi_biases
+        assert session is not None
+        assert tokenizer is not None
+        assert id2label is not None
+        assert viterbi_biases is not None
 
         import os
         from time import perf_counter
         profile = os.environ.get("OPF_PROFILE", "0") == "1"
 
         t0 = perf_counter() if profile else 0.0
-        encoded = self._tokenizer(
+        encoded = tokenizer(
             text,
             return_tensors="np",
             truncation=True,
@@ -440,12 +455,12 @@ class OpfRunner:
         inputs = dict(encoded)
         offsets = np.asarray(inputs.pop("offset_mapping"))[0]
         t1 = perf_counter() if profile else 0.0
-        outputs = self._session.run(None, self._session_inputs(inputs))
+        outputs = session.run(None, self._session_inputs(session, inputs))
         t2 = perf_counter() if profile else 0.0
         logits = np.asarray(outputs[0])[0]
-        pred_ids = _viterbi_decode(logits, self._id2label, self._viterbi_biases)
+        pred_ids = _viterbi_decode(logits, id2label, viterbi_biases)
         pred_scores = _softmax(logits)
-        spans = _decode_bioes(pred_ids, pred_scores, offsets, text, self._id2label)
+        spans = _decode_bioes(pred_ids, pred_scores, offsets, text, id2label)
         # Filtering here rather than at the API layer keeps `redacted_text` and
         # `detections` built from the same list; moving it out desyncs them.
         spans = [s for s in spans if should_keep_span(s.label, text[s.start : s.end])]
@@ -459,7 +474,7 @@ class OpfRunner:
                 (t3 - t2) * 1000.0,
                 (t3 - t0) * 1000.0,
                 len(text),
-                self._session.get_providers() if self._session else "N/A",
+                session.get_providers(),
             )
         return spans
 
@@ -545,9 +560,9 @@ class OpfRunner:
                 out[name] = 0.0
         return out
 
-    def _session_inputs(self, inputs: dict[str, Any]) -> dict[str, np.ndarray]:
-        assert self._session is not None
-        available = {i.name for i in self._session.get_inputs()}
+    @staticmethod
+    def _session_inputs(session: Any, inputs: dict[str, Any]) -> dict[str, np.ndarray]:
+        available = {i.name for i in session.get_inputs()}
         out: dict[str, np.ndarray] = {}
         for name in ("input_ids", "attention_mask", "token_type_ids"):
             if name in available and name in inputs:

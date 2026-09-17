@@ -15,10 +15,10 @@ Idempotent — already-loaded runners return immediately. Thread/coroutine
 safe: model loads run on a worker thread via :func:`asyncio.to_thread`
 and the runner's internal load lock serialises concurrent callers.
 
-By design, ``/warmup`` does **not** count as ``/redact`` activity (just
-like ``/health``). The middleware that bumps ``last_request_at`` keys on
-``path.startswith("/redact")``; ``/warmup`` is excluded by virtue of its
-path. The next genuine ``/redact`` will reset the idle clock as usual.
+``/warmup`` **does** reset the idle clock (``_ACTIVITY_PATH_PREFIXES`` in
+``server.main``), unlike ``/health``. It used to be excluded, which made it
+self-defeating: the monitor would see a loaded model against an untouched
+clock and unload, on its next tick, precisely what warmup had just loaded.
 """
 
 from __future__ import annotations

@@ -18,6 +18,7 @@ import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Final
 
 from fastapi import FastAPI, Request, Response
 
@@ -32,6 +33,16 @@ from .korean_ner_runner import KoreanNerRunner
 from .opf_runner import OpfRunner
 
 log = logging.getLogger(__name__)
+
+# ``/health`` is absent on purpose: Docker's HEALTHCHECK polls it, so counting
+# those probes would keep the model resident forever. ``/warmup`` is present on
+# purpose: omitting it let the monitor unload, on the very next tick, exactly
+# what warmup had just paid to load.
+_ACTIVITY_PATH_PREFIXES: Final = (
+    "/redact",
+    "/warmup",
+    *proxy_api.PROXY_PATH_PREFIXES,
+)
 
 
 async def _idle_unload_monitor(app: FastAPI) -> None:
@@ -147,22 +158,37 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.image_masker = None
 
 
+def _mark_activity(app: FastAPI) -> None:
+    """Reset the idle clock and clear the idle-unloaded flag."""
+
+    app.state.last_request_at = time.monotonic()
+    if getattr(app.state, "idle_unloaded", False):
+        app.state.idle_unloaded = False
+
+
 async def _track_redact_activity(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """Middleware: stamp ``last_request_at`` for ``/redact*`` endpoints.
+    """Middleware: stamp ``last_request_at`` for the paths that use the model.
 
-    /health probes do NOT count as activity — otherwise Docker healthchecks
-    would keep the model loaded forever.
+    Stamped on the way **in** as well as out, and in a ``finally`` so a
+    failed request still counts. Stamping only after ``call_next`` left the
+    clock reading its pre-request value for the entire duration of the
+    request: inference holds a worker thread while the event loop stays free
+    to tick :func:`_idle_unload_monitor`, so the monitor could unload the
+    ONNX session out from under an in-flight request and answer 500. An
+    exception in ``call_next`` then skipped the outbound stamp entirely,
+    freezing the clock so every retry hit the same race.
     """
 
-    response = await call_next(request)
-    path = request.url.path
-    if path.startswith("/redact") or path.startswith(proxy_api.PROXY_PATH_PREFIXES):
-        request.app.state.last_request_at = time.monotonic()
-        if getattr(request.app.state, "idle_unloaded", False):
-            request.app.state.idle_unloaded = False
-    return response
+    tracked = request.url.path.startswith(_ACTIVITY_PATH_PREFIXES)
+    if tracked:
+        _mark_activity(request.app)
+    try:
+        return await call_next(request)
+    finally:
+        if tracked:
+            _mark_activity(request.app)
 
 
 def create_app() -> FastAPI:

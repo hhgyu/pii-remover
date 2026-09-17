@@ -268,7 +268,8 @@ class KoreanNerRunner:
         """Release ONNX session + tokenizer references (idle-timeout hook).
 
         ``detect()`` lazy-reloads on the next request via ``load()``.
-        Idempotent and thread-safe.
+        Idempotent and thread-safe, including while a ``detect()`` call is in
+        flight — that call holds its own session reference and completes.
         """
 
         if self._session is None:
@@ -295,18 +296,25 @@ class KoreanNerRunner:
 
         if not text or not text.strip():
             return []
-        if self._session is None:
-            try:
+        # Snapshot under the lock for the same reason as
+        # ``OpfRunner._detect_raw``: the idle-unload monitor ticks on the event
+        # loop while this call holds a worker thread, so re-reading
+        # ``self._session`` mid-inference can observe a concurrent unload.
+        try:
+            with self._load_lock:
                 self.load()
-            except Exception:
-                log.exception(
-                    "Korean NER lazy-load failed; returning empty detections "
-                    "(this call is dropped, future calls will retry)"
-                )
-                return []
-        assert self._session is not None
-        assert self._tokenizer is not None
-        assert self._id2label is not None
+                session = self._session
+                tokenizer = self._tokenizer
+                id2label = self._id2label
+        except Exception:
+            log.exception(
+                "Korean NER lazy-load failed; returning empty detections "
+                "(this call is dropped, future calls will retry)"
+            )
+            return []
+        assert session is not None
+        assert tokenizer is not None
+        assert id2label is not None
 
         import os
         from time import perf_counter
@@ -319,7 +327,7 @@ class KoreanNerRunner:
         )
 
         t0 = perf_counter() if profile else 0.0
-        encoded = self._tokenizer(
+        encoded = tokenizer(
             text,
             return_tensors="np",
             truncation=True,
@@ -329,7 +337,7 @@ class KoreanNerRunner:
         inputs = dict(encoded)
         offsets = np.asarray(inputs.pop("offset_mapping"))[0]
         t1 = perf_counter() if profile else 0.0
-        outputs = self._session.run(None, self._session_inputs(inputs))
+        outputs = session.run(None, self._session_inputs(session, inputs))
         t2 = perf_counter() if profile else 0.0
         logits = np.asarray(outputs[0])[0]
         pred_ids = logits.argmax(axis=-1)
@@ -338,7 +346,7 @@ class KoreanNerRunner:
             s
             for s in _filter_min_confidence(
                 _filter_short_person_spans(
-                    _decode_bio(pred_ids, pred_scores, offsets, text, self._id2label),
+                    _decode_bio(pred_ids, pred_scores, offsets, text, id2label),
                 ),
                 threshold,
             )
@@ -354,7 +362,7 @@ class KoreanNerRunner:
                 (t3 - t2) * 1000.0,
                 (t3 - t0) * 1000.0,
                 len(text),
-                self._session.get_providers() if self._session else "N/A",
+                session.get_providers(),
             )
         return spans
 
@@ -429,9 +437,9 @@ class KoreanNerRunner:
             raise ValueError(f"id2label missing in {config_path}")
         return {int(k): str(v) for k, v in raw.items()}
 
-    def _session_inputs(self, inputs: dict[str, Any]) -> dict[str, np.ndarray]:
-        assert self._session is not None
-        available = {i.name for i in self._session.get_inputs()}
+    @staticmethod
+    def _session_inputs(session: Any, inputs: dict[str, Any]) -> dict[str, np.ndarray]:
+        available = {i.name for i in session.get_inputs()}
         out: dict[str, np.ndarray] = {}
         for name in ("input_ids", "attention_mask", "token_type_ids"):
             if name not in available:

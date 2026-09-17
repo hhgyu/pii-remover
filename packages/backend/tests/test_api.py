@@ -16,7 +16,10 @@ import re
 import time
 from collections.abc import Iterable
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
+import numpy as np
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -25,6 +28,7 @@ from server import __version__
 from server.api import health as health_api
 from server.api import redact as redact_api
 from server.api import warmup as warmup_api
+from server.korean_ner_runner import KoreanNerRunner
 from server.main import _idle_unload_monitor, _track_redact_activity
 from server.opf_runner import OpfRunner, _mask_text
 from server.schemas import Detection, RedactResponse
@@ -369,6 +373,44 @@ def test_health_probe_does_NOT_count_as_activity() -> None:
         assert app.state.last_request_at is None
 
 
+def test_activity_middleware_stamps_before_the_handler_runs() -> None:
+    app = FastAPI()
+    app.middleware("http")(_track_redact_activity)
+    seen_during_request: list[float | None] = []
+
+    @app.post("/redact/probe")
+    async def probe() -> dict[str, bool]:
+        seen_during_request.append(app.state.last_request_at)
+        return {"ok": True}
+
+    app.state.last_request_at = None
+    app.state.idle_unloaded = True
+
+    with TestClient(app) as c:
+        assert c.post("/redact/probe").status_code == 200
+
+    assert seen_during_request == [pytest.approx(app.state.last_request_at)]
+    assert app.state.last_request_at is not None
+
+
+def test_activity_middleware_stamps_even_when_the_request_fails() -> None:
+    app = FastAPI()
+    app.middleware("http")(_track_redact_activity)
+
+    @app.post("/redact/boom")
+    async def boom() -> None:
+        raise RuntimeError("simulated handler failure")
+
+    app.state.last_request_at = None
+    app.state.idle_unloaded = True
+
+    with TestClient(app, raise_server_exceptions=False) as c:
+        assert c.post("/redact/boom").status_code == 500
+
+    assert app.state.last_request_at is not None
+    assert app.state.idle_unloaded is False
+
+
 def test_idle_monitor_disabled_when_timeout_zero(monkeypatch) -> None:
     from server import config
 
@@ -441,6 +483,81 @@ def test_idle_monitor_does_NOT_unload_when_recently_active(monkeypatch) -> None:
         asyncio.run(runner())
     finally:
         config.get_settings.cache_clear()
+
+
+class _CountingSession:
+    """ONNX session stand-in: all-``O`` logits, counts ``run()`` calls."""
+
+    def __init__(self, token_count: int) -> None:
+        self._token_count = token_count
+        self.run_calls = 0
+
+    def get_inputs(self) -> list[SimpleNamespace]:
+        return [
+            SimpleNamespace(name="input_ids"),
+            SimpleNamespace(name="attention_mask"),
+        ]
+
+    def get_providers(self) -> list[str]:
+        return ["CPUExecutionProvider"]
+
+    def run(self, _output_names: Any, _inputs: Any) -> list[np.ndarray]:
+        self.run_calls += 1
+        return [np.zeros((1, self._token_count, 1), dtype=np.float32)]
+
+
+def test_opf_unload_mid_inference_does_not_break_the_in_flight_call() -> None:
+    token_count = 3
+    runner = OpfRunner()
+    session = _CountingSession(token_count)
+    runner._session = session
+    runner._id2label = {0: "O"}
+    runner._viterbi_biases = OpfRunner._load_viterbi_biases(
+        Path("no-such-viterbi-calibration.json")
+    )
+    runner._loaded_variant = "int8"
+
+    def tokenizer_that_races_the_idle_monitor(
+        _text: str, **_kwargs: Any
+    ) -> dict[str, Any]:
+        runner.unload()
+        return {
+            "input_ids": np.zeros((1, token_count), dtype=np.int64),
+            "attention_mask": np.ones((1, token_count), dtype=np.int64),
+            "offset_mapping": np.zeros((1, token_count, 2), dtype=np.int64),
+        }
+
+    runner._tokenizer = tokenizer_that_races_the_idle_monitor
+
+    result = runner.redact("alice@example.com")
+
+    assert result.detections == []
+    assert session.run_calls == 1
+    assert runner.is_loaded is False
+
+
+def test_korean_ner_unload_mid_inference_does_not_break_the_in_flight_call() -> None:
+    token_count = 3
+    runner = KoreanNerRunner()
+    session = _CountingSession(token_count)
+    runner._session = session
+    runner._id2label = {0: "O"}
+
+    def tokenizer_that_races_the_idle_monitor(
+        _text: str, **_kwargs: Any
+    ) -> dict[str, Any]:
+        runner.unload()
+        return {
+            "input_ids": np.zeros((1, token_count), dtype=np.int64),
+            "attention_mask": np.ones((1, token_count), dtype=np.int64),
+            "offset_mapping": np.zeros((1, token_count, 2), dtype=np.int64),
+        }
+
+    runner._tokenizer = tokenizer_that_races_the_idle_monitor
+
+    assert runner.detect("김철수에게 전화") == []
+    assert session.run_calls == 1
+    assert runner.is_loaded is False
 
 
 class _FakeKorenNerRunnerStub:
@@ -561,16 +678,19 @@ def test_warmup_kner_failure_surfaces_as_warning_not_503() -> None:
         assert body["warnings"][0].startswith("korean_ner_load_failed:")
 
 
-def test_warmup_does_NOT_count_as_redact_activity() -> None:
+def test_warmup_counts_as_activity_so_the_monitor_keeps_what_it_loaded() -> None:
     app = FastAPI()
     app.middleware("http")(_track_redact_activity)
     app.include_router(warmup_api.router)
-    app.state.opf_runner = UnloadableFakeOpfRunner()
+    runner = UnloadableFakeOpfRunner()
+    runner.unload()
+    app.state.opf_runner = runner
     app.state.korean_ner_runner = None
-    app.state.last_request_at = None
+    app.state.last_request_at = time.monotonic() - 9999
     app.state.idle_unloaded = True
 
     with TestClient(app) as c:
-        c.post("/warmup")
-        assert app.state.last_request_at is None
-        assert app.state.idle_unloaded is True
+        before = time.monotonic()
+        assert c.post("/warmup").status_code == 200
+        assert app.state.last_request_at >= before
+        assert app.state.idle_unloaded is False
