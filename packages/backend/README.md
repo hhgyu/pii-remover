@@ -67,6 +67,42 @@ curl -s -X POST http://localhost:8000/redact/batch \
   -d '{"texts":["foo@bar.com","just plain text"]}'
 ```
 
+## Windows native (CPU, no Docker)
+
+Install Python 3.11 with the Windows `py` launcher, then run from the repo root:
+
+```powershell
+npm run backend:up:windows -- --host 127.0.0.1 --port 8000
+```
+
+The TypeScript launcher uses Bun (the repo's existing runtime). It creates
+`packages/backend/.venv`, installs CPU dependencies, and
+starts detection and the LLM proxy at `http://127.0.0.1:8000`. No virtualenv
+activation is needed. First setup installs the ONNX exporter dependencies,
+exports the Korean NER model to INT8 ONNX under `packages/backend/.cache`,
+and downloads OPF weights. Both models must load successfully before the server
+starts. Subsequent runs reuse the exported weights. `KNER_ONNX_PATH` can point
+to an already exported Korean model instead. After setup,
+use `--skip-install` to skip dependency installation; `--port 8001` selects another
+port and `--python-version 3.12` selects the Python version when creating the venv.
+Stop with Ctrl+C.
+
+Token keys are resolved from `PII_REMOVER_TOKEN_KEY`, then the host's
+`~/.config/pii-remover/key`. If neither exists, the script adopts the existing
+`packages/backend/.env` token key or generates a random 32-byte secret, saving
+it to the host key file for reuse by the TypeScript hooks. Key values are never
+printed. An explicit environment key must also be set for any separately
+launched host hook.
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+Check `model_loaded: true`; an HTTP response alone does not confirm model loading.
+The provider paths are the same as Docker (see below). This script uses CPU;
+native GPU dependencies are not installed. Image OCR additionally requires a
+local Tesseract installation.
+
 ## GPU variant
 
 ```bash

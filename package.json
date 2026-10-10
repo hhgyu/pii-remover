@@ -19,6 +19,7 @@
     "backend:env": "bun scripts/ensure-backend-env.ts",
     "backend:up": "bun scripts/ensure-backend-env.ts && docker compose --env-file packages/backend/.env -f packages/backend/docker-compose.yml up -d",
     "backend:up:gpu": "bun scripts/ensure-backend-env.ts && docker compose --env-file packages/backend/.env -f packages/backend/docker-compose.gpu.yml up -d",
+    "backend:up:windows": "bun scripts/start-backend-windows.ts",
     "backend:down": "docker compose -f packages/backend/docker-compose.yml down",
     "gen-vectors": "bun scripts/gen-token-vectors.ts && bun scripts/gen-restore-vectors.ts && bun scripts/gen-stream-vectors.ts && bun scripts/gen-sse-vectors.ts && bun scripts/gen-provider-vectors.ts && bun scripts/gen-router-vectors.ts",
     "sync-versions": "node scripts/sync-versions.mjs",
