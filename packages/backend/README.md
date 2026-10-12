@@ -87,6 +87,48 @@ use `--skip-install` to skip dependency installation; `--port 8001` selects anot
 port and `--python-version 3.12` selects the Python version when creating the venv.
 Stop with Ctrl+C.
 
+### Windows login auto-start
+
+Register automatic startup for the current Windows user:
+
+```powershell
+npm run backend:up:windows -- --host 127.0.0.1 --port 8000 --auto-start
+```
+
+This command installs dependencies, prepares and verifies both models, registers
+a Startup folder entry, and starts the server immediately in the background.
+The command checks `/health` until the server is ready, then returns; the terminal
+can be closed. An already healthy server is reused.
+At the next login, the server starts in a hidden window using `--skip-install`.
+Repeating registration updates the existing entry with the new host and port.
+Bun, Python, and the repository must remain at their registered locations.
+Logs go to `packages/backend/.cache/windows-startup.log` (replaced each login).
+Server diagnostics and errors go to `windows-startup.log.error.log` in the same directory.
+To register auto-start but run in the current terminal for debugging:
+
+```powershell
+npm run backend:up:windows -- --host 127.0.0.1 --port 8000 --auto-start --foreground
+```
+
+Without `--auto-start`, execution stays in the foreground as before. Ctrl+C stops
+a foreground server. `--remove-auto-start` unregisters future login startup and
+does not stop a background server that is already running.
+The token key is reused from the persistent host key file. A shell-only key is
+saved there when no host key exists; a conflicting key prevents registration.
+Model environment overrides needed at login must be configured as persistent
+Windows user environment variables.
+
+Remove automatic startup:
+
+```powershell
+npm run backend:up:windows -- --remove-auto-start
+```
+
+Removal skips installation and model loading, and is safe to repeat. It removes
+only this project's login entry; an already running server continues running.
+The registration is for the current user and does not require administrator
+rights. Keep the checkout available for the registered script to run.
+
 Token keys are resolved from `PII_REMOVER_TOKEN_KEY`, then the host's
 `~/.config/pii-remover/key`. If neither exists, the script adopts the existing
 `packages/backend/.env` token key or generates a random 32-byte secret, saving
